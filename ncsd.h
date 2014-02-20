@@ -14,6 +14,7 @@ typedef enum
 
 typedef enum
 {
+	FW6x_BackupWriteWaitTime = 0,
 	FW6x_SaveCryptoFlag = 1,
 	CardDeviceFlag = 3,
 	MediaPlatformIndex = 4,

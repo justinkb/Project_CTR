@@ -15,8 +15,8 @@ int get_CCISettings(cci_settings *cciset, user_settings *usrset);
 void free_CCISettings(cci_settings *set);
 
 /* CCI Data Gen/Write */
-int GenNCSDHeader(cci_settings *cciset, user_settings *usrset);
-int GenCardInfoHeader(cci_settings *cciset, user_settings *usrset);
+int BuildNCSDHeader(cci_settings *cciset, user_settings *usrset);
+int BuildCardInfoHeader(cci_settings *cciset, user_settings *usrset);
 int WriteCCI_HDR_ToFile(cci_settings *cciset);
 int WriteCCI_Content_ToFile(cci_settings *cciset,user_settings *usrset);
 int WriteCCI_DummyBytes(cci_settings *cciset);
@@ -27,11 +27,9 @@ int GetDataFromContent0(cci_settings *cciset, user_settings *usrset);
 int GetContentFP(cci_settings *cciset, user_settings *usrset);
 
 /* Get Data from YAML Settings */
+int GetNCSDFlags(cci_settings *cciset, rsf_settings *yaml);
 int GetMediaSize(cci_settings *cciset, user_settings *usrset);
 u64 GetUnusedSize(u64 MediaSize, u8 CardType);
-int GetMediaType(cci_settings *cciset, user_settings *usrset);
-int GetPlatform(cci_settings *cciset, user_settings *usrset);
-int GetCardDevice(cci_settings *cciset, user_settings *usrset);
 int GetWriteableAddress(cci_settings *cciset, user_settings *usrset);
 int GetCardInfoBitmask(cci_settings *cciset, user_settings *usrset);
 
@@ -62,9 +60,9 @@ int build_CCI(user_settings *usrset)
 	}
 	
 	// Generate NCSD Header and Additional Header
-	result = GenNCSDHeader(cciset,usrset);
+	result = BuildNCSDHeader(cciset,usrset);
 	if(result) goto finish;
-	GenCardInfoHeader(cciset,usrset);
+	BuildCardInfoHeader(cciset,usrset);
 	
 	// Write to File
 	WriteCCI_HDR_ToFile(cciset);
@@ -103,27 +101,23 @@ int get_CCISettings(cci_settings *cciset, user_settings *usrset)
 	ctx.keys = &usrset->keys;
 	int result = 0;
 
-	/* Importing Data from Content0 */
+	/* Importing Data from Content */
 	result = CheckContent0(cciset,usrset);
 	if(result) return result;
 
 	result = GetDataFromContent0(cciset,usrset);
 	if(result) return result;
 
-	result = GetMediaSize(cciset,usrset);
+	result = GetContentFP(cciset,usrset);
 	if(result) return result;
+
+	
 
 	/* Getting Data from YAML */
-	result = GetMediaType(cciset,usrset);
+	result = GetNCSDFlags(cciset,&usrset->yaml_set);
 	if(result) return result;
 
-	result = GetPlatform(cciset,usrset);
-	if(result) return result;
-
-	result = GetCardDevice(cciset,usrset);
-	if(result) return result;
-
-	result = GetContentFP(cciset,usrset);
+	result = GetMediaSize(cciset,usrset);
 	if(result) return result;
 
 	result = CheckMediaSize(cciset);
@@ -151,7 +145,7 @@ void free_CCISettings(cci_settings *set)
 	free(set);
 }
 
-int GenNCSDHeader(cci_settings *cciset, user_settings *usrset)
+int BuildNCSDHeader(cci_settings *cciset, user_settings *usrset)
 {
 	memcpy((u8*)ctx.commonHDR.magic,"NCSD",4);
 	u32_to_u8((u8*)ctx.commonHDR.media_size,(cciset->MediaSize/cciset->MediaUnitSize),LE); 
@@ -169,14 +163,15 @@ int GenNCSDHeader(cci_settings *cciset, user_settings *usrset)
 	return 0;
 }
 
-int GenCardInfoHeader(cci_settings *cciset, user_settings *usrset)
+int BuildCardInfoHeader(cci_settings *cciset, user_settings *usrset)
 {
 	u32_to_u8((u8*)ctx.CardInfoHDR.writable_address,(cciset->WritableAddress/cciset->MediaUnitSize),LE); 
 	u32_to_u8((u8*)ctx.CardInfoHDR.card_info_bitmask,cciset->CardInfoBitmask,BE);
 	u32_to_u8((u8*)ctx.CardInfoHDR.media_size_used,cciset->TotalContentSize,LE); 
 	memcpy((u8*)ctx.CardInfoHDR.ncch_0_title_id,cciset->ContentTitleID[0],8);
 	memcpy((u8*)ctx.CardInfoHDR.initial_data,cciset->InitialData,0x30);
-	if(!(usrset->OmitImportedNcchHdr && !usrset->IsBuildingNCCH0)) memcpy((u8*)ctx.CardInfoHDR.ncch_0_header,cciset->NCCH_HDR,0x100);
+	if(!(usrset->OmitImportedNcchHdr && !usrset->IsBuildingNCCH0)) 
+		memcpy((u8*)ctx.CardInfoHDR.ncch_0_header,cciset->NCCH_HDR,0x100);
 	memcpy((u8*)ctx.DevCardInfoHDR.TitleKey,cciset->TitleKey,0x10);
 	return 0;
 }
@@ -304,6 +299,12 @@ int GetDataFromContent0(cci_settings *cciset, user_settings *usrset)
 	
 	cciset->NCCH_HDR = hdr;
 	
+	u16 ncch_format_ver = u8_to_u16(hdr->version,LE);
+	if(ncch_format_ver != 0 && ncch_format_ver != 2){
+		fprintf(stderr,"[CCI ERROR] NCCH type %d Not Supported\n",ncch_format_ver);
+		return FAILED_TO_IMPORT_FILE;
+	}
+
 	//memdump(stdout,"ncch0 head: ",(cciset->ncch0+0x100),0x100);
 	//memdump(stdout,"ncch0 head: ",(u8*)(hdr),0x100);
 	
@@ -334,7 +335,7 @@ int GetDataFromContent0(cci_settings *cciset, user_settings *usrset)
 
 int GetMediaSize(cci_settings *cciset, user_settings *usrset)
 {
-	char *MediaSizeStr = usrset->yaml_set.DefaultSpec.BasicInfo.MediaSize;
+	char *MediaSizeStr = usrset->yaml_set.BasicInfo.MediaSize;
 	if(!MediaSizeStr) cciset->MediaSize = (u64)GB*2;
 	else{
 		if(strcasecmp(MediaSizeStr,"128MB") == 0) cciset->MediaSize = (u64)MB*128;
@@ -352,7 +353,7 @@ int GetMediaSize(cci_settings *cciset, user_settings *usrset)
 		}
 	}
 	
-	if(usrset->yaml_set.DefaultSpec.BasicInfo.MediaFootPadding != -1) cciset->MediaFootPadding = usrset->yaml_set.DefaultSpec.BasicInfo.MediaFootPadding;
+	if(usrset->yaml_set.BasicInfo.MediaFootPadding != -1) cciset->MediaFootPadding = usrset->yaml_set.BasicInfo.MediaFootPadding;
 	
 	return 0;
 }
@@ -384,51 +385,57 @@ u64 GetUnusedSize(u64 MediaSize, u8 CardType)
 	return 0;
 }
 
-int GetMediaType(cci_settings *cciset, user_settings *usrset)
+int GetNCSDFlags(cci_settings *cciset, rsf_settings *yaml)
 {
-	char *MediaTypeStr = usrset->yaml_set.DefaultSpec.CardInfo.MediaType;
-	if(!MediaTypeStr) cciset->NCSD_Flags[MediaTypeIndex] = CARD1;
+	/* BackupWriteWaitTime */
+	cciset->NCSD_Flags[FW6x_BackupWriteWaitTime] = 0;
+	if(yaml->CardInfo.BackupWriteWaitTime){
+		u32 WaitTime = strtoul(yaml->CardInfo.BackupWriteWaitTime,NULL,0);
+		if(WaitTime > 255){
+			fprintf(stderr,"[CCI ERROR] Invalid Card BackupWriteWaitTime (%d) : must 0-255\n",WaitTime);
+			return EXHDR_BAD_YAML_OPT;
+		}
+		cciset->NCSD_Flags[FW6x_BackupWriteWaitTime] = (u8)WaitTime;
+	}
+
+	/* FW6x SaveCrypto */
+	cciset->NCSD_Flags[FW6x_SaveCryptoFlag] = 1;
+
+	/* MediaType */
+	if(!yaml->CardInfo.MediaType) cciset->NCSD_Flags[MediaTypeIndex] = CARD1;
 	else{
-		if(strcasecmp(MediaTypeStr,"Card1") == 0) cciset->NCSD_Flags[MediaTypeIndex] = CARD1;
-		else if(strcasecmp(MediaTypeStr,"Card2") == 0) cciset->NCSD_Flags[MediaTypeIndex] = CARD2;
+		if(strcasecmp(yaml->CardInfo.MediaType,"Card1") == 0) cciset->NCSD_Flags[MediaTypeIndex] = CARD1;
+		else if(strcasecmp(yaml->CardInfo.MediaType,"Card2") == 0) cciset->NCSD_Flags[MediaTypeIndex] = CARD2;
 		else {
-			fprintf(stderr,"[CCI ERROR] Invalid MediaType: %s\n",MediaTypeStr);
+			fprintf(stderr,"[CCI ERROR] Invalid MediaType: %s\n",yaml->CardInfo.MediaType);
 			return INVALID_YAML_OPT;
 		}
 	}
-	return 0;
-}
 
-int GetPlatform(cci_settings *cciset, user_settings *usrset)
-{
-	char *PlatformStr = usrset->yaml_set.DefaultSpec.TitleInfo.Platform;
-	if(!PlatformStr) cciset->NCSD_Flags[MediaPlatformIndex] = CTR;
+	/* Platform */
+	if(!yaml->TitleInfo.Platform) cciset->NCSD_Flags[MediaPlatformIndex] = CTR;
 	else{
-		if(strcasecmp(PlatformStr,"ctr") == 0) cciset->NCSD_Flags[MediaPlatformIndex] = CTR;
+		if(strcasecmp(yaml->TitleInfo.Platform,"ctr") == 0) cciset->NCSD_Flags[MediaPlatformIndex] = CTR;
 		else {
-			fprintf(stderr,"[CCI ERROR] Invalid Platform: %s\n",PlatformStr);
+			fprintf(stderr,"[CCI ERROR] Invalid Platform: %s\n",yaml->TitleInfo.Platform);
 			return INVALID_YAML_OPT;
 		}
 	}
-	return 0;
-}
 
-int GetCardDevice(cci_settings *cciset, user_settings *usrset)
-{
-	char *CardDeviceStr = usrset->yaml_set.DefaultSpec.CardInfo.CardDevice;
-	if(!CardDeviceStr) cciset->NCSD_Flags[CardDeviceFlag] = CARD_DEVICE_NONE;
+	/* CardDevice */
+	if(!yaml->CardInfo.CardDevice) cciset->NCSD_Flags[CardDeviceFlag] = CARD_DEVICE_NONE;
 	else{
-		if(strcmp(CardDeviceStr,"NorFlash") == 0) {
+		if(strcmp(yaml->CardInfo.CardDevice,"NorFlash") == 0) {
 			cciset->NCSD_Flags[CardDeviceFlag] = CARD_DEVICE_NOR_FLASH;
 			if(cciset->NCSD_Flags[MediaTypeIndex] == CARD2){
 				fprintf(stderr,"[CCI WARNING] 'CardDevice: NorFlash' is invalid on Card2\n");
 				cciset->NCSD_Flags[CardDeviceFlag] = CARD_DEVICE_NONE;
 			}
 		}
-		else if(strcmp(CardDeviceStr,"None") == 0) cciset->NCSD_Flags[CardDeviceFlag] = CARD_DEVICE_NONE;
-		else if(strcmp(CardDeviceStr,"BT") == 0) cciset->NCSD_Flags[CardDeviceFlag] = CARD_DEVICE_BT;
+		else if(strcmp(yaml->CardInfo.CardDevice,"None") == 0) cciset->NCSD_Flags[CardDeviceFlag] = CARD_DEVICE_NONE;
+		else if(strcmp(yaml->CardInfo.CardDevice,"BT") == 0) cciset->NCSD_Flags[CardDeviceFlag] = CARD_DEVICE_BT;
 		else {
-			fprintf(stderr,"[CCI ERROR] Invalid CardDevice: %s\n",CardDeviceStr);
+			fprintf(stderr,"[CCI ERROR] Invalid CardDevice: %s\n",yaml->CardInfo.CardDevice);
 			return INVALID_YAML_OPT;
 		}
 	}
@@ -440,7 +447,7 @@ int GetWriteableAddress(cci_settings *cciset, user_settings *usrset)
 	int result = GetSaveDataSize_yaml(&cciset->SaveDataSize,usrset);
 	if(result) return result;
 
-	char *WriteableAddressStr = usrset->yaml_set.DefaultSpec.CardInfo.WritableAddress;;
+	char *WriteableAddressStr = usrset->yaml_set.CardInfo.WritableAddress;;
 	
 	cciset->WritableAddress = -1;
 	if(cciset->NCSD_Flags[MediaTypeIndex] != CARD2) return 0; // Can only be set for Card2 Media
@@ -471,7 +478,7 @@ int GetWriteableAddress(cci_settings *cciset, user_settings *usrset)
 
 int GetCardInfoBitmask(cci_settings *cciset, user_settings *usrset)
 {
-	char *str = usrset->yaml_set.DefaultSpec.CardInfo.CardType;
+	char *str = usrset->yaml_set.CardInfo.CardType;
 	if(!str) cciset->CardInfoBitmask |= 0;
 	else{
 		if(strcasecmp(str,"s1") == 0) cciset->CardInfoBitmask |= 0;
@@ -482,7 +489,7 @@ int GetCardInfoBitmask(cci_settings *cciset, user_settings *usrset)
 		}
 	}
 	
-	str = usrset->yaml_set.DefaultSpec.CardInfo.CryptoType;
+	str = usrset->yaml_set.CardInfo.CryptoType;
 	if(!str) cciset->CardInfoBitmask |= (3*0x40);
 	else{
 		int Value = strtol(str,NULL,10);

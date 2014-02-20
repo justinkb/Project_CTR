@@ -15,23 +15,83 @@ typedef enum
 
 typedef enum
 {
-	APPLICATION = 1,
-    SYSTEM = 2,
-    BASE = 3
+	memtype_APPLICATION = 1,
+    memtype_SYSTEM = 2,
+    memtype_BASE = 3
 } MemoryTypeName;
 
 typedef enum
 {
-	PERMIT_DEBUG = 1,
-	FORCE_DEBUG = 2,
-	CAN_USE_NON_ALPHABET_AND_NUMBER = 4,
-	CAN_WRITE_SHARED_PAGE = 8,
-	CAN_USE_PRIVILEGE_PRIORITY = 16,
-	PERMIT_MAIN_FUNCTION_ARGUMENT = 32,
-	CAN_SHARE_DEVICE_MEMORY = 64,
-	RUNNABLE_ON_SLEEP = 128,
-	SPECIAL_MEMORY_ARRANGE = 4096
+	processtype_DEFAULT = -1,
+	processtype_SYSTEM = 0,
+	processtype_APPLICATION = 1
+} ProcessTypeName;
+
+typedef enum
+{
+	resrc_limit_APPLICATION,
+	resrc_limit_SYS_APPLET,
+	resrc_limit_LIB_APPLET,
+	resrc_limit_OTHER
+} ResourceLimitCategoryName;
+
+typedef enum
+{
+	PERMIT_DEBUG,
+	FORCE_DEBUG,
+	CAN_USE_NON_ALPHABET_AND_NUMBER,
+	CAN_WRITE_SHARED_PAGE,
+	CAN_USE_PRIVILEGE_PRIORITY,
+	PERMIT_MAIN_FUNCTION_ARGUMENT,
+	CAN_SHARE_DEVICE_MEMORY,
+	RUNNABLE_ON_SLEEP,
+	SPECIAL_MEMORY_ARRANGE = 12,
 } OtherCapabilities_Flagbitmask;
+
+typedef enum
+{
+	CATEGORY_SYSTEM_APPLICATION,
+	CATEGORY_HARDWARE_CHECK,
+	CATEGORY_FILE_SYSTEM_TOOL,
+	DEBUG,
+	TWL_CARD_BACKUP,
+	TWL_NAND_DATA,
+	BOSS,
+	DIRECT_SDMC,
+	CORE,
+	CTR_NAND_RO,
+	CTR_NAND_RW,
+	CTR_NAND_RO_WRITE,
+	CATEGORY_SYSTEM_SETTINGS,
+	CARD_BOARD,
+	EXPORT_IMPORT_IVS,
+	DIRECT_SDMC_WRITE,
+	SWITCH_CLEANUP,
+	SAVE_DATA_MOVE,
+	SHOP,
+	SHELL,
+	CATEGORY_HOME_MENU
+} FileSystemAccess;
+
+typedef enum
+{
+	NOT_USE_ROMFS,
+	USE_EXTENDED_SAVEDATA_ACCESS_CONTROL
+} AttributeName;
+
+typedef enum
+{
+	FS_MOUNT_NAND,
+	FS_MOUNT_NAND_RO_WRITE,
+	FS_MOUNT_TWLN,
+	FS_MOUNT_WNAND,
+	FS_MOUNT_CARD_SPI,
+	USE_SDIF3,
+	CREATE_SEED,
+	USE_CARD_SPI,
+	SD_APPLICATION,
+	USE_DIRECT_SDMC
+} Arm9Capability;
 
 typedef struct
 {
@@ -68,20 +128,20 @@ typedef struct
 
 typedef struct
 {
-	u8 extsavedataid[8];
-	u8 systemsavedataid[8];
-	u8 reserved[8];
-	u8 accessinfo[7];
-	u8 otherattributes;
+	u8 ExtSaveDataId[8];
+	u8 SystemSaveDataId[8];
+	u8 StorageAccessableUniqueIds[8];
+	//u8 reserved[7];
+	//u8 flag;
+	u8 AccessInfo[7];
+	u8 OtherAttributes;
 } exhdr_StorageInfo;
 
 typedef struct
 {
 	u8 ProgramId[8];
 	u8 Flags[8];
-	u8 MaxCpu;
-	u8 Reserved0;
-	u8 ResourceLimitDescriptor[15][2];
+	u8 ResourceLimitDescriptor[16][2];
 	exhdr_StorageInfo StorageInfo;
 	u8 ServiceAccessControl[32][8]; // Those char[8] svc handles
 	u8 Reserved1[0x1f];
@@ -90,45 +150,30 @@ typedef struct
 
 typedef struct
 {
-	u8 descriptors[28][4];// Descripters are a collection of u32s, with bitmask idents so they can be identified, no matter the pos
-	/*
-	struct
-	{
-		u32 data[8];
-	} SystemCallAccessControl;
+	u16 num;
+	u32 *Data;
+} ARM11KernelCapabilityDescriptor;
 
-	struct
-	{
-		u32 data[8];
-	} InterruptNumberList;
+typedef enum
+{
+	desc_InteruptNumList = 0xe0000000,
+	desc_SysCallControl = 0xf0000000,
+	desc_KernelReleaseVersion = 0xfc000000,
+	desc_HandleTableSize = 0xfe000000,
+	desc_OtherCapabilities = 0xff000000,
+	desc_MappingStatic = 0xff800000,
+	desc_MappingIO = 0xffc00000,
+} ARM11KernelCapabilityDescriptorBitmask;
 
-	struct
-	{
-		
-	} AddressMapping;
-
-	struct
-	{
-		u32 Data; // le u32 : Flags 
-	} OtherCapabilities;
-
-	struct
-	{
-		u32 Data;
-	} HandleTableSize;
-
-	struct
-	{
-		u32 Data;
-	} ReleaseKernelVersion;
-	*/
+typedef struct
+{
+	u8 descriptors[28][4];// Descripters are a collection of u32s, with bitmask idents so they can be identified, 'no matter the pos'
 	u8 reserved[0x10];
 } exhdr_ARM11KernelCapabilities;
 
 typedef struct
 {
-        u8 descriptors[15];
-        u8 descversion;
+	u8 descriptors[16]; //descriptors[15] = DescVersion
 } exhdr_ARM9AccessControlInfo;
 
 typedef struct
@@ -157,7 +202,7 @@ typedef struct
 typedef struct
 {
 	keys_struct *keys;
-	desc_settings *yaml;
+	rsf_settings *yaml;
 
 	/* Output */
 	ExtendedHeader_Struct *ExHdr; // is the exheader output buffer ptr(in ncchset) cast as exheader struct ptr;

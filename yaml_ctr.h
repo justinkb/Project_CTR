@@ -10,12 +10,6 @@ typedef enum
 	YAML_UNKNOWN_KEY = -5,
 } ctr_yaml_error;
 
-typedef enum
-{
-	type_rsf,
-	type_desc,
-} specfile_type;
-
 typedef struct
 {
 	// For Continued Parsing of file
@@ -30,8 +24,6 @@ typedef struct
 	yaml_event_type_t prev_event;
 	u32 Level;
 	
-	// Spec File Type
-	specfile_type type;
 } ctr_yaml_context;
 
 #endif

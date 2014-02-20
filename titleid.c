@@ -6,16 +6,16 @@ u32 SetPIDCategoryFromName(char *Category);
 u32 SetPIDCategoryFromFlags(char **CategoryFlags, u32 FlagNum);
 u32 SetPIDCategoryFromFlag(u32 Category, u32 Flag, char *FlagName);
 u32 SetPIDUniqueId(char *UniqueIdStr);
-u16 SetTitleVariation(u16 Category, desc_settings *yaml_set);
+u16 SetTitleVariation(u16 Category, rsf_settings *yaml_set);
 
 u64 ConvertTwlIdToCtrId(u64 pgid)
 {
 	return 0x0004800000000000 | (pgid & 0x00007FFFFFFFFFFF);
 }
 
-int GetProgramID(u64 *dest, desc_settings *yaml, bool IsForExheader)
+int GetProgramID(u64 *dest, rsf_settings *yaml, bool IsForExheader)
 {
-	if(yaml->DefaultSpec.TitleInfo.Category && yaml->DefaultSpec.TitleInfo.CategoryFlags){
+	if(yaml->TitleInfo.Category && yaml->TitleInfo.CategoryFlags){
 		fprintf(stderr,"[ERROR] Can not set Cateory and CategoryFlags at the same time.\n");
 		return PID_BAD_YAML_SET;
 	}
@@ -25,20 +25,21 @@ int GetProgramID(u64 *dest, desc_settings *yaml, bool IsForExheader)
 	u16 m_Variation = 0;
 
 	// Getting Category
-	if(yaml->DefaultSpec.TitleInfo.Category) 
-		m_Category = SetPIDCategoryFromName(yaml->DefaultSpec.TitleInfo.Category);
-	else if(yaml->DefaultSpec.TitleInfo.CategoryFlags) 
-		m_Category = SetPIDCategoryFromFlags(yaml->DefaultSpec.TitleInfo.CategoryFlags,yaml->DefaultSpec.TitleInfo.CategoryFlagsNum);
-	if(IsForExheader && yaml->DefaultSpec.TitleInfo.TargetCategory)
-		m_Category = SetPIDCategoryFromName(yaml->DefaultSpec.TitleInfo.TargetCategory);
+	if(yaml->TitleInfo.Category) 
+		m_Category = SetPIDCategoryFromName(yaml->TitleInfo.Category);
+	else if(yaml->TitleInfo.CategoryFlags) 
+		m_Category = SetPIDCategoryFromFlags(yaml->TitleInfo.CategoryFlags,yaml->TitleInfo.CategoryFlagsNum);
+	if(IsForExheader && yaml->TitleInfo.TargetCategory)
+		m_Category = SetPIDCategoryFromName(yaml->TitleInfo.TargetCategory);
 	if(m_Category == PID_INVALID_CATEGORY) // Error occured
 		return PID_BAD_YAML_SET;
 
 	// Getting UniqueId
-	if(yaml->DefaultSpec.TitleInfo.UniqueId) UniqueId = SetPIDUniqueId(yaml->DefaultSpec.TitleInfo.UniqueId);
-	else UniqueId = 0xf7fff;
-	if(UniqueId == PID_INVALID_UNIQUE_ID) // Error occured
+	if(yaml->TitleInfo.UniqueId) UniqueId = SetPIDUniqueId(yaml->TitleInfo.UniqueId);
+	else{
+		fprintf(stderr,"[ERROR] ParameterNotFound: TitleInfo/UniqueId\n");
 		return PID_BAD_YAML_SET;
+	}
 
 	m_Variation = SetTitleVariation(m_Category,yaml);
 	if(m_Variation == PID_INVALID_VARIATION) // Error occured
@@ -58,10 +59,13 @@ int GetProgramID(u64 *dest, desc_settings *yaml, bool IsForExheader)
 	return 0;
 }
 
-int GetUniqueID(u32 *dest, desc_settings *yaml)
+int GetUniqueID(u32 *dest, rsf_settings *yaml)
 {
-	if(yaml->DefaultSpec.TitleInfo.UniqueId) *dest = SetPIDUniqueId(yaml->DefaultSpec.TitleInfo.UniqueId);
-	else *dest = 0xf7fff;
+	if(yaml->TitleInfo.UniqueId) *dest = 0xffffff & SetPIDUniqueId(yaml->TitleInfo.UniqueId);
+	else{
+		fprintf(stderr,"[ERROR] ParameterNotFound: TitleInfo/UniqueId\n");
+		return PID_BAD_YAML_SET;
+	}
 	return 0;
 }
 
@@ -137,16 +141,14 @@ u32 SetPIDCategoryFromFlag(u32 Category, u32 Flag, char *FlagName)
 
 u32 SetPIDUniqueId(char *UniqueIdStr)
 {
-	u32 UniqueId = strtoul(UniqueIdStr,NULL,0);
-	if(UniqueId > 0xffffff) return PID_INVALID_UNIQUE_ID;
-	return UniqueId;
+	return 0xffffff & strtoull(UniqueIdStr,NULL,0);
 }
 
-u16 SetTitleVariation(u16 Category, desc_settings *yaml_set)
+u16 SetTitleVariation(u16 Category, rsf_settings *yaml_set)
 {
 	if(IsDemo(Category)){
-		if(yaml_set->DefaultSpec.TitleInfo.DemoIndex){
-			u16 DemoIndex = strtol(yaml_set->DefaultSpec.TitleInfo.DemoIndex,NULL,10);
+		if(yaml_set->TitleInfo.DemoIndex){
+			u16 DemoIndex = strtol(yaml_set->TitleInfo.DemoIndex,NULL,10);
 			if(DemoIndex > 255 || DemoIndex == 0){
 				fprintf(stderr,"[ERROR] Invalid demo index '%d'\n",DemoIndex);
 				return PID_INVALID_VARIATION;
@@ -160,8 +162,8 @@ u16 SetTitleVariation(u16 Category, desc_settings *yaml_set)
 	}
 	
 	else if(IsDlpChild(Category)){
-		if(yaml_set->DefaultSpec.TitleInfo.ChildIndex){
-			u16 ChildIndex = strtol(yaml_set->DefaultSpec.TitleInfo.ChildIndex,NULL,10);
+		if(yaml_set->TitleInfo.ChildIndex){
+			u16 ChildIndex = strtol(yaml_set->TitleInfo.ChildIndex,NULL,10);
 			if(ChildIndex > 255){
 				fprintf(stderr,"[ERROR] Invalid child index '%d'\n",ChildIndex);
 				return PID_INVALID_VARIATION;
@@ -172,8 +174,8 @@ u16 SetTitleVariation(u16 Category, desc_settings *yaml_set)
 			return 0;
 	}
 	else if(IsAddOnContent(Category)){
-		if(yaml_set->DefaultSpec.TitleInfo.Variation){
-			u16 DataTitleIndex = strtol(yaml_set->DefaultSpec.TitleInfo.Variation,NULL,10);
+		if(yaml_set->TitleInfo.Variation){ // Might Rename to DataTitleIndex
+			u16 DataTitleIndex = strtol(yaml_set->TitleInfo.Variation,NULL,10);
 			if(DataTitleIndex > 255){
 				fprintf(stderr,"[ERROR] Invalid variation '%d'\n",DataTitleIndex);
 				return PID_INVALID_VARIATION;
@@ -184,8 +186,8 @@ u16 SetTitleVariation(u16 Category, desc_settings *yaml_set)
 			return 0;
 	}
 	else if(IsContents(Category)){
-		if(yaml_set->DefaultSpec.TitleInfo.ContentsIndex){
-			u16 ContentsIndex = strtol(yaml_set->DefaultSpec.TitleInfo.ContentsIndex,NULL,10);
+		if(yaml_set->TitleInfo.ContentsIndex){
+			u16 ContentsIndex = strtol(yaml_set->TitleInfo.ContentsIndex,NULL,10);
 			if(ContentsIndex > 255){
 				fprintf(stderr,"[ERROR] Invalid content index '%d'\n",ContentsIndex);
 				return PID_INVALID_VARIATION;
@@ -196,8 +198,8 @@ u16 SetTitleVariation(u16 Category, desc_settings *yaml_set)
 			return 0;
 	}
 	else{
-		if(yaml_set->DefaultSpec.TitleInfo.Version){
-			u16 Version = strtol(yaml_set->DefaultSpec.TitleInfo.Version,NULL,10);
+		if(yaml_set->TitleInfo.Version){
+			u16 Version = strtol(yaml_set->TitleInfo.Version,NULL,10);
 			if(Version > 255){
 				fprintf(stderr,"[ERROR] Invalid version '%d'\n",Version);
 				return PID_INVALID_VARIATION;

@@ -3,7 +3,7 @@
 
 // Private Prototypes
 void InitYamlContext(ctr_yaml_context *ctx);
-int ParseSpecFile(void *set, char *path, specfile_type type);
+int ParseSpecFile(rsf_settings *set, char *path);
 void CheckEvent(ctr_yaml_context *ctx);
 
 void BadYamlFormatting(void);
@@ -11,33 +11,27 @@ void BadYamlFormatting(void);
 // Code
 int GetYamlSettings(user_settings *set)
 {
-	rsf_settings rsf_set;
-	memset(&rsf_set,0,sizeof(rsf_settings));
-	desc_settings desc_set;
-	memset(&desc_set,0,sizeof(desc_settings));
-	InvalidateRSFBooleans(&rsf_set);
-	InvalidateDESCBooleans(&desc_set);
-	InvalidateRSFBooleans(&desc_set.DefaultSpec);
-	if(set->rsf_path){	
-		int res = ParseSpecFile(&rsf_set,set->rsf_path,type_rsf);
-		if(res) return res;
+	memset(&set->yaml_set,0,sizeof(rsf_settings));
+	InvalidateRSFBooleans(&set->yaml_set);
+	int ret = 0;
+	if(set->rsf_path) {
+		FILE *tmp = fopen(set->rsf_path,"rb");
+		if(!tmp) {
+			fprintf(stderr,"[YAML ERROR] Failed to open %s\n",set->rsf_path);
+			return FAILED_TO_OPEN_FILE;
+		}
+		fclose(tmp);
+		ret = ParseSpecFile(&set->yaml_set,set->rsf_path);
 	}
-	if(set->desc_path){
-		int res = ParseSpecFile(&desc_set,set->desc_path,type_desc);
-		if(res) return res;
-	}
-	return MergeSpecData(&set->yaml_set,&desc_set,&rsf_set);
+	return ret;
 }
 
-int ParseSpecFile(void *set, char *path, specfile_type type)
+int ParseSpecFile(rsf_settings *set, char *path)
 {
 	ctr_yaml_context *ctx = malloc(sizeof(ctr_yaml_context));
 	InitYamlContext(ctx);
-	
-	
 
 	/* Set Specfile Type */
-	ctx->type = type;
 	
 	/* Create the Parser object. */
 	yaml_parser_initialize(&ctx->parser);
@@ -63,8 +57,7 @@ int ParseSpecFile(void *set, char *path, specfile_type type)
 		
 		
 		if(EventIsScalar(ctx)){
-			if(ctx->type == type_rsf) EvaluateRSF((rsf_settings*)set,ctx);
-			else EvaluateDESC((desc_settings*)set,ctx);
+			EvaluateRSF(set,ctx);
 			if(ctx->error) goto error;
 			break;
 		}
@@ -93,7 +86,7 @@ int ParseSpecFile(void *set, char *path, specfile_type type)
 
 	/* On error. */
 	error:
-	fprintf(stderr,"[-] Error Proccessing %s file\n",ctx->type? "DESC" : "RSF");
+	fprintf(stderr,"[-] Error Proccessing RSF file\n");
 	
 	/* Destroy the Parser object. */
 	yaml_parser_delete(&ctx->parser);

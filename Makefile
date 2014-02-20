@@ -19,12 +19,11 @@ CFLAGS = --std=c99 -Wall -I. -DMAKEROM_VER_MAJOR=$(VER_MAJOR) -DMAKEROM_VER_MINO
 CC = gcc
  
 # MAKEROM Build Settings
-MAKEROM_BUILD_FLAGS = -DPRIVATE_BUILD -DRETAIL_FSIGN -DELF_DEBUG 
+MAKEROM_BUILD_FLAGS = -DPRIVATE_BUILD #-DRETAIL_FSIGN #-DELF_DEBUG 
 VER_MAJOR = 0
-VER_MINOR = 1
+VER_MINOR = 2
 OUTPUT = makerom
 
-# 
 main: build
 
 rebuild: clean build
@@ -38,7 +37,7 @@ clean:
 # Winfail compatibility
 rebuildwin: cleanwin build
 cleanwin:
-	del $(OUTPUT).exe *.o polarssl\*.o libyaml\*.o *.cci *.cia *.cxi *.cfa
+	del /Q objs $(OUTPUT).exe *.o polarssl\*.o libyaml\*.o *.cci *.cia *.cxi *.cfa
 
 #Test Functions
 	

@@ -88,8 +88,8 @@ typedef enum
 
 u64 ConvertTwlIdToCtrId(u64 pgid);
 
-int GetProgramID(u64 *dest, desc_settings *yaml, bool IsForExheader);
-int GetUniqueID(u32 *dest, desc_settings *yaml);
+int GetProgramID(u64 *dest, rsf_settings *yaml, bool IsForExheader);
+int GetUniqueID(u32 *dest, rsf_settings *yaml);
 
 bool IsDemo(u16 Category);
 bool IsSystem(u16 Category);

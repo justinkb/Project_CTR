@@ -29,7 +29,7 @@ void InitKeys(keys_struct *keys)
 	
 	// NCCH
 	keys->aes.NormalKey = (u8*)zeros_fixed_aesKey;
-	SetSystemFixedKey(keys,(u8*)zeros_fixed_aesKey);
+	//SetSystemFixedKey(keys,(u8*)zeros_fixed_aesKey);
 
 	/* RSA Keys */
 	// CIA

@@ -134,7 +134,7 @@ int get_CIASettings(cia_settings *ciaset, user_settings *usrset)
 		if(result) return result;
 	}
 
-	else if(usrset->Content0IsCci){
+	else if(usrset->ConvertCci){
 		result = GetSettingsFromCci(ciaset);
 		if(result) return result;
 	}
@@ -227,7 +227,7 @@ int GetSettingsFromNcch0(cia_settings *ciaset, u32 ncch0_offset)
 		}
 	}
 	else if(result != 0){
-		fprintf(stderr,"[CIA ERROR] Content 0 Is Corrupt\n");
+		fprintf(stderr,"[CIA ERROR] Content 0 Is Corrupt (res = %d)\n",result);
 		return CIA_INVALID_NCCH0;
 	}
 
@@ -241,8 +241,8 @@ int GetSettingsFromNcch0(cia_settings *ciaset, u32 ncch0_offset)
 	ExtendedHeader_Struct *ExHeader = malloc(ncch_ctx->exheader_size);
 	if(!ExHeader){ fprintf(stderr,"[CIA ERROR] MEM ERROR\n"); free(ExeFs); return MEM_ERROR; }
 
-	GetNCCHSection(ExeFs, ncch_ctx->exefs_size, 0, ncch0, ncch_ctx, ciaset->keys, ncch_exefs);
-	GetNCCHSection((u8*)ExHeader, ncch_ctx->exheader_size, 0, ncch0, ncch_ctx, ciaset->keys, ncch_ExHeader);
+	if(!(ciaset->content.IsCfa||ciaset->content.KeyNotFound)) GetNCCHSection(ExeFs, ncch_ctx->exefs_size, 0, ncch0, ncch_ctx, ciaset->keys, ncch_exefs);
+	if(!(ciaset->content.IsCfa||ciaset->content.KeyNotFound)) GetNCCHSection((u8*)ExHeader, ncch_ctx->exheader_size, 0, ncch0, ncch_ctx, ciaset->keys, ncch_ExHeader);
 	
 	result = GetCIADataFromNcch(ciaset,hdr,ExHeader); // Data For TMD
 	if(result) goto finish;
@@ -536,7 +536,7 @@ int WriteCurrentSectionstoFile(cia_settings *ciaset)
 int WriteContentsToFile(cia_settings *ciaset, user_settings *usrset)
 {
 	u8 *Content0 = ciaset->content.content0;
-	if(usrset->Content0IsCci) Content0 = (u8*)(ciaset->content.content0+ciaset->content.CCIContentOffsets[0]);
+	if(usrset->ConvertCci) Content0 = (u8*)(ciaset->content.content0+ciaset->content.CCIContentOffsets[0]);
 
 	ctr_sha(Content0,ciaset->content.ContentSize[0],ciaset->content.ContentHash[0],CTR_SHA_256);
 	if(ciaset->content.EncryptContents) {
@@ -546,7 +546,7 @@ int WriteContentsToFile(cia_settings *ciaset, user_settings *usrset)
 	WriteBuffer(Content0,ciaset->content.ContentSize[0],ciaset->content.ContentOffset[0]+ciaset->CIA_Sections.ContentOffset,ciaset->out);
 	
 	// Free Buffer if Not CCI
-	if(!usrset->Content0IsCci){
+	if(!usrset->ConvertCci){
 		free(usrset->Content0.buffer);
 		usrset->Content0.buffer = NULL;
 		usrset->Content0.size = 0;
@@ -571,7 +571,7 @@ int WriteContentsToFile(cia_settings *ciaset, user_settings *usrset)
 			free(ContentBuff);
 		}
 	}
-	else if(usrset->Content0IsCci){
+	else if(usrset->ConvertCci){
 		for(int i = 1; i < ciaset->content.ContentCount; i++){
 			u8 *ContentBuff = (u8*)(ciaset->content.content0+ciaset->content.CCIContentOffsets[i]);
 			ctr_sha(ContentBuff,ciaset->content.ContentSize[i],ciaset->content.ContentHash[i],CTR_SHA_256);

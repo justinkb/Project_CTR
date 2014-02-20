@@ -170,21 +170,29 @@ int SetBasicOptions(ncch_settings *ncchset, user_settings *usrset)
 
 	ncchset->Options.IncludeExeFsLogo = usrset->include_exefs_logo;
 	
-	if(usrset->yaml_set.DefaultSpec.Option.EnableCompress != -1) ncchset->Options.CompressCode = usrset->yaml_set.DefaultSpec.Option.EnableCompress;
+	if(usrset->yaml_set.Option.EnableCompress != -1) ncchset->Options.CompressCode = usrset->yaml_set.Option.EnableCompress;
 	else ncchset->Options.CompressCode = true;
 
-	if(usrset->yaml_set.DefaultSpec.Option.UseOnSD != -1) ncchset->Options.UseOnSD = usrset->yaml_set.DefaultSpec.Option.UseOnSD;
+	if(usrset->yaml_set.Option.UseOnSD != -1) ncchset->Options.UseOnSD = usrset->yaml_set.Option.UseOnSD;
 	else ncchset->Options.UseOnSD = false;
+	usrset->yaml_set.Option.UseOnSD = ncchset->Options.UseOnSD;
 
-	if(usrset->yaml_set.DefaultSpec.Option.EnableCrypt != -1) ncchset->Options.Encrypt = usrset->yaml_set.DefaultSpec.Option.EnableCrypt;
+	if(usrset->yaml_set.Option.EnableCrypt != -1) ncchset->Options.Encrypt = usrset->yaml_set.Option.EnableCrypt;
 	else ncchset->Options.Encrypt = true;
 
-	if(usrset->yaml_set.DefaultSpec.Option.FreeProductCode != -1) ncchset->Options.FreeProductCode = usrset->yaml_set.DefaultSpec.Option.FreeProductCode;
+	if(usrset->yaml_set.Option.FreeProductCode != -1) ncchset->Options.FreeProductCode = usrset->yaml_set.Option.FreeProductCode;
 	else ncchset->Options.FreeProductCode = false;
 
 	ncchset->Options.IsCfa = (usrset->build_ncch_type == CFA);
 	
 	ncchset->Options.IsBuildingCodeSection = (usrset->elf_path != NULL);
+
+	ncchset->Options.UseRomFS = ((ncchset->yaml_set->Rom.HostRoot && strlen(ncchset->yaml_set->Rom.HostRoot) > 0) || usrset->romfs_path);
+	
+	if(ncchset->Options.IsCfa && !ncchset->Options.UseRomFS){
+		fprintf(stderr,"[NCCH ERROR] 'Rom/HostRoot' must be set\n");
+		return NCCH_BAD_YAML_SET;
+	}
 
 	ncchset->Options.accessdesc = usrset->accessdesc;
 
@@ -289,38 +297,38 @@ int ImportLogo(ncch_settings *ncchset)
 		if(!ncchset->Sections.Logo.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 		ReadFile_64(ncchset->Sections.Logo.buffer,ncchset->Sections.Logo.size,0,ncchset->ComponentFilePtrs.logo);
 	}
-	else if(ncchset->yaml_set->DefaultSpec.BasicInfo.Logo){
-		if(strcasecmp(ncchset->yaml_set->DefaultSpec.BasicInfo.Logo,"nintendo") == 0){
+	else if(ncchset->yaml_set->BasicInfo.Logo){
+		if(strcasecmp(ncchset->yaml_set->BasicInfo.Logo,"nintendo") == 0){
 			ncchset->Sections.Logo.size = 0x2000;
 			ncchset->Sections.Logo.buffer = malloc(ncchset->Sections.Logo.size);
 			if(!ncchset->Sections.Logo.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 			memcpy(ncchset->Sections.Logo.buffer,Nintendo_LZ,0x2000);
 		}
-		else if(strcasecmp(ncchset->yaml_set->DefaultSpec.BasicInfo.Logo,"licensed") == 0){
+		else if(strcasecmp(ncchset->yaml_set->BasicInfo.Logo,"licensed") == 0){
 			ncchset->Sections.Logo.size = 0x2000;
 			ncchset->Sections.Logo.buffer = malloc(ncchset->Sections.Logo.size);
 			if(!ncchset->Sections.Logo.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 			memcpy(ncchset->Sections.Logo.buffer,Nintendo_LicensedBy_LZ,0x2000);
 		}
-		else if(strcasecmp(ncchset->yaml_set->DefaultSpec.BasicInfo.Logo,"distributed") == 0){
+		else if(strcasecmp(ncchset->yaml_set->BasicInfo.Logo,"distributed") == 0){
 			ncchset->Sections.Logo.size = 0x2000;
 			ncchset->Sections.Logo.buffer = malloc(ncchset->Sections.Logo.size);
 			if(!ncchset->Sections.Logo.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 			memcpy(ncchset->Sections.Logo.buffer,Nintendo_DistributedBy_LZ,0x2000);
 		}
-		else if(strcasecmp(ncchset->yaml_set->DefaultSpec.BasicInfo.Logo,"ique") == 0){
+		else if(strcasecmp(ncchset->yaml_set->BasicInfo.Logo,"ique") == 0){
 			ncchset->Sections.Logo.size = 0x2000;
 			ncchset->Sections.Logo.buffer = malloc(ncchset->Sections.Logo.size);
 			if(!ncchset->Sections.Logo.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 			memcpy(ncchset->Sections.Logo.buffer,iQue_with_ISBN_LZ,0x2000);
 		}
-		else if(strcasecmp(ncchset->yaml_set->DefaultSpec.BasicInfo.Logo,"ique_without_isbn") == 0){
+		else if(strcasecmp(ncchset->yaml_set->BasicInfo.Logo,"iqueforsystem") == 0){
 			ncchset->Sections.Logo.size = 0x2000;
 			ncchset->Sections.Logo.buffer = malloc(ncchset->Sections.Logo.size);
 			if(!ncchset->Sections.Logo.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 			memcpy(ncchset->Sections.Logo.buffer,iQue_without_ISBN_LZ,0x2000);
 		}
-		else if(strcasecmp(ncchset->yaml_set->DefaultSpec.BasicInfo.Logo,"none") != 0){
+		else if(strcasecmp(ncchset->yaml_set->BasicInfo.Logo,"none") != 0){
 			fprintf(stderr,"[NCCH ERROR] Invalid logo name\n");
 			return NCCH_BAD_YAML_SET;
 		}
@@ -342,21 +350,21 @@ int SetCommonHeaderBasicData(ncch_settings *ncchset, NCCH_Header *hdr)
 	u64_to_u8(hdr->title_id,ProgramId,LE);
 
 	/* Get Product Code and Maker Code */
-	if(ncchset->yaml_set->DefaultSpec.BasicInfo.ProductCode){
-		if(!IsValidProductCode((char*)ncchset->yaml_set->DefaultSpec.BasicInfo.ProductCode,ncchset->Options.FreeProductCode)){
+	if(ncchset->yaml_set->BasicInfo.ProductCode){
+		if(!IsValidProductCode((char*)ncchset->yaml_set->BasicInfo.ProductCode,ncchset->Options.FreeProductCode)){
 			fprintf(stderr,"[NCCH ERROR] Invalid Product Code\n");
 			return NCCH_BAD_YAML_SET;
 		}
-		memcpy(hdr->product_code,ncchset->yaml_set->DefaultSpec.BasicInfo.ProductCode,strlen((char*)ncchset->yaml_set->DefaultSpec.BasicInfo.ProductCode));
+		memcpy(hdr->product_code,ncchset->yaml_set->BasicInfo.ProductCode,strlen((char*)ncchset->yaml_set->BasicInfo.ProductCode));
 	}
 	else memcpy(hdr->product_code,"CTR-P-CTAP",10);
 
-	if(ncchset->yaml_set->DefaultSpec.BasicInfo.CompanyCode){
-		if(strlen((char*)ncchset->yaml_set->DefaultSpec.BasicInfo.CompanyCode) != 2){
+	if(ncchset->yaml_set->BasicInfo.CompanyCode){
+		if(strlen((char*)ncchset->yaml_set->BasicInfo.CompanyCode) != 2){
 			fprintf(stderr,"[NCCH ERROR] Company code length must be 2\n");
 			return NCCH_BAD_YAML_SET;
 		}
-		memcpy(hdr->maker_code,ncchset->yaml_set->DefaultSpec.BasicInfo.CompanyCode,2);
+		memcpy(hdr->maker_code,ncchset->yaml_set->BasicInfo.CompanyCode,2);
 	}
 	else memcpy(hdr->maker_code,"00",2);
 
@@ -364,10 +372,10 @@ int SetCommonHeaderBasicData(ncch_settings *ncchset, NCCH_Header *hdr)
 	hdr->flags[ContentUnitSize] = 0;
 
 	/* Setting ContentPlatform */
-	if(ncchset->yaml_set->DefaultSpec.TitleInfo.Platform){
-		if(strcasecmp(ncchset->yaml_set->DefaultSpec.TitleInfo.Platform,"ctr") == 0) hdr->flags[ContentPlatform] = 1;
+	if(ncchset->yaml_set->TitleInfo.Platform){
+		if(strcasecmp(ncchset->yaml_set->TitleInfo.Platform,"ctr") == 0) hdr->flags[ContentPlatform] = 1;
 		else{
-			fprintf(stderr,"[NCCH ERROR] Invalid Platform: %s\n",ncchset->yaml_set->DefaultSpec.TitleInfo.Platform);
+			fprintf(stderr,"[NCCH ERROR] Invalid Platform: %s\n",ncchset->yaml_set->TitleInfo.Platform);
 			return NCCH_BAD_YAML_SET;
 		}
 	}
@@ -384,14 +392,14 @@ int SetCommonHeaderBasicData(ncch_settings *ncchset, NCCH_Header *hdr)
 	hdr->flags[ContentType] = 0;
 	if(ncchset->Sections.RomFs.size) hdr->flags[ContentType] |= RomFS;
 	if(ncchset->Sections.ExeFs.size) hdr->flags[ContentType] |= ExeFS;
-	if(ncchset->yaml_set->DefaultSpec.BasicInfo.ContentType){
-		if(strcmp(ncchset->yaml_set->DefaultSpec.BasicInfo.ContentType,"Application") == 0) hdr->flags[ContentType] |= 0;
-		else if(strcmp(ncchset->yaml_set->DefaultSpec.BasicInfo.ContentType,"SystemUpdate") == 0) hdr->flags[ContentType] |= SystemUpdate;
-		else if(strcmp(ncchset->yaml_set->DefaultSpec.BasicInfo.ContentType,"Manual") == 0) hdr->flags[ContentType] |= Manual;
-		else if(strcmp(ncchset->yaml_set->DefaultSpec.BasicInfo.ContentType,"Child") == 0) hdr->flags[ContentType] |= Child;
-		else if(strcmp(ncchset->yaml_set->DefaultSpec.BasicInfo.ContentType,"Trial") == 0) hdr->flags[ContentType] |= Trial;
+	if(ncchset->yaml_set->BasicInfo.ContentType){
+		if(strcmp(ncchset->yaml_set->BasicInfo.ContentType,"Application") == 0) hdr->flags[ContentType] |= 0;
+		else if(strcmp(ncchset->yaml_set->BasicInfo.ContentType,"SystemUpdate") == 0) hdr->flags[ContentType] |= SystemUpdate;
+		else if(strcmp(ncchset->yaml_set->BasicInfo.ContentType,"Manual") == 0) hdr->flags[ContentType] |= Manual;
+		else if(strcmp(ncchset->yaml_set->BasicInfo.ContentType,"Child") == 0) hdr->flags[ContentType] |= Child;
+		else if(strcmp(ncchset->yaml_set->BasicInfo.ContentType,"Trial") == 0) hdr->flags[ContentType] |= Trial;
 		else{
-			fprintf(stderr,"[NCCH ERROR] Invalid ContentType '%s'\n",ncchset->yaml_set->DefaultSpec.BasicInfo.ContentType);
+			fprintf(stderr,"[NCCH ERROR] Invalid ContentType '%s'\n",ncchset->yaml_set->BasicInfo.ContentType);
 			return NCCH_BAD_YAML_SET;
 		}
 	}
@@ -669,6 +677,9 @@ int VerifyNCCH(u8 *ncch, keys_struct *keys, bool SuppressOutput)
 		// Checking Exheader Hash to see if decryption was sucessful
 		ctr_sha(ExHeader,0x400,Hash,CTR_SHA_256);
 		if(memcmp(Hash,hdr->extended_header_sha_256_hash,0x20) != 0){
+			//memdump(stdout,"Expected Hash: ",hdr->extended_header_sha_256_hash,0x20);
+			//memdump(stdout,"Actual Hash:   ",Hash,0x20);
+			//memdump(stdout,"Exheader:      ",(u8*)ExHeader,0x400);
 			if(!SuppressOutput) {
 				fprintf(stderr,"[NCCH ERROR] ExHeader Hashcheck Failed\n");
 				fprintf(stderr,"[NCCH ERROR] CXI is corrupt\n");
@@ -871,7 +882,14 @@ bool IsCfa(NCCH_Header* hdr)
 
 u32 GetNCCH_MediaUnitSize(NCCH_Header* hdr)
 {
-	return 0x200*pow(2,hdr->flags[ContentUnitSize]);
+	u16 version = u8_to_u16(hdr->version,LE);
+	u32 ret = 0;
+	if (version == 1)
+		ret = 1;
+	else if (version == 2 || version == 0)
+		ret = 1 << (hdr->flags[ContentUnitSize] + 9);
+	return ret;
+	//return 0x200*pow(2,hdr->flags[ContentUnitSize]);
 }
 
 u32 GetNCCH_MediaSize(NCCH_Header* hdr)
@@ -884,7 +902,7 @@ ncch_key_type GetNCCHKeyType(NCCH_Header* hdr)
 	// Non-Secure Key Options
 	if((hdr->flags[OtherFlag] & NoCrypto) == NoCrypto) return NoKey;
 	if((hdr->flags[OtherFlag] & FixedCryptoKey) == FixedCryptoKey){
-		if((hdr->program_id[3] & 0x10) == 0x10) return KeyIsSystemFixed;
+		if((hdr->program_id[4] & 0x10) == 0x10) return KeyIsSystemFixed;
 		else return KeyIsNormalFixed;
 	}
 

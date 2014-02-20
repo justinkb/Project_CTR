@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
 	result = ParseArgs(argc,argv,usrset);
 	if(result < 0) goto fail_finalise;
 	
-	// Import RSF/DESC Settings if present
+	// Import RSF Settings if present
 	result = GetYamlSettings(usrset);
 	if(result < 0) goto fail_finalise;
 
@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 			ReadFile_64(usrset->Content0.buffer,size,0,srl);
 			fclose(srl);
 		}
-		else if(usrset->Content0IsCci){
+		else if(usrset->ConvertCci){
 			FILE *cci = fopen(usrset->CciPath,"rb");
 			if(!cci) {fprintf(stderr,"[MAKEROM ERROR] Failed to open CCI: %s\n",usrset->CciPath); goto fail_finalise;}
 			fclose(cci);
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 	else{// Build Content 0
 		result = build_NCCH(usrset);
 		if(result < 0) { 
-			fprintf(stderr,"[ERROR] %s generation failed\n",usrset->build_ncch_type == CXI? "CXI" : "CFA"); 
+			//fprintf(stderr,"[ERROR] %s generation failed\n",usrset->build_ncch_type == CXI? "CXI" : "CFA"); 
 			fprintf(stderr,"[RESULT] Failed to build outfile\n"); 
 			goto fail_finalise; 
 		}	

@@ -124,7 +124,7 @@ typedef struct
 typedef struct
 {
 	keys_struct *keys;
-	desc_settings *yaml_set;
+	rsf_settings *yaml_set;
 	COMPONENT_STRUCT *out;
 
 	struct{
@@ -145,6 +145,7 @@ typedef struct
 		bool FreeProductCode;
 		bool IsCfa;
 		bool IsBuildingCodeSection;
+		bool UseRomFS;
 	} Options;
 
 	struct

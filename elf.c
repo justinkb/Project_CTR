@@ -157,8 +157,8 @@ int ImportExeFsCodeBinaryFromFile(ncch_settings *ncchset)
 
 u32 GetPageSize(ncch_settings *ncchset)
 {
-	if(ncchset->yaml_set->DefaultSpec.Option.PageSize)
-		return strtoul(ncchset->yaml_set->DefaultSpec.Option.PageSize,NULL,10);
+	if(ncchset->yaml_set->Option.PageSize)
+		return strtoul(ncchset->yaml_set->Option.PageSize,NULL,10);
 	return 0x1000;
 }
 
@@ -181,16 +181,16 @@ int GetBSS_SizeFromElf(ElfContext *elf, u8 *ElfFile, ncch_settings *ncchset)
 
 int ImportPlainRegionFromElf(ElfContext *elf, u8 *ElfFile, ncch_settings *ncchset) // Doesn't work same as N makerom
 {
-	if(!ncchset->yaml_set->DefaultSpec.PlainRegionNum) return 0;
-	u16 *Index = malloc(sizeof(u16)*ncchset->yaml_set->DefaultSpec.PlainRegionNum);
+	if(!ncchset->yaml_set->PlainRegionNum) return 0;
+	u16 *Index = malloc(sizeof(u16)*ncchset->yaml_set->PlainRegionNum);
 
 	/* Getting Index Values for each section */
-	for(int i = 0; i < ncchset->yaml_set->DefaultSpec.PlainRegionNum; i++){
-		Index[i] = GetElfSectionIndexFromName(ncchset->yaml_set->DefaultSpec.PlainRegion[i],elf,ElfFile);
+	for(int i = 0; i < ncchset->yaml_set->PlainRegionNum; i++){
+		Index[i] = GetElfSectionIndexFromName(ncchset->yaml_set->PlainRegion[i],elf,ElfFile);
 	}
 
 	// Eliminating Duplicated Sections
-	for(int i = ncchset->yaml_set->DefaultSpec.PlainRegionNum - 1; i >= 0; i--){
+	for(int i = ncchset->yaml_set->PlainRegionNum - 1; i >= 0; i--){
 		for(int j = i-1; j >= 0; j--){
 			if(Index[i] == Index[j]) Index[i] = 0;
 		}
@@ -198,7 +198,7 @@ int ImportPlainRegionFromElf(ElfContext *elf, u8 *ElfFile, ncch_settings *ncchse
 
 	/* Calculating Total Size of Data */
 	u64 TotalSize = 0;
-	for(int i = 0; i < ncchset->yaml_set->DefaultSpec.PlainRegionNum; i++){
+	for(int i = 0; i < ncchset->yaml_set->PlainRegionNum; i++){
 		TotalSize += elf->Sections[Index[i]].Size;
 	}
 	
@@ -210,7 +210,7 @@ int ImportPlainRegionFromElf(ElfContext *elf, u8 *ElfFile, ncch_settings *ncchse
 
 	/* Storing Sections */
 	u64 pos = 0;
-	for(int i = 0; i < ncchset->yaml_set->DefaultSpec.PlainRegionNum; i++){
+	for(int i = 0; i < ncchset->yaml_set->PlainRegionNum; i++){
 		memcpy((ncchset->Sections.PlainRegion.buffer+pos),elf->Sections[Index[i]].Ptr,elf->Sections[Index[i]].Size);
 		pos += elf->Sections[Index[i]].Size;
 	}
@@ -227,11 +227,11 @@ int CreateExeFsCode(ElfContext *elf, u8 *ElfFile, ncch_settings *ncchset)
 	CodeSegment Data;
 	memset(&Data,0,sizeof(CodeSegment));
 
-	int result = CreateCodeSegmentFromElf(&Text,elf,ElfFile,ncchset->yaml_set->DefaultSpec.ExeFs.Text,ncchset->yaml_set->DefaultSpec.ExeFs.TextNum);
+	int result = CreateCodeSegmentFromElf(&Text,elf,ElfFile,ncchset->yaml_set->ExeFs.Text,ncchset->yaml_set->ExeFs.TextNum);
 	if(result) return result;
-	result = CreateCodeSegmentFromElf(&RO,elf,ElfFile,ncchset->yaml_set->DefaultSpec.ExeFs.ReadOnly,ncchset->yaml_set->DefaultSpec.ExeFs.ReadOnlyNum);
+	result = CreateCodeSegmentFromElf(&RO,elf,ElfFile,ncchset->yaml_set->ExeFs.ReadOnly,ncchset->yaml_set->ExeFs.ReadOnlyNum);
 	if(result) return result;
-	result = CreateCodeSegmentFromElf(&Data,elf,ElfFile,ncchset->yaml_set->DefaultSpec.ExeFs.ReadWrite,ncchset->yaml_set->DefaultSpec.ExeFs.ReadWriteNum);
+	result = CreateCodeSegmentFromElf(&Data,elf,ElfFile,ncchset->yaml_set->ExeFs.ReadWrite,ncchset->yaml_set->ExeFs.ReadWriteNum);
 	if(result) return result;
 
 	/* Allocating Buffer for ExeFs Code */

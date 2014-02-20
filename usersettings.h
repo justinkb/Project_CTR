@@ -18,7 +18,7 @@ typedef enum
 typedef enum
 {
 	auto_gen,
-	use_desc_file,
+	use_spec_file,
 	app,
 	demo,
 	dlp,
@@ -35,10 +35,8 @@ typedef enum
 
 static const char output_extention[4][5] = {".cxi",".cfa",".cci",".cia"};
 
-
 typedef struct
 {	
-	// Based on SDK 5.x makerom
 	struct{
 		// Booleans
 		int NoPadding;
@@ -52,8 +50,8 @@ typedef struct
 		char *PageSize;
 		
 		// String Collections
-		u32 AppendSystemCallNum;
-		char **AppendSystemCall;
+		u32 AppendSystemCallNum; // DELETE
+		char **AppendSystemCall; // DELETE
 	} Option;
 	
 	struct{
@@ -67,16 +65,16 @@ typedef struct
 		int CanShareDeviceMemory;
 		int UseOtherVariationSaveData;
 		int UseExtSaveData;
+		int UseExtendedSaveDataAccessControl;
 		int RunnableOnSleep;
 		int SpecialMemoryArrange;
 		
 		// Strings
-		char *ProgramId;
+		char *ProgramId; // DELETE
 		char *IdealProcessor;
 		char *Priority;
 		char *MemoryType;
 		char *SystemMode;
-		char *FirmwareVersion;
 		char *CoreVersion;
 		char *HandleTableSize;
 		char *SystemSaveDataId1;
@@ -85,8 +83,14 @@ typedef struct
 		char *OtherUserSaveDataId2;
 		char *OtherUserSaveDataId3;
 		char *ExtSaveDataId;
-		char *ExtSaveDataNumber;
 		char *AffinityMask;
+		// Strings From DESC
+		char *DescVersion;
+		char *CryptoKey; // DELETE
+		char *ResourceLimitCategory;
+		char *ReleaseKernelMajor;
+		char *ReleaseKernelMinor;
+		char *MaxCpu;
 		
 		// String Collections
 		u32 MemoryMappingNum;
@@ -96,15 +100,17 @@ typedef struct
 		u32 FileSystemAccessNum;
 		char **FileSystemAccess;
 		u32 IoAccessControlNum;
-		char **IoAccessControl;
+		char **IoAccessControl; //Equiv to Arm9AccessControl
 		u32 InterruptNumbersNum;
 		char **InterruptNumbers;
 		u32 SystemCallAccessNum;
 		char **SystemCallAccess;
 		u32 ServiceAccessControlNum;
 		char **ServiceAccessControl;
-		u32 StorageIdNum;
-		char **StorageId;
+		u32 StorageIdNum; // DELETE
+		char **StorageId; // DELETE
+		u32 AccessibleSaveDataIdsNum;
+		char **AccessibleSaveDataIds;
 	} AccessControlInfo;
 
 	struct{
@@ -137,7 +143,7 @@ typedef struct
 	struct{
 		// Strings
 		char *HostRoot;
-		char *Padding;
+		char *Padding; // DELETE
 		char *SaveDataSize;
 		
 		// String Collections
@@ -171,7 +177,7 @@ typedef struct
 		char *Version;
 		char *ContentsIndex;
 		char *Variation;
-		char *Use;
+		char *Use; // DELETE
 		char *ChildIndex;
 		char *DemoIndex;
 		char *TargetCategory;
@@ -187,57 +193,12 @@ typedef struct
 		char *CryptoType;
 		char *CardDevice;
 		char *MediaType;
+		char *BackupWriteWaitTime;
 	} CardInfo;
 	
-} rsf_settings;
+	struct{
+		bool Found;
 
-typedef struct
-{	
-	struct{
-		bool Found;
-	
-		// Booleans
-		int RunnableOnSleep;
-		int SpecialMemoryArrange;
-		int AutoGen;
-	
-		// String
-		char *ProgramIdDesc;
-		char *PriorityDesc;
-		char *AffinityMaskDesc;
-		char *IdealProcessorDesc;
-		char *FirmwareVersionDesc;		
-		char *HandleTableSizeDesc;
-		char *MemoryTypeDesc;
-		char *DescVersionDesc;
-		char *SystemModeDesc;
-		char *AccCtlDescSign;
-		char *AccCtlDescBin;
-		char *CryptoKey;
-		char *ResourceLimitCategory;
-		char *ReleaseKernelMajor;
-		char *ReleaseKernelMinor;
-		
-		// String Collections
-		u32 ServiceAccessControlDescNum;
-		char **ServiceAccessControlDesc;
-		u32 MemoryMappingDescNum;
-		char **MemoryMappingDesc;
-		u32 IORegisterMappingDescNum;
-		char **IORegisterMappingDesc;
-		u32 Arm9AccessControlDescNum;
-		char **Arm9AccessControlDesc; //Equiv to IoAccessControl
-		u32 EnableInterruptNumbersNum;
-		char **EnableInterruptNumbers;
-		u32 EnableSystemCallsNum;
-		char **EnableSystemCalls;
-		u32 StorageIdDescNum;
-		char **StorageIdDesc;
-	} AccessControlDescriptor;
-	
-	struct{
-		bool Found;
-		
 		char *D;
 		char *P;
 		char *Q;
@@ -246,10 +207,11 @@ typedef struct
 		char *InverseQ;
 		char *Modulus;
 		char *Exponent;
+
+		char *AccCtlDescSign;
+		char *AccCtlDescBin;
 	} CommonHeaderKey;
-	
-	rsf_settings DefaultSpec;
-} desc_settings;
+} rsf_settings;
 
 typedef struct
 {
@@ -260,7 +222,7 @@ typedef struct
 	output_format out_format;
 
 	// Content0
-	bool Content0IsCci;
+	bool ConvertCci;
 	char *CciPath;
 	bool Content0IsSrl;
 	char *SrlPath;
@@ -273,7 +235,6 @@ typedef struct
 	// Ncch0 Build
 	bool IsBuildingNCCH0;
 	output_format build_ncch_type;
-	char *desc_path;
 	char *elf_path;
 	char *icon_path;
 	char *banner_path;
@@ -300,7 +261,7 @@ typedef struct
 	keys_struct keys; 
 	
 	// RSF/DESC Imported Settings
-	desc_settings yaml_set;
+	rsf_settings yaml_set;
 } user_settings;
 #endif
 
@@ -312,7 +273,4 @@ int ParseArgs(int argc, char *argv[], user_settings *usr_settings);
 void ReadYAMLtest(char *filepath);
 
 void InvalidateRSFBooleans(rsf_settings *rsf_set);
-void InvalidateDESCBooleans(desc_settings *desc_set);
-
 void free_RsfSettings(rsf_settings *set);
-void free_DescSettings(desc_settings *set);

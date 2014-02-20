@@ -31,7 +31,7 @@ int ParseArgs(int argc, char *argv[], user_settings *usr_settings)
 	// Allocating Memory for Content Path Ptrs
 	usr_settings->ContentPath = malloc(CIA_MAX_CONTENT*sizeof(char*));
 	if(usr_settings->ContentPath == NULL){
-		fprintf(stderr,"[ERROR] MEM ERROR\n");
+		fprintf(stderr,"[SETTING ERROR] MEM ERROR\n");
 		return USR_MEM_ERROR;
 	}
 	memset(usr_settings->ContentPath,0,CIA_MAX_CONTENT*sizeof(char*));
@@ -60,13 +60,13 @@ int ParseArgs(int argc, char *argv[], user_settings *usr_settings)
 	if(!usr_settings->outfile){
 		char *source_path = NULL;
 		if(usr_settings->IsBuildingNCCH0) source_path = usr_settings->rsf_path;
-		else if(usr_settings->Content0IsCci) source_path = usr_settings->CciPath;
+		else if(usr_settings->ConvertCci) source_path = usr_settings->CciPath;
 		else if(usr_settings->Content0IsSrl) source_path = usr_settings->SrlPath;
 		else source_path = usr_settings->ContentPath[0];
 		u16 outfile_len = strlen(source_path) + 3;
 		usr_settings->outfile = malloc(outfile_len);
 		if(!usr_settings->outfile){
-			fprintf(stderr,"[ERROR] MEM ERROR\n");
+			fprintf(stderr,"[SETTING ERROR] MEM ERROR\n");
 			return USR_MEM_ERROR;
 		}
 		usr_settings->outfile_mallocd = true;
@@ -82,7 +82,7 @@ void SetDefaults(user_settings *set)
 	#ifdef RETAIL_FSIGN
 	set->accessdesc = auto_gen;
 	#else
-	set->accessdesc = use_desc_file;
+	set->accessdesc = use_spec_file;
 	#endif
 	set->include_exefs_logo = false;
 	set->out_format = CXI;
@@ -90,7 +90,7 @@ void SetDefaults(user_settings *set)
 
 	// Content0 Info
 	set->Content0IsNcch = true;
-	set->Content0IsCci = false;
+	set->ConvertCci = false;
 	set->Content0IsSrl = false;
 
 	set->Version[0] = 0xffff;
@@ -129,14 +129,6 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 			return USR_ARG_REQ_PARAM;
 		}
 		set->rsf_path = argv[i+1];
-		return 2;
-	}
-	else if(strcmp(argv[i],"-desc") == 0){
-		if(!HasParam){
-			PrintNeedsParam("-desc");
-			return USR_ARG_REQ_PARAM;
-		}
-		set->desc_path = argv[i+1];
 		return 2;
 	}
 	else if(strcmp(argv[i],"-icon") == 0){
@@ -210,7 +202,7 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 			PrintNeedsParam("-cci");
 			return USR_ARG_REQ_PARAM;
 		}
-		set->Content0IsCci = true;
+		set->ConvertCci = true;
 		set->Content0IsSrl = false;
 		set->Content0IsNcch = false;
 		set->IsBuildingNCCH0 = false;
@@ -223,7 +215,7 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 			PrintNeedsParam("-srl");
 			return USR_ARG_REQ_PARAM;
 		}
-		set->Content0IsCci = false;
+		set->ConvertCci = false;
 		set->Content0IsSrl = true;
 		set->Content0IsNcch = false;
 		set->IsBuildingNCCH0 = false;
@@ -323,25 +315,27 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		free(key);
 		return 2;
 	}
-	#else
+	#endif
 	else if(strcmp(argv[i],"-accessdesc") == 0){
 		if(!HasParam){
 			PrintNeedsParam("-accessdesc");
 			return USR_ARG_REQ_PARAM;
 		}
 		
-		if(strcasecmp(argv[i+1],"usedesc") == 0) set->accessdesc = use_desc_file;
-		else if(strcasecmp(argv[i+1],"autogen") == 0 || strcasecmp(argv[i+1],"auto") == 0) set->accessdesc = auto_gen;
-		else if(strcasecmp(argv[i+1],"app") == 0) set->accessdesc = app;
-		else if(strcasecmp(argv[i+1],"demo") == 0) set->accessdesc = demo;
-		else if(strcasecmp(argv[i+1],"dlpchild") == 0 || strcasecmp(argv[i+1],"dlp") == 0) set->accessdesc = dlp;
+		if(strcasecmp(argv[i+1],"UseRsf") == 0) set->accessdesc = use_spec_file;
+		else if(strcasecmp(argv[i+1],"AutoGen") == 0 || strcasecmp(argv[i+1],"Auto") == 0) set->accessdesc = auto_gen;
+#ifndef RETAIL_FSIGN
+		else if(strcasecmp(argv[i+1],"App") == 0) set->accessdesc = app;
+		else if(strcasecmp(argv[i+1],"Demo") == 0) set->accessdesc = demo;
+		else if(strcasecmp(argv[i+1],"DlpChild") == 0 || strcasecmp(argv[i+1],"Dlp") == 0) set->accessdesc = dlp;
+#endif
 		else{
 			fprintf(stderr,"[-] Accessdesc pre-set '%s' not recognised\n",argv[i+1]);
 			return USR_BAD_ARG;
 		}
 		return 2;
 	}
-	#endif
+	
 	else if(strcmp(argv[i],"-exefslogo") == 0){
 		if(HasParam){
 			PrintNoNeedParam("-exefslogo");
@@ -401,14 +395,14 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		}
 		char *pos = strstr(argv[i+1],":");
 		if(!pos){
-			fprintf(stderr,"[ERROR] Bad argument '%s %s', correct format:\n",argv[i],argv[i+1]);
+			fprintf(stderr,"[SETTING ERROR] Bad argument '%s %s', correct format:\n",argv[i],argv[i+1]);
 			fprintf(stderr,"	-content <CONTENT PATH>:<INDEX>\n");
 			fprintf(stderr,"  If generating a CIA, then use the format:\n");
 			fprintf(stderr,"	-content <CONTENT PATH>:<INDEX>:<ID>\n");
 			return USR_BAD_ARG;
 		}		
 		if(strlen(pos) < 2){
-			fprintf(stderr,"[ERROR] Bad argument '%s %s', correct format:\n",argv[i],argv[i+1]);
+			fprintf(stderr,"[SETTING ERROR] Bad argument '%s %s', correct format:\n",argv[i],argv[i+1]);
 			fprintf(stderr,"	-content <CONTENT PATH>:<INDEX>\n");
 			fprintf(stderr,"  If generating a CIA, then use the format:\n");
 			fprintf(stderr,"	-content <CONTENT PATH>:<INDEX>:<ID>\n");
@@ -423,12 +417,12 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		
 		if(content_index == 0) set->IsBuildingNCCH0 = false;
 		if(set->ContentPath[content_index] != NULL){
-			fprintf(stderr,"[-] Content %d is already specified\n",content_index);
+			fprintf(stderr,"[SETTING ERROR] Content %d is already specified\n",content_index);
 			return USR_BAD_ARG;
 		}
 		set->ContentPath[content_index] = malloc(path_len);
 		if(set->ContentPath[content_index] == NULL){
-			fprintf(stderr,"[-] MEM ERROR\n");
+			fprintf(stderr,"[SETTING ERROR] MEM ERROR\n");
 			return USR_MEM_ERROR;
 		}
 		memset(set->ContentPath[content_index],0,path_len);
@@ -443,12 +437,14 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		/* Return Next Arg Pos*/
 		return 2;
 	}
+	/*
 	else if(strncmp(argv[i],"-D",2) == 0){
 		fprintf(stderr,"[WARNING] -DNAME=VALUE not implemented yet\n");
 	}
+	*/
 
 	// If not a valid argument
-	fprintf(stderr,"[ERROR] Unrecognised argument '%s'\n",argv[i]);
+	fprintf(stderr,"[SETTING ERROR] Unrecognised argument '%s'\n",argv[i]);
 	return USR_UNK_ARG;
 }
 
@@ -456,25 +452,25 @@ int CheckArgumentCombination(user_settings *set)
 {
 	for(int i = 0; i < CIA_MAX_CONTENT; i++){
 		if( i > CCI_MAX_CONTENT-1 && set->ContentPath[i] && set->out_format == CCI){
-			fprintf(stderr,"[ERROR] Content indexes > 7 are invalid for CCI\n");
+			fprintf(stderr,"[SETTING ERROR] Content indexes > 7 are invalid for CCI\n");
 			return USR_BAD_ARG;
 		}
 		if(set->ContentPath[i] && (set->out_format == CXI || set->out_format == CFA)){
-			fprintf(stderr,"[ERROR] You cannot specify content while outputting CXI/CFA files\n");
+			fprintf(stderr,"[SETTING ERROR] You cannot specify content while outputting CXI/CFA files\n");
 			return USR_BAD_ARG;
 		}
 	}
 	if((set->out_format == CXI || set->out_format == CFA) && set->build_ncch_type > 0){
-		fprintf(stderr,"[ERROR] Arguments '-f cxi|cfa' and '-ncch cxi|cfa' are invalid\n");
+		fprintf(stderr,"[SETTING ERROR] Arguments '-f cxi|cfa' and '-ncch cxi|cfa' are invalid\n");
 		return USR_BAD_ARG;
 	}
 	if(set->build_ncch_type > 0 && !set->IsBuildingNCCH0){
-		fprintf(stderr,"[ERROR] Arguments '-content %s:0' and '-ncch cxi|cfa' cannot be used together\n",set->ContentPath[0]);
+		fprintf(stderr,"[SETTING ERROR] Arguments '-content %s:0' and '-ncch cxi|cfa' cannot be used together\n",set->ContentPath[0]);
 		return USR_BAD_ARG;
 	}
 
 	if(set->elf_path && set->exefs_code_path){
-		fprintf(stderr,"[ERROR] Arguments '-elf' and '-code' cannot be used together\n");
+		fprintf(stderr,"[SETTING ERROR] Arguments '-elf' and '-code' cannot be used together\n");
 		return USR_BAD_ARG;
 	}
 
@@ -495,10 +491,6 @@ int CheckArgumentCombination(user_settings *set)
 		PrintNeedsArgument("-rsf");
 		return USR_BAD_ARG;
 	}
-	if((buildCXI && !set->desc_path) && !(set->exefs_code_path && (set->accessdesc != use_desc_file))){
-		PrintNeedsArgument("-desc");
-		return USR_BAD_ARG;
-	}
 	if(buildCXI && !set->exheader_path && set->exefs_code_path){
 		PrintNeedsArgument("-exheader");
 		return USR_BAD_ARG;
@@ -507,10 +499,6 @@ int CheckArgumentCombination(user_settings *set)
 	// Reporting bad arguments
 	if(!buildCXI && set->elf_path){
 		PrintArgumentInvalid("-elf");
-		return USR_BAD_ARG;
-	}
-	if(!buildCXI && set->desc_path){
-		PrintArgumentInvalid("-desc");
 		return USR_BAD_ARG;
 	}
 	if(!buildCXI && set->exefs_code_path){
@@ -555,17 +543,11 @@ void InvalidateRSFBooleans(rsf_settings *rsf_set)
 	rsf_set->AccessControlInfo.CanShareDeviceMemory = -1;
 	rsf_set->AccessControlInfo.UseOtherVariationSaveData = -1;
 	rsf_set->AccessControlInfo.UseExtSaveData = -1;
+	rsf_set->AccessControlInfo.UseExtendedSaveDataAccessControl = -1;
 	rsf_set->AccessControlInfo.RunnableOnSleep = -1;
 	rsf_set->AccessControlInfo.SpecialMemoryArrange = -1;
 	
 	rsf_set->BasicInfo.MediaFootPadding = -1;
-}
-
-void InvalidateDESCBooleans(desc_settings *desc_set)
-{
-	desc_set->AccessControlDescriptor.RunnableOnSleep = -1;
-	desc_set->AccessControlDescriptor.SpecialMemoryArrange = -1;
-	desc_set->AccessControlDescriptor.AutoGen = -1;
 }
 
 void init_UserSettings(user_settings *usr_settings)
@@ -589,7 +571,6 @@ void free_RsfSettings(rsf_settings *set)
 	free(set->AccessControlInfo.Priority);
 	free(set->AccessControlInfo.MemoryType);
 	free(set->AccessControlInfo.SystemMode);
-	free(set->AccessControlInfo.FirmwareVersion);
 	free(set->AccessControlInfo.CoreVersion);
 	free(set->AccessControlInfo.HandleTableSize);
 	free(set->AccessControlInfo.SystemSaveDataId1);
@@ -598,10 +579,15 @@ void free_RsfSettings(rsf_settings *set)
 	free(set->AccessControlInfo.OtherUserSaveDataId2);
 	free(set->AccessControlInfo.OtherUserSaveDataId3);
 	free(set->AccessControlInfo.ExtSaveDataId);
-	free(set->AccessControlInfo.ExtSaveDataNumber);
 	free(set->AccessControlInfo.SystemMode);	
 	free(set->AccessControlInfo.AffinityMask);
-	
+	free(set->AccessControlInfo.DescVersion);
+	free(set->AccessControlInfo.CryptoKey);
+	free(set->AccessControlInfo.ResourceLimitCategory);
+	free(set->AccessControlInfo.ReleaseKernelMajor);
+	free(set->AccessControlInfo.ReleaseKernelMinor);
+	free(set->AccessControlInfo.MaxCpu);
+
 	for(u32 i = 0; i < set->AccessControlInfo.MemoryMappingNum; i++){
 		free(set->AccessControlInfo.MemoryMapping[i]);
 	}
@@ -641,6 +627,11 @@ void free_RsfSettings(rsf_settings *set)
 		free(set->AccessControlInfo.StorageId[i]);
 	}
 	free(set->AccessControlInfo.StorageId);
+
+	for(u32 i = 0; i < set->AccessControlInfo.AccessibleSaveDataIdsNum; i++){
+		free(set->AccessControlInfo.AccessibleSaveDataIds[i]);
+	}
+	free(set->AccessControlInfo.AccessibleSaveDataIds);
 	
 	//SystemControlInfo
 	free(set->SystemControlInfo.AppType);
@@ -733,62 +724,8 @@ void free_RsfSettings(rsf_settings *set)
 	free(set->CardInfo.CryptoType);
 	free(set->CardInfo.CardDevice);
 	free(set->CardInfo.MediaType);
-}
+	free(set->CardInfo.BackupWriteWaitTime);
 
-void free_DescSettings(desc_settings *set)
-{
-	//AccessControlDescriptor
-	free(set->AccessControlDescriptor.ProgramIdDesc);
-	free(set->AccessControlDescriptor.PriorityDesc);
-	free(set->AccessControlDescriptor.AffinityMaskDesc);
-	free(set->AccessControlDescriptor.IdealProcessorDesc);
-	free(set->AccessControlDescriptor.FirmwareVersionDesc);
-	free(set->AccessControlDescriptor.HandleTableSizeDesc);
-	free(set->AccessControlDescriptor.MemoryTypeDesc);
-	free(set->AccessControlDescriptor.DescVersionDesc);
-	free(set->AccessControlDescriptor.SystemModeDesc);
-	free(set->AccessControlDescriptor.AccCtlDescSign);
-	free(set->AccessControlDescriptor.AccCtlDescBin);
-	free(set->AccessControlDescriptor.CryptoKey);
-	free(set->AccessControlDescriptor.ResourceLimitCategory);
-	free(set->AccessControlDescriptor.ReleaseKernelMajor);
-	free(set->AccessControlDescriptor.ReleaseKernelMinor);
-	
-	for(u32 i = 0; i < set->AccessControlDescriptor.ServiceAccessControlDescNum; i++){
-		free(set->AccessControlDescriptor.ServiceAccessControlDesc[i]);
-	}
-	free(set->AccessControlDescriptor.ServiceAccessControlDesc);
-	
-	for(u32 i = 0; i < set->AccessControlDescriptor.MemoryMappingDescNum; i++){
-		free(set->AccessControlDescriptor.MemoryMappingDesc[i]);
-	}
-	free(set->AccessControlDescriptor.MemoryMappingDesc);
-	
-	for(u32 i = 0; i < set->AccessControlDescriptor.IORegisterMappingDescNum; i++){
-		free(set->AccessControlDescriptor.IORegisterMappingDesc[i]);
-	}
-	free(set->AccessControlDescriptor.IORegisterMappingDesc);
-	
-	for(u32 i = 0; i < set->AccessControlDescriptor.Arm9AccessControlDescNum; i++){
-		free(set->AccessControlDescriptor.Arm9AccessControlDesc[i]);
-	}
-	free(set->AccessControlDescriptor.Arm9AccessControlDesc);
-	
-	for(u32 i = 0; i < set->AccessControlDescriptor.EnableInterruptNumbersNum; i++){
-		free(set->AccessControlDescriptor.EnableInterruptNumbers[i]);
-	}
-	free(set->AccessControlDescriptor.EnableInterruptNumbers);
-	
-	for(u32 i = 0; i < set->AccessControlDescriptor.EnableSystemCallsNum; i++){
-		free(set->AccessControlDescriptor.EnableSystemCalls[i]);
-	}
-	free(set->AccessControlDescriptor.EnableSystemCalls);
-	
-	for(u32 i = 0; i < set->AccessControlDescriptor.StorageIdDescNum; i++){
-		free(set->AccessControlDescriptor.StorageIdDesc[i]);
-	}
-	free(set->AccessControlDescriptor.StorageIdDesc);
-	
 	//CommonHeaderKey
 	free(set->CommonHeaderKey.D);
 	free(set->CommonHeaderKey.P);
@@ -798,8 +735,8 @@ void free_DescSettings(desc_settings *set)
 	free(set->CommonHeaderKey.InverseQ);
 	free(set->CommonHeaderKey.Modulus);
 	free(set->CommonHeaderKey.Exponent);
-	
-	free_RsfSettings(&set->DefaultSpec);
+	free(set->CommonHeaderKey.AccCtlDescSign);
+	free(set->CommonHeaderKey.AccCtlDescBin);
 }
 
 void free_UserSettings(user_settings *usr_settings)
@@ -813,7 +750,7 @@ void free_UserSettings(user_settings *usr_settings)
 	}
 	
 	// Free Spec File Setting
-	free_DescSettings(&usr_settings->yaml_set);
+	free_RsfSettings(&usr_settings->yaml_set);
 	
 	// Free Key Data
 	FreeKeys(&usr_settings->keys);
@@ -833,22 +770,22 @@ void free_UserSettings(user_settings *usr_settings)
 
 void PrintNeedsArgument(char *arg)
 {
-	fprintf(stderr,"[ERROR] Argument '%s' is required\n",arg);
+	fprintf(stderr,"[SETTING ERROR] Argument '%s' is required\n",arg);
 }
 
 void PrintArgumentInvalid(char *arg)
 {
-	fprintf(stderr,"[ERROR] Argument '%s' is invalid\n",arg);
+	fprintf(stderr,"[SETTING ERROR] Argument '%s' is invalid\n",arg);
 }
 
 void PrintNeedsParam(char *arg)
 {
-	fprintf(stderr,"[ERROR] '%s' requires a parameter\n",arg);
+	fprintf(stderr,"[SETTING ERROR] '%s' requires a parameter\n",arg);
 }
 
 void PrintNoNeedParam(char *arg)
 {
-	fprintf(stderr,"[ERROR] '%s' does not take a parameter\n",arg);
+	fprintf(stderr,"[SETTING ERROR] '%s' does not take a parameter\n",arg);
 }
 
 void DisplayHelp(char *app_name)
@@ -869,15 +806,13 @@ void DisplayHelp(char *app_name)
 	printf("NCCH Options:\n");
 	printf(" -ncch0         <ncch format>       NCCH Format (cxi|cfa)\n");
 	printf(" -elf           <elf path>          ELF File\n");
-	printf(" -desc          <desc path>         Desc File\n");
 	printf(" -icon          <icon path>         Icon File\n");
 	printf(" -banner        <banner path>       Banner File\n");
 	printf(" -logo          <logo path>         Logo File\n");
 	printf(" -exefslogo                         Include Logo in ExeFs\n");
+	printf(" -accessdesc    <accessdesc type>   (AutoGen|UseRsf)\n");
 #ifdef RETAIL_FSIGN
-	printf(" -sysfixedkey   <32 hex chars>      Specify SystemFixed Key\n");
-#else
-	printf(" -accessdesc    <accessdesc type>   (AutoGen|UseDesc|App|Demo|Dlp)\n");
+	printf(" -sysfixedkey   <32 hex chars>      Specify SystemFixed Key\n");	
 #endif
 #ifdef PRIVATE_BUILD
 	printf(" -code          <code path>         Specify ExeFs code File\n");
