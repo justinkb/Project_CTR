@@ -30,8 +30,9 @@
 #include "keys_retail.h"
 #else
 #include "keys_debug.h"
-#include "accessdesc_sig.h"
 #endif
+#include "accessdesc_sig.h"
+
 #include "keyset.h"
 #include "usersettings.h"
 #include "libyaml/yaml.h"

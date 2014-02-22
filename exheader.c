@@ -90,6 +90,9 @@ int BuildExHeader(ncch_settings *ncchset)
 
 	result = set_AccessDesc(exhdrset,ncchset);
 	if(result) goto finish;
+
+	exhdrset->ExHdr->AccessDescriptor.ARM11SystemLocalCapabilities.Flags[6] = 5;
+
 finish:
 	if(result) fprintf(stderr,"[EXHEADER ERROR] Failed to create ExHeader\n");
 	free_ExHeaderSettings(exhdrset);
@@ -152,7 +155,7 @@ int get_ExHeaderSettingsFromNcchset(exheader_settings *exhdrset, ncch_settings *
 	if(ncchset->Options.UseOnSD)
 		exhdrset->ExHdr->CodeSetInfo.Flags.flag |= RetailSDAppFlag;
 	if(!ncchset->Options.UseRomFS) // Move this later
-		exhdrset->ExHdr->ARM11SystemLocalCapabilities.StorageInfo.OtherAttributes |= 1 << NOT_USE_ROMFS;
+		exhdrset->ExHdr->ARM11SystemLocalCapabilities.StorageInfo.OtherAttributes |= 1 << attribute_NOT_USE_ROMFS;
 
 	return 0;
 }
@@ -443,47 +446,47 @@ int SetARM11StorageInfo(exhdr_ARM11SystemLocalCapabilities *arm11, rsf_settings 
 	u32 AccessInfo = 0;
 	for(int i = 0; i < yaml->AccessControlInfo.FileSystemAccessNum; i++){
 		if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CategorySystemApplication") == 0)
-			AccessInfo |= 1 << CATEGORY_SYSTEM_APPLICATION;
+			AccessInfo |= 1 << fsaccess_CATEGORY_SYSTEM_APPLICATION;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CategoryHardwareCheck") == 0)
-			AccessInfo |= 1 << CATEGORY_HARDWARE_CHECK;
+			AccessInfo |= 1 << fsaccess_CATEGORY_HARDWARE_CHECK;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CategoryFileSystemTool") == 0)
-			AccessInfo |= 1 << CATEGORY_FILE_SYSTEM_TOOL;
+			AccessInfo |= 1 << fsaccess_CATEGORY_FILE_SYSTEM_TOOL;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"Debug") == 0)
-			AccessInfo |= 1 << DEBUG;
+			AccessInfo |= 1 << fsaccess_DEBUG;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"TwlCardBackup") == 0)
-			AccessInfo |= 1 << TWL_CARD_BACKUP;
+			AccessInfo |= 1 << fsaccess_TWL_CARD_BACKUP;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"TwlNandData") == 0)
-			AccessInfo |= 1 << TWL_NAND_DATA;
+			AccessInfo |= 1 << fsaccess_TWL_NAND_DATA;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"Boss") == 0)
-			AccessInfo |= 1 << BOSS;
+			AccessInfo |= 1 << fsaccess_BOSS;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"DirectSdmc") == 0)
-			AccessInfo |= 1 << DIRECT_SDMC;
+			AccessInfo |= 1 << fsaccess_DIRECT_SDMC;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"Core") == 0)
-			AccessInfo |= 1 << CORE;
+			AccessInfo |= 1 << fsaccess_CORE;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CtrNandRo") == 0)
-			AccessInfo |= 1 << CTR_NAND_RO;
+			AccessInfo |= 1 << fsaccess_CTR_NAND_RO;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CtrNandRw") == 0)
-			AccessInfo |= 1 << CTR_NAND_RW;
+			AccessInfo |= 1 << fsaccess_CTR_NAND_RW;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CtrNandRoWrite") == 0)
-			AccessInfo |= 1 << CTR_NAND_RO_WRITE;
+			AccessInfo |= 1 << fsaccess_CTR_NAND_RO_WRITE;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CategorySystemSettings") == 0)
-			AccessInfo |= 1 << CATEGORY_SYSTEM_SETTINGS;
+			AccessInfo |= 1 << fsaccess_CATEGORY_SYSTEM_SETTINGS;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CardBoard") == 0)
-			AccessInfo |= 1 << CARD_BOARD;
+			AccessInfo |= 1 << fsaccess_CARD_BOARD;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"ExportImportIvs") == 0)
-			AccessInfo |= 1 << EXPORT_IMPORT_IVS;
+			AccessInfo |= 1 << fsaccess_EXPORT_IMPORT_IVS;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"DirectSdmcWrite") == 0)
-			AccessInfo |= 1 << DIRECT_SDMC_WRITE;
+			AccessInfo |= 1 << fsaccess_DIRECT_SDMC_WRITE;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"SwitchCleanup") == 0)
-			AccessInfo |= 1 << SWITCH_CLEANUP;
+			AccessInfo |= 1 << fsaccess_SWITCH_CLEANUP;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"SaveDataMove") == 0)
-			AccessInfo |= 1 << SAVE_DATA_MOVE;
+			AccessInfo |= 1 << fsaccess_SAVE_DATA_MOVE;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"Shop") == 0)
-			AccessInfo |= 1 << SHOP;
+			AccessInfo |= 1 << fsaccess_SHOP;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"Shell") == 0)
-			AccessInfo |= 1 << SHELL;
+			AccessInfo |= 1 << fsaccess_SHELL;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CategoryHomeMenu") == 0)
-			AccessInfo |= 1 << CATEGORY_HOME_MENU;
+			AccessInfo |= 1 << fsaccess_CATEGORY_HOME_MENU;
 		else{
 			fprintf(stderr,"[EXHEADER ERROR] Invalid FileSystemAccess Name: '%s'\n",yaml->AccessControlInfo.FileSystemAccess[i]);
 			return EXHDR_BAD_YAML_OPT;
@@ -602,7 +605,7 @@ int SetARM11StorageInfoAccessibleSaveDataIds(exhdr_ARM11SystemLocalCapabilities 
 		}
 	}
 
-	arm11->StorageInfo.OtherAttributes |= 1 << USE_EXTENDED_SAVEDATA_ACCESS_CONTROL;
+	arm11->StorageInfo.OtherAttributes |= 1 << attribute_USE_EXTENDED_SAVEDATA_ACCESS_CONTROL;
 
 	/* UseOtherVariationSaveData Flag */
 	if(yaml->AccessControlInfo.UseOtherVariationSaveData){
@@ -1012,23 +1015,23 @@ int SetARM11KernelDescOtherCapabilities(ARM11KernelCapabilityDescriptor *desc, r
 	u32 OtherCapabilities = 0;
 	
 	if(!yaml->AccessControlInfo.DisableDebug)
-		OtherCapabilities |= 1 << PERMIT_DEBUG;
+		OtherCapabilities |= 1 << othcap_PERMIT_DEBUG;
 	if(yaml->AccessControlInfo.EnableForceDebug)
-		OtherCapabilities |= 1 << FORCE_DEBUG;
+		OtherCapabilities |= 1 << othcap_FORCE_DEBUG;
 	if(yaml->AccessControlInfo.CanUseNonAlphabetAndNumber)
-		OtherCapabilities |= 1 << CAN_USE_NON_ALPHABET_AND_NUMBER;
+		OtherCapabilities |= 1 << othcap_CAN_USE_NON_ALPHABET_AND_NUMBER;
 	if(yaml->AccessControlInfo.CanWriteSharedPage)
-		OtherCapabilities |= 1 << CAN_WRITE_SHARED_PAGE;
+		OtherCapabilities |= 1 << othcap_CAN_WRITE_SHARED_PAGE;
 	if(yaml->AccessControlInfo.CanUsePrivilegedPriority)
-		OtherCapabilities |= 1 << CAN_USE_PRIVILEGE_PRIORITY;
+		OtherCapabilities |= 1 << othcap_CAN_USE_PRIVILEGE_PRIORITY;
 	if(yaml->AccessControlInfo.PermitMainFunctionArgument)
-		OtherCapabilities |= 1 << PERMIT_MAIN_FUNCTION_ARGUMENT;
+		OtherCapabilities |= 1 << othcap_PERMIT_MAIN_FUNCTION_ARGUMENT;
 	if(yaml->AccessControlInfo.CanShareDeviceMemory)
-		OtherCapabilities |= 1 << CAN_SHARE_DEVICE_MEMORY;
+		OtherCapabilities |= 1 << othcap_CAN_SHARE_DEVICE_MEMORY;
 	if(yaml->AccessControlInfo.RunnableOnSleep)
-		OtherCapabilities |= 1 << RUNNABLE_ON_SLEEP;
+		OtherCapabilities |= 1 << othcap_RUNNABLE_ON_SLEEP;
 	if(yaml->AccessControlInfo.SpecialMemoryArrange)
-		OtherCapabilities |= 1 << SPECIAL_MEMORY_ARRANGE;
+		OtherCapabilities |= 1 << othcap_SPECIAL_MEMORY_ARRANGE;
 
 	if(yaml->AccessControlInfo.MemoryType){
 		u32 MemType = 0; 
@@ -1123,21 +1126,21 @@ int get_ExHeaderARM9AccessControlInfo(exhdr_ARM9AccessControlInfo *arm9, rsf_set
 	u32 Arm9AccessControl = 0;
 	for(int i = 0; i < yaml->AccessControlInfo.IoAccessControlNum; i++){
 		if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"FsMountNand") == 0)
-			Arm9AccessControl |= 1 << FS_MOUNT_NAND;
+			Arm9AccessControl |= 1 << arm9cap_FS_MOUNT_NAND;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"FsMountNandRoWrite") == 0)
-			Arm9AccessControl |= 1 << FS_MOUNT_NAND_RO_WRITE;
+			Arm9AccessControl |= 1 << arm9cap_FS_MOUNT_NAND_RO_WRITE;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"FsMountTwln") == 0)
-			Arm9AccessControl |= 1 << FS_MOUNT_TWLN;
+			Arm9AccessControl |= 1 << arm9cap_FS_MOUNT_TWLN;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"FsMountWnand") == 0)
-			Arm9AccessControl |= 1 << FS_MOUNT_WNAND;
+			Arm9AccessControl |= 1 << arm9cap_FS_MOUNT_WNAND;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"FsMountCardSpi") == 0)
-			Arm9AccessControl |= 1 << FS_MOUNT_CARD_SPI;
+			Arm9AccessControl |= 1 << arm9cap_FS_MOUNT_CARD_SPI;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"UseSdif3") == 0)
-			Arm9AccessControl |= 1 << USE_SDIF3;
+			Arm9AccessControl |= 1 << arm9cap_USE_SDIF3;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"CreateSeed") == 0)
-			Arm9AccessControl |= 1 << CREATE_SEED;
+			Arm9AccessControl |= 1 << arm9cap_CREATE_SEED;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"UseCardSpi") == 0)
-			Arm9AccessControl |= 1 << USE_CARD_SPI;
+			Arm9AccessControl |= 1 << arm9cap_USE_CARD_SPI;
 		else{
 			fprintf(stderr,"[EXHEADER ERROR] Invalid IoAccessControl Name: '%s'\n",yaml->AccessControlInfo.IoAccessControl[i]);
 			return EXHDR_BAD_YAML_OPT;
@@ -1146,11 +1149,11 @@ int get_ExHeaderARM9AccessControlInfo(exhdr_ARM9AccessControlInfo *arm9, rsf_set
 	
 	for(int i = 0; i < yaml->AccessControlInfo.FileSystemAccessNum; i++){
 		if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"DirectSdmc") == 0)
-			Arm9AccessControl |= 1 << USE_DIRECT_SDMC;
+			Arm9AccessControl |= 1 << arm9cap_USE_DIRECT_SDMC;
 	}
 
 	if(yaml->Option.UseOnSD)
-		Arm9AccessControl |= 1 << SD_APPLICATION;
+		Arm9AccessControl |= 1 << arm9cap_SD_APPLICATION;
 
 	u32_to_u8(arm9->descriptors,Arm9AccessControl,LE);
 

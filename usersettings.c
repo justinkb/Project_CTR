@@ -555,6 +555,111 @@ void init_UserSettings(user_settings *usr_settings)
 	memset(usr_settings,0,sizeof(user_settings));
 }
 
+void free_YamlSettings(yaml_settings *set)
+{
+	// Option
+	free(set->Option.PageSize);
+	
+	// RomFs
+	free(set->RomFs.HostRoot);
+	free_StringCollection(set->RomFs.DefaultReject,set->RomFs.DefaultRejectNum);
+	free_StringCollection(set->RomFs.Reject,set->RomFs.RejectNum);
+	free_StringCollection(set->RomFs.Include,set->RomFs.IncludeNum);
+	free_StringCollection(set->RomFs.File,set->RomFs.FileNum);
+
+	// ExeFs
+	free(set->ExeFs.StackSize);
+	free_StringCollection(set->ExeFs.Text,set->ExeFs.TextNum);
+	free_StringCollection(set->ExeFs.ReadOnly,set->ExeFs.ReadOnlyNum);
+	free_StringCollection(set->ExeFs.ReadWrite,set->ExeFs.ReadWriteNum);
+	
+	// Plain Region
+	free_StringCollection(set->PlainRegion,set->PlainRegionNum);
+
+	// BasicInfo
+	free(set->BasicInfo.Title);
+	free(set->BasicInfo.CompanyCode);
+	free(set->BasicInfo.ProductCode);
+	free(set->BasicInfo.ContentType);
+	free(set->BasicInfo.Logo);
+	free(set->BasicInfo.RemasterVersion);
+
+	// TitleInfo
+	free(set->TitleInfo.Category);
+	free(set->TitleInfo.ChildIndex);
+	free(set->TitleInfo.ContentsIndex);
+	free(set->TitleInfo.DataTitleIndex);
+	free(set->TitleInfo.DemoIndex);
+	free(set->TitleInfo.Version);
+	free(set->TitleInfo.TargetCategory);
+	free(set->TitleInfo.UniqueId);
+	free_StringCollection(set->TitleInfo.CategoryFlags,set->TitleInfo.CategoryFlagsNum);
+
+	// CardInfo
+	free(set->CardInfo.BackupWriteWaitTime);
+	free(set->CardInfo.CardDevice);
+	free(set->CardInfo.CardType);
+	free(set->CardInfo.CryptoType);
+	free(set->CardInfo.MediaSize);
+	free(set->CardInfo.MediaType);
+	free(set->CardInfo.WritableAddress);
+
+	// SystemInfo
+	free(set->SystemInfo.JumpId);
+	free(set->SystemInfo.SaveDataSize);
+
+	// Dependency
+	free_StringCollection(set->Dependency,set->DependencyNum);
+
+	// ARM11SystemLocalCapabilities
+	free(set->ARM11SystemLocalCapabilities.AppType);
+	free(set->ARM11SystemLocalCapabilities.MaxCpu);
+	free(set->ARM11SystemLocalCapabilities.CoreVersion);
+	free(set->ARM11SystemLocalCapabilities.IdealProcessor);
+	free(set->ARM11SystemLocalCapabilities.Priority);
+	free(set->ARM11SystemLocalCapabilities.AffinityMask);
+	free(set->ARM11SystemLocalCapabilities.SystemMode);
+	free(set->ARM11SystemLocalCapabilities.ResourceLimitCategory);
+
+	free_StringCollection(set->ARM11SystemLocalCapabilities.ServiceAccessControl,set->ARM11SystemLocalCapabilities.ServiceAccessControlNum);
+
+	// ARM11KernelCapabilities
+	free(set->ARM11KernelCapabilities.MemoryType);
+	free(set->ARM11KernelCapabilities.HandleTableSize);
+	free(set->ARM11KernelCapabilities.ReleaseKernelMajor);
+	free(set->ARM11KernelCapabilities.ReleaseKernelMinor);
+	free(set->ARM11KernelCapabilities.StorageInfo.SystemSaveDataId1);
+	free(set->ARM11KernelCapabilities.StorageInfo.SystemSaveDataId2);
+	free(set->ARM11KernelCapabilities.StorageInfo.OtherUserSaveDataId1);
+	free(set->ARM11KernelCapabilities.StorageInfo.OtherUserSaveDataId2);
+	free(set->ARM11KernelCapabilities.StorageInfo.OtherUserSaveDataId3);
+	free(set->ARM11KernelCapabilities.StorageInfo.ExtSaveDataId);
+
+	free_StringCollection(set->ARM11KernelCapabilities.MemoryMapping,set->ARM11KernelCapabilities.MemoryMappingNum);
+	free_StringCollection(set->ARM11KernelCapabilities.IORegisterMapping,set->ARM11KernelCapabilities.IORegisterMappingNum);
+	free_StringCollection(set->ARM11KernelCapabilities.FileSystemAccess,set->ARM11KernelCapabilities.FileSystemAccessNum);
+	free_StringCollection(set->ARM11KernelCapabilities.InterruptNumbers,set->ARM11KernelCapabilities.InterruptNumbersNum);
+	free_StringCollection(set->ARM11KernelCapabilities.SystemCallAccess,set->ARM11KernelCapabilities.SystemCallAccessNum);
+	free_StringCollection(set->ARM11KernelCapabilities.StorageInfo.AccessibleSaveDataIds,set->ARM11KernelCapabilities.StorageInfo.AccessibleSaveDataIdsNum);
+	
+	// ARM9AccessControlInfo
+	free(set->ARM9AccessControlInfo.DescVersion);
+	free_StringCollection(set->ARM9AccessControlInfo.IoAccessControl,set->ARM9AccessControlInfo.IoAccessControlNum);
+
+	// CommonHeaderKey
+	free(set->CommonHeaderKey.D);
+	free(set->CommonHeaderKey.Modulus);
+	free(set->CommonHeaderKey.Exponent);
+	free(set->CommonHeaderKey.AccCtlDescSign);
+	free(set->CommonHeaderKey.AccCtlDescBin);
+}
+
+void free_StringCollection(char **Collection, u32 StringNum)
+{
+	for(int i = 0; i < StringNum; i++)
+		free(Collection[i]);
+	free(Collection);
+}
 
 void free_RsfSettings(rsf_settings *set)
 {
@@ -805,6 +910,7 @@ void DisplayHelp(char *app_name)
 	//printf(" -DNAME=VALUE                       Substitute values in Spec files\n");
 	printf("NCCH Options:\n");
 	printf(" -ncch0         <ncch format>       NCCH Format (cxi|cfa)\n");
+	printf(" -desc          <desc path>         DESC File\n");
 	printf(" -elf           <elf path>          ELF File\n");
 	printf(" -icon          <icon path>         Icon File\n");
 	printf(" -banner        <banner path>       Banner File\n");

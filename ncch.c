@@ -57,16 +57,24 @@ int CheckCXISignature(u8 *Signature, u8 *CXI_HDR, u8 *PubK)
 int build_NCCH(user_settings *usrset)
 {
 	int result;
-
+#ifdef DEBUG
+	printf("[DEBUG] Init Settings\n");
+#endif
 	// Init Settings
 	ncch_settings *ncchset = malloc(sizeof(ncch_settings));
 	if(!ncchset) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 	init_NCCHSettings(ncchset);
 
+#ifdef DEBUG
+	printf("[DEBUG] Get Settings\n");
+#endif
 	// Get Settings
 	result = get_NCCHSettings(ncchset,usrset);
 	if(result) goto finish;
 
+#ifdef DEBUG
+	printf("[DEBUG] Build ExeFS Code/PlainRegion\n");
+#endif
 	// Build ExeFs Code Section
 	result = BuildExeFsCode(ncchset);
 	if(result) goto finish;
@@ -82,25 +90,46 @@ int build_NCCH(user_settings *usrset)
 	memdump(stdout,"Code Hash: ",hash,0x20);
 #endif
 	
+#ifdef DEBUG
+	printf("[DEBUG] Build Exheader\n");
+#endif
 	// Build ExHeader
 	result = BuildExHeader(ncchset);
 	if(result) goto finish;
 	
-	
+
+#ifdef DEBUG
+	printf("[DEBUG] Exefs\n");
+#endif
 	// Build ExeFs/RomFs
 	result = BuildExeFs(ncchset);
 	if(result) goto finish;
+#ifdef DEBUG
+	printf("[DEBUG] Build Romfs\n");
+#endif
 	result = BuildRomFs(ncchset);
 	if(result) goto finish;
 	
 	// Final Steps
+#ifdef DEBUG
+	printf("[DEBUG] Build common header\n");
+#endif
 	result = BuildCommonHeader(ncchset);
 	if(result) goto finish;
+#ifdef DEBUG
+	printf("[DEBUG] Encrypt Sections\n");
+#endif
 	result = EncryptNCCHSections(ncchset);
 	if(result) goto finish;
+#ifdef DEBUG
+	printf("[DEBUG] Write Sections\n");
+#endif
 	result = WriteNCCHSectionsToBuffer(ncchset);
 	if(result) goto finish;
 finish:
+#ifdef DEBUG
+	printf("[DEBUG] Finish Building\n");
+#endif
 	if(result) fprintf(stderr,"[NCCH ERROR] NCCH Build Process Failed\n");
 	free_NCCHSettings(ncchset);
 	return result;

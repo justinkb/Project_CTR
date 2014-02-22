@@ -39,7 +39,7 @@ typedef struct
 {	
 	struct{
 		// Booleans
-		int NoPadding;
+		int NoPadding; // DELETE
 		int AllowUnalignedSection;
 		int EnableCrypt;
 		int EnableCompress;
@@ -136,8 +136,8 @@ typedef struct
 		char *MediaSize;
 		char *ContentType;
 		char *Logo;
-		char *BackupMemoryType;
-		char *InitialCode;
+		char *BackupMemoryType;// Delete
+		char *InitialCode;// Delete
 	} BasicInfo;
 	
 	struct{
@@ -215,6 +215,183 @@ typedef struct
 
 typedef struct
 {
+	struct{
+		// Booleans
+		int EnableCrypt;
+		int EnableCompress;
+		int FreeProductCode;
+		int UseOnSD;
+
+		// Strings
+		char *PageSize;
+	} Option;
+	
+	struct{
+		// Strings
+		char *HostRoot;
+		
+		// String Collections
+		u32 DefaultRejectNum;
+		char **DefaultReject;
+		u32 RejectNum;
+		char **Reject;
+		u32 IncludeNum;
+		char **Include;
+		u32 FileNum;
+		char **File;
+	} RomFs;
+	
+	struct{
+		char *StackSize;
+
+		u32 TextNum;
+		char **Text;
+		u32 ReadOnlyNum;
+		char **ReadOnly;
+		u32 ReadWriteNum;
+		char **ReadWrite;
+	} ExeFs;
+	
+	u32 PlainRegionNum;
+	char **PlainRegion;
+	
+	struct{
+		// Strings
+		char *Title;
+		char *CompanyCode;
+		char *ProductCode;
+		char *ContentType;
+		char *Logo;
+		char *RemasterVersion;
+	} BasicInfo;
+
+	struct{
+		// Strings
+		char *Category;
+		char *UniqueId;
+		char *Version;
+		char *ContentsIndex;
+		char *DataTitleIndex;
+		char *ChildIndex;
+		char *DemoIndex;
+		char *TargetCategory;
+		
+		// String Collections
+		u32 CategoryFlagsNum;
+		char **CategoryFlags;
+	} TitleInfo;
+	
+	struct{
+		// Booleans
+		int MediaFootPadding;
+
+		// Strings
+		char *WritableAddress;
+		char *CardType;
+		char *CryptoType;
+		char *CardDevice;
+		char *MediaType;
+		char *BackupWriteWaitTime;
+		char *MediaSize;
+	} CardInfo;
+	
+	struct{
+		char *SaveDataSize;
+		char *JumpId;
+	} SystemInfo;
+
+	u32 DependencyNum;
+	char **Dependency;
+
+	struct{
+		// Strings
+		char *AppType;
+		char *MaxCpu;
+		char *CoreVersion;
+		char *IdealProcessor;
+		char *Priority;
+		char *AffinityMask;
+		char *SystemMode;
+		char *ResourceLimitCategory;
+
+		// String Collections
+		u32 ServiceAccessControlNum;
+		char **ServiceAccessControl;
+	} ARM11SystemLocalCapabilities;
+	
+	struct{
+		struct{ // Set from RSF
+			// Booleans
+			bool UseOtherVariationSaveData;
+			bool UseExtSaveData;
+			bool UseExtendedSaveDataAccessControl;
+
+			// Strings
+			char *SystemSaveDataId1;
+			char *SystemSaveDataId2;
+			char *OtherUserSaveDataId1;
+			char *OtherUserSaveDataId2;
+			char *OtherUserSaveDataId3;
+			char *ExtSaveDataId;
+
+			// String Collections
+			u32 AccessibleSaveDataIdsNum;
+			char **AccessibleSaveDataIds;
+		} StorageInfo;
+
+		// Booleans
+		int DisableDebug;
+		int EnableForceDebug;
+		int CanWriteSharedPage;
+		int CanUsePrivilegedPriority;
+		int CanUseNonAlphabetAndNumber;
+		int PermitMainFunctionArgument;
+		int CanShareDeviceMemory;
+		int RunnableOnSleep;
+		int SpecialMemoryArrange;
+		
+		// Strings
+		char *MemoryType;
+		char *HandleTableSize;
+		char *ReleaseKernelMajor;
+		char *ReleaseKernelMinor;
+		
+		// String Collections
+		u32 MemoryMappingNum;
+		char **MemoryMapping;
+		u32 IORegisterMappingNum;
+		char **IORegisterMapping;
+		u32 FileSystemAccessNum;
+		char **FileSystemAccess;
+		u32 InterruptNumbersNum;
+		char **InterruptNumbers;
+		u32 SystemCallAccessNum;
+		char **SystemCallAccess;
+	} ARM11KernelCapabilities;
+
+	struct{
+		// Strings
+		char *DescVersion;
+
+		// String Collections
+		u32 IoAccessControlNum;
+		char **IoAccessControl;
+	} ARM9AccessControlInfo;
+
+	struct{
+		bool Found;
+
+		char *D;
+		char *Modulus;
+		char *Exponent;
+
+		char *AccCtlDescSign;
+		char *AccCtlDescBin;
+	} CommonHeaderKey;
+} yaml_settings;
+
+typedef struct
+{
 	// General Settings
 	char *rsf_path;
 	bool outfile_mallocd;
@@ -274,3 +451,7 @@ void ReadYAMLtest(char *filepath);
 
 void InvalidateRSFBooleans(rsf_settings *rsf_set);
 void free_RsfSettings(rsf_settings *set);
+
+void SetYAMLBooleanDefaults(yaml_settings *yaml);
+void free_YamlSettings(yaml_settings *set);
+void free_StringCollection(char **Collection, u32 StringNum);

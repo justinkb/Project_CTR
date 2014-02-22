@@ -1,0 +1,76 @@
+BasicInfo:
+  Title:
+  CompanyCode:
+  ProductCode:
+  ContentType:
+  Logo:
+  RemasterVersion:
+
+TitleInfo:
+  UniqueId:
+  Category:
+  CategoryFlags:
+  TargetCategory:
+  #Variation
+  Version:
+  ContentsIndex:
+  DataTitleIndex:
+  ChildIndex:
+  DemoIndex:
+
+CardInfo:
+  MediaSize:
+  MediaFootPadding:
+
+  WritableAddress:
+  CardType:
+  CryptoType:
+  CardDevice:
+  MediaType:
+
+  BackupWriteWaitTime:
+
+SystemInfo:
+  SaveDataSize:
+  JumpID:
+
+StorageInfo:
+  #Extdata Related
+  UseExtSaveData: #Boolean
+  ExtSaveDataId:
+
+  #SystemSaveIds
+  SystemSaveDataId1:
+  SystemSaveDataId2:
+  
+  #Other Accessible SaveIds:
+  UseOtherVariationSaveData: #Boolean
+  OtherUserSaveDataId1:
+  OtherUserSaveDataId2:
+  OtherUserSaveDataId3:
+
+  #SDK 6+ Accessible SaveIds alternate method
+  # Renders Extdata/OtherUserSaveData values empty
+  UseExtendedSaveDataAccessControl: #Boolean
+  AccessibleSaveDataIds: # List of (max 6) SaveIds
+
+Option:
+  PageSize:
+
+  EnableCrypt: #Boolean
+  EnableCompress: #Boolean
+  FreeProductCode: #Boolean
+  UseOnSD: #Boolean
+
+ExeFs:
+  Text:
+  ReadOnly:
+  ReadWrite:
+  StackSize:
+
+RomFs:
+  HostRoot:
+  DefaultReject:
+  Reject:
+  Include:
+  File:
