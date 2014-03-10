@@ -151,6 +151,11 @@ int GetSettingsFromUsrset(cia_settings *ciaset, user_settings *usrset)
 	ciaset->content.content0_FileLen = usrset->Content0.size;
 	u32_to_u8(ciaset->Title_type,TYPE_CTR,BE);
 	ciaset->content.EncryptContents = usrset->EncryptContents;
+	if(ciaset->keys->aes.CommonKey[ciaset->keys->aes.CurrentCommonKey] == NULL && ciaset->content.EncryptContents){
+		fprintf(stderr,"[CIA WARNING] Common Key could not be loaded, CIA will not be encrypted\n");
+		ciaset->content.EncryptContents = false;
+	}
+	
 	ciaset->cert.ca_crl_version = 0;
 	ciaset->cert.signer_crl_version = 0;
 
@@ -172,7 +177,6 @@ int GetSettingsFromUsrset(cia_settings *ciaset, user_settings *usrset)
 	}
 	
 	ciaset->tik.ticket_format_ver = 1;
-	ciaset->tik.UnknownDataType = tik_normal;
 
 	int result = GenCertChildIssuer(ciaset->tik.TicketIssuer,usrset->keys.certs.tik_cert);
 	if(result) return result;

@@ -135,9 +135,6 @@ typedef struct
 	struct
 	{
 		u32 MediaSize;
-
-		fixed_accessdesc_type accessdesc;
-
 		bool IncludeExeFsLogo;
 		bool CompressCode;
 		bool UseOnSD;

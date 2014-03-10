@@ -51,7 +51,6 @@ typedef struct
 		u8 DeviceID[8];
 		u8 TicketVersion[3];
 		u8 TitleKey[16];
-		u8 UnknownDataType;
 	} tik;
 
 	struct{

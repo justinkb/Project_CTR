@@ -413,6 +413,8 @@ int GetNCSDFlags(cci_settings *cciset, rsf_settings *yaml)
 	}
 
 	/* Platform */
+	cciset->NCSD_Flags[MediaPlatformIndex] = CTR;
+	/*
 	if(!yaml->TitleInfo.Platform) cciset->NCSD_Flags[MediaPlatformIndex] = CTR;
 	else{
 		if(strcasecmp(yaml->TitleInfo.Platform,"ctr") == 0) cciset->NCSD_Flags[MediaPlatformIndex] = CTR;
@@ -421,6 +423,7 @@ int GetNCSDFlags(cci_settings *cciset, rsf_settings *yaml)
 			return INVALID_YAML_OPT;
 		}
 	}
+	*/
 
 	/* CardDevice */
 	if(!yaml->CardInfo.CardDevice) cciset->NCSD_Flags[CardDeviceFlag] = CARD_DEVICE_NONE;

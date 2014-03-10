@@ -1,51 +1,111 @@
 # Default value for application
 BasicInfo:
-  Title           : "Pyramids"
+  Title           : "Homebrew"
   CompanyCode     : "00"
-  ProductCode     : "CTR-T-JA9P"
+  MediaSize       : 128MB # 128MB / 256MB / 512MB / 1GB / 2GB
+  MediaFootPadding: false
+  ProductCode     : "CTR-P-HAXX"
   ContentType     : Application # Application / SystemUpdate / Manual / Child / Trial
-  Logo            : Licensed # Nintendo / Licensed / Distributed / iQue / iQueForSystem
+  Logo            : Licensed # Nintendo / Licensed / Distributed
   BackupMemoryType: None # None / 128KB / 512KB
-  
+
+Rom:
+  # Specifies the root path of the file system to include in the ROM.
+  #HostRoot: "$(ROMFS_ROOT)"
+  SaveDataSize: 512KB
+  DefaultReject: 
+   - .*
+  File: 
+   - "*"
+
+
 TitleInfo:
+  UniqueId: 0xff3ff
+  #TargetCategory: Contents
   Category: Application
-  UniqueId: 0x60f
-  
+  #DemoIndex: 1
+  Version: 0
+
+CardInfo:
+  #WritableAddress: 0x200
+  #CardType       : S2 # S1 / S2
+  #CryptoType     : 3 # 0 - 3
+  CardDevice     : NorFlash # NorFlash(0), None(1), BT(2)
+  #MediaType      : CARD1 # Card1 / Card2
+  BackupWriteWaitTime: 0
+
 Option:
   UseOnSD: true # true if App is to be installed to SD
   EnableCompress: true
   FreeProductCode: true
-  EnableCrypt    : true
-  
-Rom:
-  SaveDataSize: 128KB
-  
+  EnableCrypt    : false
+
 ExeFs: 
   ReadOnly: 
    - .rodata
-   #- RO
+   - RO
   ReadWrite: 
    - .data
-   #- RW
+   - RO
   Text: 
    - .text
-   #- STUP_ENTRY
+   - STUP_ENTRY
+   
+PlainRegion: 
+ - .module_id
   
-# Don't Modify Below here  
-AccessControlInfo: 
-  MaxCpu: 0x9E
-  AffinityMask: 1
-  CoreVersion: 2
-  DescVersion: 2
-  HandleTableSize: 512
-  IORegisterMapping: 
-   - 1ff50000-1ff57fff
-   - 1ff70000-1ff77fff
-  IdealProcessor: 0
-  MemoryMapping: 
-   - 1f000000-1f5fffff:r
-  Priority: 16
+AccessControlInfo:
+  MaxCpu: 0x0 # 0x9E
+  DisableDebug : true
+  EnableForceDebug : true
+  CanWriteSharedPage : true
+  CanUsePrivilegedPriority : true
+  CanUseNonAlphabetAndNumber : true
+  PermitMainFunctionArgument : true
+  CanShareDeviceMemory : true
+  #UseOtherVariationSaveData : true
+  #UseExtSaveData : true
+  RunnableOnSleep : true
+  SpecialMemoryArrange : true 
+  #ExtSaveDataId: 0xffffffff
+  SystemSaveDataId1: 0x220
+  SystemSaveDataId2: 0x00040010
+  #OtherUserSaveDataId1: 0x220
+  #OtherUserSaveDataId2: 0x330
+  #OtherUserSaveDataId3: 0x440
+  UseExtendedSaveDataAccessControl: true
+  AccessibleSaveDataIds: [0x101, 0x202, 0x303, 0x404, 0x505, 0x606]
+  IoAccessControl:
+   - FsMountNand # 0x1
+   - FsMountNandRoWrite #0x2
+   - FsMountTwln #0x4
+   - FsMountWnand # 0x8
+   - FsMountCardSpi #0x10
+   - UseSdif3 # 0x20
+   - CreateSeed # 0x40
+   - UseCardSpi # 0x80
+  FileSystemAccess:
+   - CategorySystemApplication #0x1
+   - CategoryHardwareCheck #0x2
+   - CategoryFileSystemTool #0x4
+   - Debug #0x8
+   - TwlCardBackup #0x10
+   - TwlNandData #0x20
+   - Boss #0x40
+   - DirectSdmc #0x80
+   - Core #0x100
+   - CtrNandRo #0x200
+   - CtrNandRw #0x400
+   - CtrNandRoWrite #0x800
+   - CategorySystemSettings #0x1000
+   - CardBoard #0x2000
+   - ExportImportIvs #0x4000
+   - DirectSdmcWrite #0x8000
   InterruptNumbers:
+    - 0x1
+  AffinityMask: 1
+  DescVersion: 2
+  DisableDebug: false
   SystemCallAccess: 
     ArbitrateAddress: 34
     Break: 60
@@ -98,9 +158,18 @@ AccessControlInfo:
     UnmapMemoryBlock: 32
     WaitSynchronization1: 36
     WaitSynchronizationN: 37
+  HandleTableSize: 512
+  IORegisterMapping: 
+   - 1ff50000-1ff57fff
+   - 1ff70000-1ff77fff
+  IdealProcessor: 0
+  MemoryMapping: 
+   - 1f000000-1f5fffff:r
   MemoryType: Application
+  Priority: 16
+  ProgramId: 0x00040000ffffff00L
   ReleaseKernelMajor: "02"
-  ReleaseKernelMinor: "33"
+  ReleaseKernelMinor: "33" 
   ServiceAccessControl: 
    - APT:U
    - $hioFIO
@@ -130,8 +199,12 @@ AccessControlInfo:
    - y2r:u
    - ldr:ro
    - ir:USER
-
-SystemControlInfo: 
+  CoreVersion: 2
+  StorageId: 
+   - 0
+   
+SystemControlInfo:
+  RemasterVersion: 5
   Dependency: 
     ac: 0x0004013000002402L
     am: 0x0004013000001502L
@@ -164,8 +237,8 @@ SystemControlInfo:
     spi: 0x0004013000002302L
     ssl: 0x0004013000002f02L
   StackSize: 0x40000
-
-CommonHeaderKey: 
+  
+CommonHeaderKey:
   D: |
     jL2yO86eUQnYbXIrzgFVMm7FVze0LglZ2f5g+c42hWoEdnb5BOotaMQPBfqt
     aUyAEmzQPaoi/4l4V+hTJRXQfthVRqIEx27B84l8LA6Tl5Fy9PaQaQ+4yRfP
@@ -173,6 +246,20 @@ CommonHeaderKey:
     0RCb66lYcr2h/p2G7SnpKUliS9h9KnpmG+UEgVYQUK+4SCfByUa9PxYGpT0E
     nw1UcRz0gsBmdOqcgzwnAd9vVqgb42hVn6uQZyAl+j1RKiMWywZarazIR/k5
     Lmr4+groimSEa+3ajyoIho9WaWTDmFU3mkhA2tUDIQ==
+  DP: |
+    pD8c9uymjXDj6oyhx7EmQcrEDizxsj6hTjJ0x3G/PYNv/v2/DA9gp3X30h35
+    uRZ1O+SgonWCGVnOJ7Wfjr4w2cOcSzxpzT3PQsS6Gs9z0RvcDsUHRL5f2EiT
+    6A1ZPj6xyzmo9Ts6w9yfxCwaHci0f2hP9bq9FimfFKigCoNcFBE=
+  DQ: |
+    y+6Pado7N+SIZJgQ7zEGyQ7/SxGHHEy5uW04HHde9IqHD5HFGG2GegF655mM
+    iI9ja1eTCh/AFs8xjAg0drQEvB5q80TjPNKtwVUT8ghOlN3xTzpdaLwX0d+c
+    Twy74VY4KPawcdDeLaGFtXknhFOdGmIbx+BInibz7NZ9eLqGwaE=
+  Exponent: |
+    AQAB
+  InverseQ: |
+    tc9/lcF837g8AdfyeuCyuLyd36Zm1ZmJ1VSSuH8y3/1ZhBYZkOFXxU7EhMvJ
+    FyAu4qyCA9otzCXM+cqKxE3ZCkSconsXOu8szZTwuINSkwHlt22FtiTfPt+V
+    /g5kjtkjoZVOGfSvvfel9Smwy1yrFvKfi/yJsjATeNFjiEquV/w=
   Modulus: |
     z+yySANtuAnjXGxiLKlJ4fT0DGzD5S+dUKArWgDGcgALowRdlEbnABtIhbVh
     LMl0yitDE8F4l1wzLwfHhfDa22CWUA98S3rXF53k5cOrb12leDKtBN2Wbtx1
@@ -180,6 +267,14 @@ CommonHeaderKey:
     BEou29fQZEOc0HgRQYgz3TFikC0X8sapK5xwq9zTq13a7j1sDoH/9mdaRPms
     Bz0jlHVlkyAMxXYdD2UGPSGi8JaAtwpJUzijXcB0PKTZQDaFH4zRLRX57ySp
     fp2yHvigcoEXd3OxVn+tBaLSMFr1068PEEpS2AlHlw==
+  P: |
+    6SdD3AiAybNamgUgGJduyFWO1/LeakmoJm+23IEJADyU4nz+reGjxQnMrR+x
+    syuB8VPGuf1z0SInfRIu9PEjIfW9/H/fZ59GwckQuJbneODjW7KU1jM3cTVX
+    +AWvaxWDwlCUmVSYD2OySUJlo3szGmBYh/o/tKAq7kElaaOt+cc=
+  Q: |
+    5EyO8bCyfqgLTfipAG/nNLObQbqMyARdQfudxh4eQqHmzblEM3jareuA8eUZ
+    K8pIaP+U9UfxwWTeFsOulrpsm04j4gS71WGNx3YwOIRPXXOn7zBkxA3AO9qq
+    K8lMeV3gNsdt4Fz8Zh2F68HSP4avB+ThO2S18SXMyIkcM7Sbw7E=
   Signature: |
     3xyLmORvojVswxgXmPPOVH4ULn8e2G3PvClO/jIuwRGtRprGcOruKFUi4TYF
     HASKzg8Mg4/I1t4RjurPrZvPgQ3rcROz066DAkwOEFBZPO5gBvuMf8IgJAFi

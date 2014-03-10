@@ -36,13 +36,13 @@ int ParseArgs(int argc, char *argv[], user_settings *usr_settings)
 	}
 	memset(usr_settings->ContentPath,0,CIA_MAX_CONTENT*sizeof(char*));
 	
+	// Initialise Keys
+	InitKeys(&usr_settings->keys);
+
 	// Setting Defaults
 	SetDefaults(usr_settings);
 	
-	// Initialise Keys
-	InitKeys(&usr_settings->keys);
-	
-	// Reading Arguments
+	// Parsing Arguments
 	int set_result;
 	int i = 1;
 	while(i < argc){
@@ -54,9 +54,13 @@ int ParseArgs(int argc, char *argv[], user_settings *usr_settings)
 		i += set_result;
 	}
 	
+	// Checking arguments
 	set_result = CheckArgumentCombination(usr_settings);
 	if(set_result) return set_result;
 	
+	// Setting Keys
+	SetKeys(&usr_settings->keys);
+
 	if(!usr_settings->outfile){
 		char *source_path = NULL;
 		if(usr_settings->IsBuildingNCCH0) source_path = usr_settings->rsf_path;
@@ -77,16 +81,20 @@ int ParseArgs(int argc, char *argv[], user_settings *usr_settings)
 
 void SetDefaults(user_settings *set)
 {
+	// Target Info
+	set->keys.keyset = keyset_RETAIL;
+
 	// Build NCCH Info
 	set->IsBuildingNCCH0 = true;
-	#ifdef RETAIL_FSIGN
-	set->accessdesc = auto_gen;
-	#else
-	set->accessdesc = use_spec_file;
-	#endif
 	set->include_exefs_logo = false;
 	set->out_format = CXI;
 	set->build_ncch_type = format_not_set;
+
+	// Yaml Settings
+	set->yaml_set.Option.EnableCompress = true;
+	set->yaml_set.Option.EnableCrypt = true;
+	set->yaml_set.Option.UseOnSD = false;
+	set->yaml_set.Option.FreeProductCode = false;
 
 	// Content0 Info
 	set->Content0IsNcch = true;
@@ -100,7 +108,7 @@ void SetDefaults(user_settings *set)
 	set->OmitImportedNcchHdr = false;
 
 	// CIA Info
-	set->EncryptContents = false;
+	set->EncryptContents = true;
 	set->RandomTitleKey = false;
 	for(int i = 0; i < CIA_MAX_CONTENT; i++){
 		set->ContentID[i] = 0x100000000;
@@ -114,7 +122,6 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 	if(!IsLastArg){
 		if(argv[i+1][0] != '-') HasParam = true;
 	}
-	
 	if(strcmp(argv[i],"-elf") == 0){
 		if(!HasParam){
 			PrintNeedsParam("-elf");
@@ -164,7 +171,6 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		set->outfile_mallocd = false;
 		return 2;
 	}
-	#ifdef PRIVATE_BUILD
 	else if(strcmp(argv[i],"-exheader") == 0){
 		if(!HasParam){
 			PrintNeedsParam("-exheader");
@@ -195,6 +201,21 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 			return USR_ARG_REQ_PARAM;
 		}
 		set->plain_region_path = argv[i+1];
+		return 2;
+	}
+	else if(strcmp(argv[i],"-target") == 0){
+		if(!HasParam){
+			PrintNeedsParam("-target");
+			return USR_ARG_REQ_PARAM;
+		}
+		if(strcasecmp(argv[i+1],"debug") == 0 || strcasecmp(argv[i+1],"dev") == 0)
+			set->keys.keyset = keyset_DEBUG;
+		else if(strcasecmp(argv[i+1],"retail") == 0 || strcasecmp(argv[i+1],"prod") == 0)
+			set->keys.keyset = keyset_RETAIL;
+		else{
+			fprintf(stderr,"[SETTING ERROR] Unrecognised target '%s'\n",argv[i+1]);
+			return USR_BAD_ARG;
+		}
 		return 2;
 	}
 	else if(strcmp(argv[i],"-cci") == 0){
@@ -240,7 +261,15 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		set->OmitImportedNcchHdr = true;
 		return 1;
 	}
-	#endif
+	else if(strcmp(argv[i],"-cfa") == 0){
+		if(HasParam){
+			PrintNoNeedParam("-cfa");
+			return USR_ARG_REQ_PARAM;
+		}
+		set->build_ncch_type = CFA;
+			
+		return 1;
+	}
 	else if(strcmp(argv[i],"-f") == 0){
 		if(!HasParam){
 			PrintNeedsParam("-f");
@@ -256,20 +285,6 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		}		
 		return 2;
 	}
-	else if(strcmp(argv[i],"-ncch") == 0){
-		if(!HasParam){
-			PrintNeedsParam("-ncch");
-			return USR_ARG_REQ_PARAM;
-		}
-		if(strcasecmp(argv[i+1],"cxi") == 0) set->build_ncch_type = CXI;
-		else if(strcasecmp(argv[i+1],"cfa") == 0) set->build_ncch_type = CFA;
-		else {
-			fprintf(stderr,"[-] Invalid ncch type '%s'\n",argv[i+1]);
-			return USR_BAD_ARG;
-		}		
-		return 2;
-	}
-	#ifdef RETAIL_FSIGN
 	else if(strcmp(argv[i],"-sysfixedkey") == 0){
 		if(!HasParam){
 			PrintNeedsParam("-sysfixedkey");
@@ -315,24 +330,38 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		free(key);
 		return 2;
 	}
-	#endif
 	else if(strcmp(argv[i],"-accessdesc") == 0){
 		if(!HasParam){
 			PrintNeedsParam("-accessdesc");
 			return USR_ARG_REQ_PARAM;
 		}
-		
-		if(strcasecmp(argv[i+1],"UseRsf") == 0) set->accessdesc = use_spec_file;
-		else if(strcasecmp(argv[i+1],"AutoGen") == 0 || strcasecmp(argv[i+1],"Auto") == 0) set->accessdesc = auto_gen;
-#ifndef RETAIL_FSIGN
-		else if(strcasecmp(argv[i+1],"App") == 0) set->accessdesc = app;
-		else if(strcasecmp(argv[i+1],"Demo") == 0) set->accessdesc = demo;
-		else if(strcasecmp(argv[i+1],"DlpChild") == 0 || strcasecmp(argv[i+1],"Dlp") == 0) set->accessdesc = dlp;
-#endif
+		char *tmp = argv[i+1];
+		char *tmp2 = strstr(tmp,":");
+		if(!tmp2){
+			fprintf(stderr,"[SETTING ERROR] Bad argument '%s %s', correct format:\n",argv[i],argv[i+1]);
+			fprintf(stderr,"	-accessdesc <APP TYPE>:<TARGET FIRMWARE>\n");
+		}
+		if(strlen(tmp2) < 2){
+			fprintf(stderr,"[SETTING ERROR] Bad argument '%s %s', correct format:\n",argv[i],argv[i+1]);
+			fprintf(stderr,"	-accessdesc <APP TYPE>:<TARGET FIRMWARE>\n");
+		}
+
+		u32 app_type_len = (u32)(tmp2-tmp);
+		char *app_type = malloc(app_type_len+1);
+		memset(app_type,0,app_type_len+1);
+		memcpy(app_type,tmp,app_type_len);
+
+		if(strcasecmp(app_type,"App") == 0 || strcasecmp(app_type,"SDApp") == 0) set->keys.AccessDescSign.PresetType = app;
+		else if(strcasecmp(app_type,"Demo") == 0) set->keys.AccessDescSign.PresetType = demo;
+		else if(strcasecmp(app_type,"DlpChild") == 0 || strcasecmp(app_type,"Dlp") == 0) set->keys.AccessDescSign.PresetType = dlp;
 		else{
-			fprintf(stderr,"[-] Accessdesc pre-set '%s' not recognised\n",argv[i+1]);
+			fprintf(stderr,"[SETTING ERROR] Accessdesc AppType preset '%s' not valid, please manually configure RSF\n",app_type);
 			return USR_BAD_ARG;
 		}
+
+
+		char *target_firmware = (tmp2+1);
+		set->keys.AccessDescSign.TargetFirmware = strtoul(target_firmware,NULL,10);
 		return 2;
 	}
 	
@@ -352,12 +381,12 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		set->RandomTitleKey = true;
 		return 1;
 	}
-	else if(strcmp(argv[i],"-encryptcia") == 0){
+	else if(strcmp(argv[i],"-nocryptcia") == 0){
 		if(HasParam){
-			PrintNoNeedParam("-encryptcia");
+			PrintNoNeedParam("-nocryptcia");
 			return USR_BAD_ARG;
 		}
-		set->EncryptContents = true;
+		set->EncryptContents = false;
 		return 1;
 	}
 	else if(strcmp(argv[i],"-major") == 0){
@@ -523,31 +552,6 @@ int CheckArgumentCombination(user_settings *set)
 	}
 
 	return 0;
-}
-
-void InvalidateRSFBooleans(rsf_settings *rsf_set)
-{
-	rsf_set->Option.NoPadding = -1;
-	rsf_set->Option.AllowUnalignedSection = -1;
-	rsf_set->Option.EnableCrypt = -1;
-	rsf_set->Option.EnableCompress = -1;
-	rsf_set->Option.FreeProductCode = -1;
-	rsf_set->Option.UseOnSD = -1;
-
-	rsf_set->AccessControlInfo.DisableDebug = -1;
-	rsf_set->AccessControlInfo.EnableForceDebug = -1;
-	rsf_set->AccessControlInfo.CanWriteSharedPage = -1;
-	rsf_set->AccessControlInfo.CanUsePrivilegedPriority = -1;
-	rsf_set->AccessControlInfo.CanUseNonAlphabetAndNumber = -1;
-	rsf_set->AccessControlInfo.PermitMainFunctionArgument = -1;
-	rsf_set->AccessControlInfo.CanShareDeviceMemory = -1;
-	rsf_set->AccessControlInfo.UseOtherVariationSaveData = -1;
-	rsf_set->AccessControlInfo.UseExtSaveData = -1;
-	rsf_set->AccessControlInfo.UseExtendedSaveDataAccessControl = -1;
-	rsf_set->AccessControlInfo.RunnableOnSleep = -1;
-	rsf_set->AccessControlInfo.SpecialMemoryArrange = -1;
-	
-	rsf_set->BasicInfo.MediaFootPadding = -1;
 }
 
 void init_UserSettings(user_settings *usr_settings)
@@ -791,43 +795,46 @@ void PrintNoNeedParam(char *arg)
 void DisplayHelp(char *app_name)
 {
 	printf("CTR MAKEROM %d.%d",MAKEROM_VER_MAJOR,MAKEROM_VER_MINOR);
-#ifdef PRIVATE_BUILD
+#ifndef PUBLIC_BUILD
 	printf(" PRIVATE BUILD");
 #endif
 	printf("\n(C) 3DSGuy 2014\n");
 	printf("Usage: %s [options... ]\n",app_name);
 	printf("Option          Parameter           Explanation\n");
-	printf("Global Options:\n");
+	printf("GLOBAL OPTIONS:\n");
 	printf(" -help                              Display this text\n");
 	printf(" -rsf           <rsf path>          RSF File\n");
 	printf(" -f             <out format>        Output Format (cxi|cfa|cci|cia)\n");
 	printf(" -o             <outfile>           Output File\n");
+	//printf(" -v                                 Verbose\n");
 	//printf(" -DNAME=VALUE                       Substitute values in Spec files\n");
-	printf("NCCH Options:\n");
-	printf(" -ncch0         <ncch format>       NCCH Format (cxi|cfa)\n");
+	printf("KEY OPTIONS:\n");
+	printf(" -sysfixedkey   <32 hex chars>      Specify SystemFixed Key\n");	
+	printf(" -commonkey    <32 hex chars> <id>  Specify commonkey and index\n");
+#ifndef PUBLIC_BUILD
+	printf(" -target        <value>             Debug or Retail(Default)\n");
+#endif
+	printf("NCCH OPTIONS:\n");
 	printf(" -elf           <elf path>          ELF File\n");
 	printf(" -icon          <icon path>         Icon File\n");
 	printf(" -banner        <banner path>       Banner File\n");
-	printf(" -logo          <logo path>         Logo File\n");
-	printf(" -exefslogo                         Include Logo in ExeFs\n");
-	printf(" -accessdesc    <accessdesc type>   (AutoGen|UseRsf)\n");
-#ifdef RETAIL_FSIGN
-	printf(" -sysfixedkey   <32 hex chars>      Specify SystemFixed Key\n");	
-#endif
-#ifdef PRIVATE_BUILD
+	printf(" -logo          <logo path>         Logo File (Overrides \"BasicInfo/Logo\" in RSF)\n");
+	printf(" -accessdesc    <apptype>:<fw>      Specify AccessDesc Preset\n");
+	printf(" -exefslogo                         Include Logo in ExeFs (Required for usage on <5.X Systems)\n");
+	printf(" -cfa                               Specify if building a Data Archive when \"-f cia\"\n");
+	printf("NCCH REBUILD OPTIONS:\n");
 	printf(" -code          <code path>         Specify ExeFs code File\n");
 	printf(" -exheader      <exhdr path>        ExHeader Template File\n");
 	printf(" -plain-region  <pln region path>   PlainRegion File\n");
 	printf(" -romfs         <romfs path>        RomFS File\n");	
-#endif
-	printf("CCI Options:\n");
-#ifdef PRIVATE_BUILD
+	printf("CCI OPTIONS:\n");
+#ifndef PUBLIC_BUILD
 	printf(" -devcardcci                        Use SDK CardInfo Method\n");
 	printf(" -omitncchhdr                       Omit NCCH Hdr for imported NCCH0\n");
 #endif
 	printf(" -content <filepath>:<index>        Specify content files\n");
-	printf("CIA Options:\n");
-#ifdef PRIVATE_BUILD
+	printf("CIA OPTIONS:\n");
+#ifndef PUBLIC_BUILD
 	printf(" -cci           <cci path>          Convert CCI to CIA\n");
 	printf(" -srl           <srl path>          Use TWL SRL as Content0\n");
 #endif
@@ -836,8 +843,5 @@ void DisplayHelp(char *app_name)
 	printf(" -minor         <version minor>     Specify Title Version Minor\n");
 	printf(" -micro         <version micro>     Specify Title Version Micro\n");
 	printf(" -rand                              Use a random title key\n");
-	printf(" -encryptcia                        Encrypt CIA Contents\n");
-#ifdef RETAIL_FSIGN
-	printf(" -commonkey    <32 hex chars> <id>  Specify commonkey and index\n");
-#endif
+	printf(" -nocryptcia                        Don't encrypt CIA contents\n");
 }

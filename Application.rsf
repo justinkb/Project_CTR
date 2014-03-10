@@ -1,0 +1,89 @@
+# Default value for application
+BasicInfo:
+  Title           : "Homebrew"
+  CompanyCode     : "00"
+  MediaSize       : 128MB # 128MB / 256MB / 512MB / 1GB / 2GB
+  MediaFootPadding: false
+  ProductCode     : "CTR-P-HAXX"
+  ContentType     : Application # Application / SystemUpdate / Manual / Child / Trial
+  Logo            : Licensed # Nintendo / Licensed / Distributed
+  BackupMemoryType: None # None / 128KB / 512KB
+
+Rom:
+  # Specifies the root path of the file system to include in the ROM.
+  #HostRoot: "$(ROMFS_ROOT)"
+  SaveDataSize: 512KB
+  DefaultReject: 
+   - .*
+  File: 
+   - "*"
+
+
+TitleInfo:
+  UniqueId: 0xff3ff
+  #TargetCategory: Contents
+  Category: Application
+  #DemoIndex: 1
+  Version: 0
+
+CardInfo:
+  #WritableAddress: 0x200
+  #CardType       : S2 # S1 / S2
+  #CryptoType     : 3 # 0 - 3
+  CardDevice     : NorFlash # NorFlash(0), None(1), BT(2)
+  #MediaType      : CARD1 # Card1 / Card2
+  BackupWriteWaitTime: 0
+
+Option:
+  UseOnSD: true # true if App is to be installed to SD
+  EnableCompress: true
+  FreeProductCode: true
+  EnableCrypt    : false
+
+ExeFs: 
+  ReadOnly: 
+   - .rodata
+   - RO
+  ReadWrite: 
+   - .data
+   - RO
+  Text: 
+   - .text
+   - STUP_ENTRY
+   
+PlainRegion: 
+ - .module_id
+  
+AccessControlInfo:
+  #UseOtherVariationSaveData : true
+  #UseExtSaveData : true
+  #ExtSaveDataId: 0xffffffff
+  SystemSaveDataId1: 0x220
+  SystemSaveDataId2: 0x00040010
+  #OtherUserSaveDataId1: 0x220
+  #OtherUserSaveDataId2: 0x330
+  #OtherUserSaveDataId3: 0x440
+  UseExtendedSaveDataAccessControl: true
+  AccessibleSaveDataIds: [0x101, 0x202, 0x303, 0x404, 0x505, 0x606]
+  FileSystemAccess:
+   #- CategorySystemApplication #0x1
+   #- CategoryHardwareCheck #0x2
+   #- CategoryFileSystemTool #0x4
+   - Debug #0x8
+   #- TwlCardBackup #0x10
+   #- TwlNandData #0x20
+   #- Boss #0x40
+   - DirectSdmc #0x80
+   #- Core #0x100
+   #- CtrNandRo #0x200
+   #- CtrNandRw #0x400
+   #- CtrNandRoWrite #0x800
+   #- CategorySystemSettings #0x1000
+   #- CardBoard #0x2000
+   #- ExportImportIvs #0x4000
+   - DirectSdmcWrite #0x8000
+   
+SystemControlInfo:
+  RemasterVersion: 5
+  StackSize: 0x40000
+  #JumpId: 0

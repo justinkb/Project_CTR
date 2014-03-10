@@ -5,9 +5,7 @@
 #include "titleid.h"
 #include "polarssl/base64.h"
 
-#ifndef RETAIL_FSIGN
 #include "accessdesc_sig.h" // For AccessDesc Presets
-#endif
 
 /* Prototypes */
 void init_ExHeaderSettings(exheader_settings *exhdrset);
@@ -15,11 +13,10 @@ void free_ExHeaderSettings(exheader_settings *exhdrset);
 int get_ExHeaderSettingsFromNcchset(exheader_settings *exhdrset, ncch_settings *ncchset);
 int get_ExHeaderSettingsFromYaml(exheader_settings *exhdrset);
 
-void AdjustBooleans(rsf_settings *yaml);
 int get_ExHeaderCodeSetInfo(exhdr_CodeSetInfo *CodeSetInfo, rsf_settings *yaml);
 int get_ExHeaderDependencyList(u8 *DependencyList, rsf_settings *yaml);
 int get_ExHeaderSystemInfo(exhdr_SystemInfo *SystemInfo, rsf_settings *yaml);
-int get_ExHeaderARM11SystemLocalInfo(exhdr_ARM11SystemLocalCapabilities *arm11, rsf_settings *yaml);
+int get_ExHeaderARM11SystemLocalInfo(exhdr_ARM11SystemLocalCapabilities *arm11, rsf_settings *yaml, bool UseAccessDescPreset);
 int SetARM11SystemLocalInfoFlags(exhdr_ARM11SystemLocalCapabilities *arm11, rsf_settings *yaml);
 int GetAppType(int *AppType, rsf_settings *yaml);
 int SetARM11ResLimitDesc(exhdr_ARM11SystemLocalCapabilities *arm11, rsf_settings *yaml);
@@ -56,6 +53,9 @@ u32 GetDescPrefixMask(int numPrefixBits);
 u32 GetDescPrefixBits(int numPrefixBits, u32 PrefixVal);
 int get_ExHeaderARM9AccessControlInfo(exhdr_ARM9AccessControlInfo *arm9, rsf_settings *yaml);
 int set_AccessDesc(exheader_settings *exhdrset, ncch_settings *ncchset);
+int accessdesc_SignWithKey(exheader_settings *exhdrset, ncch_settings *ncchset);
+int accessdesc_GetSignFromRsf(exheader_settings *exhdrset, ncch_settings *ncchset);
+int accessdesc_GetSignFromPreset(exheader_settings *exhdrset, ncch_settings *ncchset);
 
 /* ExHeader Signature Functions */
 int SignAccessDesc(ExtendedHeader_Struct *ExHdr, keys_struct *keys)
@@ -90,6 +90,9 @@ int BuildExHeader(ncch_settings *ncchset)
 
 	result = set_AccessDesc(exhdrset,ncchset);
 	if(result) goto finish;
+
+	exhdrset->ExHdr->AccessDescriptor.ARM11SystemLocalCapabilities.Flags[6] = 5;
+
 finish:
 	if(result) fprintf(stderr,"[EXHEADER ERROR] Failed to create ExHeader\n");
 	free_ExHeaderSettings(exhdrset);
@@ -112,6 +115,7 @@ int get_ExHeaderSettingsFromNcchset(exheader_settings *exhdrset, ncch_settings *
 	/* Transfer settings */
 	exhdrset->keys = ncchset->keys;
 	exhdrset->yaml = ncchset->yaml_set;
+	exhdrset->UseAccessDescPreset = ncchset->keys->AccessDescSign.PresetType != not_preset;
 
 	/* Creating Output Buffer */
 	ncchset->Sections.ExHeader.size = 0x800;
@@ -119,10 +123,14 @@ int get_ExHeaderSettingsFromNcchset(exheader_settings *exhdrset, ncch_settings *
 	if(!ncchset->Sections.ExHeader.buffer) {fprintf(stderr,"[EXHEADER ERROR] MEM ERROR\n"); return MEM_ERROR;}
 	memset(ncchset->Sections.ExHeader.buffer,0,ncchset->Sections.ExHeader.size);
 	
-	/* Import ExHeader template */
+	/* Import ExHeader Code Section template */
 	if(ncchset->ComponentFilePtrs.exheader_size){ 
-		u32 import_size = min_u64(0x40,ncchset->ComponentFilePtrs.exheader_size);
-		ReadFile_64(ncchset->Sections.ExHeader.buffer,import_size,0,ncchset->ComponentFilePtrs.exheader);
+		u32 import_size = 0x30; min_u64(0x30,ncchset->ComponentFilePtrs.exheader_size);
+		u32 import_offset = 0x10;
+		if((import_size+import_offset) > ncchset->ComponentFilePtrs.exheader_size){
+			fprintf(stderr,"[EXHEADER ERROR] Exheader Template is too small\n");
+		}
+		ReadFile_64((ncchset->Sections.ExHeader.buffer+import_offset),import_size,import_offset,ncchset->ComponentFilePtrs.exheader);
 	}
 
 	/* Create ExHeader Struct for output */
@@ -152,52 +160,38 @@ int get_ExHeaderSettingsFromNcchset(exheader_settings *exhdrset, ncch_settings *
 	if(ncchset->Options.UseOnSD)
 		exhdrset->ExHdr->CodeSetInfo.Flags.flag |= RetailSDAppFlag;
 	if(!ncchset->Options.UseRomFS) // Move this later
-		exhdrset->ExHdr->ARM11SystemLocalCapabilities.StorageInfo.OtherAttributes |= 1 << NOT_USE_ROMFS;
+		exhdrset->ExHdr->ARM11SystemLocalCapabilities.StorageInfo.OtherAttributes |= 1 << attribute_NOT_USE_ROMFS;
 
 	return 0;
 }
 
 int get_ExHeaderSettingsFromYaml(exheader_settings *exhdrset)
 {
-	AdjustBooleans(exhdrset->yaml);
-
 	int result = 0;
 	result = get_ExHeaderCodeSetInfo(&exhdrset->ExHdr->CodeSetInfo, exhdrset->yaml);
 	if(result) goto finish;
 
-	result = get_ExHeaderDependencyList((u8*)&exhdrset->ExHdr->DependencyList[0], exhdrset->yaml);
-	if(result) goto finish;
+	if(!exhdrset->UseAccessDescPreset){
+		result = get_ExHeaderDependencyList((u8*)&exhdrset->ExHdr->DependencyList[0], exhdrset->yaml);
+		if(result) goto finish;
+	}
 
 	result = get_ExHeaderSystemInfo(&exhdrset->ExHdr->SystemInfo, exhdrset->yaml);
 	if(result) goto finish;
 
-	result = get_ExHeaderARM11SystemLocalInfo(&exhdrset->ExHdr->ARM11SystemLocalCapabilities, exhdrset->yaml);
+	result = get_ExHeaderARM11SystemLocalInfo(&exhdrset->ExHdr->ARM11SystemLocalCapabilities, exhdrset->yaml, exhdrset->UseAccessDescPreset);
 	if(result) goto finish;
 
-	result = get_ExHeaderARM11KernelInfo(&exhdrset->ExHdr->ARM11KernelCapabilities, exhdrset->yaml);
-	if(result) goto finish;
+	if(!exhdrset->UseAccessDescPreset){
+		result = get_ExHeaderARM11KernelInfo(&exhdrset->ExHdr->ARM11KernelCapabilities, exhdrset->yaml);
+		if(result) goto finish;
 
-	result = get_ExHeaderARM9AccessControlInfo(&exhdrset->ExHdr->ARM9AccessControlInfo, exhdrset->yaml);
-	if(result) goto finish;
+		result = get_ExHeaderARM9AccessControlInfo(&exhdrset->ExHdr->ARM9AccessControlInfo, exhdrset->yaml);
+		if(result) goto finish;
+	}
 
 finish:
 	return result;
-}
-
-void AdjustBooleans(rsf_settings *yaml)
-{
-	if(yaml->AccessControlInfo.DisableDebug == -1) yaml->AccessControlInfo.DisableDebug = 0;
-	if(yaml->AccessControlInfo.EnableForceDebug == -1) yaml->AccessControlInfo.EnableForceDebug = 0;
-	if(yaml->AccessControlInfo.CanWriteSharedPage == -1) yaml->AccessControlInfo.CanWriteSharedPage = 0;
-	if(yaml->AccessControlInfo.CanUsePrivilegedPriority == -1) yaml->AccessControlInfo.CanUsePrivilegedPriority = 0;
-	if(yaml->AccessControlInfo.CanUseNonAlphabetAndNumber == -1) yaml->AccessControlInfo.CanUseNonAlphabetAndNumber = 0;
-	if(yaml->AccessControlInfo.PermitMainFunctionArgument == -1) yaml->AccessControlInfo.PermitMainFunctionArgument = 0;
-	if(yaml->AccessControlInfo.CanShareDeviceMemory == -1) yaml->AccessControlInfo.CanShareDeviceMemory = 0;
-	if(yaml->AccessControlInfo.UseOtherVariationSaveData == -1) yaml->AccessControlInfo.UseOtherVariationSaveData = 0;
-	if(yaml->AccessControlInfo.UseExtSaveData == -1) yaml->AccessControlInfo.UseExtSaveData = 0;
-	if(yaml->AccessControlInfo.UseExtendedSaveDataAccessControl == -1) yaml->AccessControlInfo.UseExtendedSaveDataAccessControl = 0;
-	if(yaml->AccessControlInfo.RunnableOnSleep == -1) yaml->AccessControlInfo.RunnableOnSleep = 0;
-	if(yaml->AccessControlInfo.SpecialMemoryArrange == -1) yaml->AccessControlInfo.SpecialMemoryArrange = 0;
 }
 
 int get_ExHeaderCodeSetInfo(exhdr_CodeSetInfo *CodeSetInfo, rsf_settings *yaml)
@@ -256,19 +250,19 @@ int get_ExHeaderSystemInfo(exhdr_SystemInfo *SystemInfo, rsf_settings *yaml)
 		if(strstr(yaml->Rom.SaveDataSize,"K")){
 			char *str = strstr(yaml->Rom.SaveDataSize,"K");
 			if(strcmp(str,"K") == 0 || strcmp(str,"KB") == 0 ){
-				SaveDataSize = SaveDataSize*KB;
+				SaveDataSize *= KB;
 			}
 		}
 		else if(strstr(yaml->Rom.SaveDataSize,"M")){
 			char *str = strstr(yaml->Rom.SaveDataSize,"M");
 			if(strcmp(str,"M") == 0 || strcmp(str,"MB") == 0 ){
-				SaveDataSize = SaveDataSize*MB;
+				SaveDataSize *= MB;
 			}
 		}
 		else if(strstr(yaml->Rom.SaveDataSize,"G")){
 			char *str = strstr(yaml->Rom.SaveDataSize,"G");
 			if(strcmp(str,"G") == 0 || strcmp(str,"GB") == 0 ){
-				SaveDataSize = SaveDataSize*GB;
+				SaveDataSize *= GB;
 			}
 		}
 		else{
@@ -298,7 +292,7 @@ int get_ExHeaderSystemInfo(exhdr_SystemInfo *SystemInfo, rsf_settings *yaml)
 	return 0;
 }
 
-int get_ExHeaderARM11SystemLocalInfo(exhdr_ARM11SystemLocalCapabilities *arm11, rsf_settings *yaml)
+int get_ExHeaderARM11SystemLocalInfo(exhdr_ARM11SystemLocalCapabilities *arm11, rsf_settings *yaml, bool UseAccessDescPreset)
 {
 	/* Program Id */
 	u64 ProgramId = 0;
@@ -306,30 +300,33 @@ int get_ExHeaderARM11SystemLocalInfo(exhdr_ARM11SystemLocalCapabilities *arm11, 
 	if(result) return result;
 	u64_to_u8(arm11->ProgramId,ProgramId,LE);
 	
-	/* Flags */
-	result = SetARM11SystemLocalInfoFlags(arm11, yaml);
-	if(result) return result;
+	if(!UseAccessDescPreset){
+		/* Flags */
+		result = SetARM11SystemLocalInfoFlags(arm11, yaml);
+		if(result) return result;
 
-	/* Resource Limit Descriptors */
-	result = SetARM11ResLimitDesc(arm11, yaml);
-	if(result) return result;
+		/* Resource Limit Descriptors */
+		result = SetARM11ResLimitDesc(arm11, yaml);
+		if(result) return result;
+	}
 
 	/* Storage Info */
 	result = SetARM11StorageInfo(arm11, yaml);
 	if(result) return result;
 
-	/* Service Access Control */
-	result = SetARM11ServiceAccessControl(arm11, yaml);
-	if(result) return result;
+	if(!UseAccessDescPreset){
+		/* Service Access Control */
+		result = SetARM11ServiceAccessControl(arm11, yaml);
+		if(result) return result;
 
-	/* Resource Limit Category */
-	if(yaml->AccessControlInfo.ResourceLimitCategory){
-		if(strcasecmp(yaml->AccessControlInfo.ResourceLimitCategory,"application") == 0) arm11->ResourceLimitCategory = resrc_limit_APPLICATION;
-		else if(strcasecmp(yaml->AccessControlInfo.ResourceLimitCategory,"sysapplet") == 0) arm11->ResourceLimitCategory = resrc_limit_SYS_APPLET;
-		else if(strcasecmp(yaml->AccessControlInfo.ResourceLimitCategory,"libapplet") == 0) arm11->ResourceLimitCategory = resrc_limit_LIB_APPLET;
-		else if(strcasecmp(yaml->AccessControlInfo.ResourceLimitCategory,"other") == 0) arm11->ResourceLimitCategory = resrc_limit_OTHER;
+		/* Resource Limit Category */
+		if(yaml->AccessControlInfo.ResourceLimitCategory){
+			if(strcasecmp(yaml->AccessControlInfo.ResourceLimitCategory,"application") == 0) arm11->ResourceLimitCategory = resrc_limit_APPLICATION;
+			else if(strcasecmp(yaml->AccessControlInfo.ResourceLimitCategory,"sysapplet") == 0) arm11->ResourceLimitCategory = resrc_limit_SYS_APPLET;
+			else if(strcasecmp(yaml->AccessControlInfo.ResourceLimitCategory,"libapplet") == 0) arm11->ResourceLimitCategory = resrc_limit_LIB_APPLET;
+			else if(strcasecmp(yaml->AccessControlInfo.ResourceLimitCategory,"other") == 0) arm11->ResourceLimitCategory = resrc_limit_OTHER;
+		}
 	}
-
 	/* Finish */
 	return 0;
 }
@@ -352,14 +349,14 @@ int SetARM11SystemLocalInfoFlags(exhdr_ARM11SystemLocalCapabilities *arm11, rsf_
 	u8 SystemMode = 0;
 	if(yaml->AccessControlInfo.AffinityMask){
 		AffinityMask = strtol(yaml->AccessControlInfo.AffinityMask,NULL,0);
-		if(AffinityMask != 0 && AffinityMask != 1){
+		if(AffinityMask > 1){
 			fprintf(stderr,"[EXHEADER ERROR] Unexpected AffinityMask: %d. Expected range: 0x0 - 0x1\n",AffinityMask);
 			return EXHDR_BAD_YAML_OPT;
 		}
 	}
 	if(yaml->AccessControlInfo.IdealProcessor){
 		IdealProcessor = strtol(yaml->AccessControlInfo.IdealProcessor,NULL,0);
-		if(IdealProcessor != 0 && IdealProcessor != 1){
+		if(IdealProcessor > 1){
 			fprintf(stderr,"[EXHEADER ERROR] Unexpected IdealProcessor: %d. Expected range: 0x0 - 0x1\n",IdealProcessor);
 			return EXHDR_BAD_YAML_OPT;
 		}
@@ -443,47 +440,47 @@ int SetARM11StorageInfo(exhdr_ARM11SystemLocalCapabilities *arm11, rsf_settings 
 	u32 AccessInfo = 0;
 	for(int i = 0; i < yaml->AccessControlInfo.FileSystemAccessNum; i++){
 		if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CategorySystemApplication") == 0)
-			AccessInfo |= 1 << CATEGORY_SYSTEM_APPLICATION;
+			AccessInfo |= 1 << fsaccess_CATEGORY_SYSTEM_APPLICATION;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CategoryHardwareCheck") == 0)
-			AccessInfo |= 1 << CATEGORY_HARDWARE_CHECK;
+			AccessInfo |= 1 << fsaccess_CATEGORY_HARDWARE_CHECK;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CategoryFileSystemTool") == 0)
-			AccessInfo |= 1 << CATEGORY_FILE_SYSTEM_TOOL;
+			AccessInfo |= 1 << fsaccess_CATEGORY_FILE_SYSTEM_TOOL;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"Debug") == 0)
-			AccessInfo |= 1 << DEBUG;
+			AccessInfo |= 1 << fsaccess_DEBUG;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"TwlCardBackup") == 0)
-			AccessInfo |= 1 << TWL_CARD_BACKUP;
+			AccessInfo |= 1 << fsaccess_TWL_CARD_BACKUP;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"TwlNandData") == 0)
-			AccessInfo |= 1 << TWL_NAND_DATA;
+			AccessInfo |= 1 << fsaccess_TWL_NAND_DATA;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"Boss") == 0)
-			AccessInfo |= 1 << BOSS;
+			AccessInfo |= 1 << fsaccess_BOSS;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"DirectSdmc") == 0)
-			AccessInfo |= 1 << DIRECT_SDMC;
+			AccessInfo |= 1 << fsaccess_DIRECT_SDMC;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"Core") == 0)
-			AccessInfo |= 1 << CORE;
+			AccessInfo |= 1 << fsaccess_CORE;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CtrNandRo") == 0)
-			AccessInfo |= 1 << CTR_NAND_RO;
+			AccessInfo |= 1 << fsaccess_CTR_NAND_RO;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CtrNandRw") == 0)
-			AccessInfo |= 1 << CTR_NAND_RW;
+			AccessInfo |= 1 << fsaccess_CTR_NAND_RW;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CtrNandRoWrite") == 0)
-			AccessInfo |= 1 << CTR_NAND_RO_WRITE;
+			AccessInfo |= 1 << fsaccess_CTR_NAND_RO_WRITE;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CategorySystemSettings") == 0)
-			AccessInfo |= 1 << CATEGORY_SYSTEM_SETTINGS;
+			AccessInfo |= 1 << fsaccess_CATEGORY_SYSTEM_SETTINGS;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CardBoard") == 0)
-			AccessInfo |= 1 << CARD_BOARD;
+			AccessInfo |= 1 << fsaccess_CARD_BOARD;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"ExportImportIvs") == 0)
-			AccessInfo |= 1 << EXPORT_IMPORT_IVS;
+			AccessInfo |= 1 << fsaccess_EXPORT_IMPORT_IVS;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"DirectSdmcWrite") == 0)
-			AccessInfo |= 1 << DIRECT_SDMC_WRITE;
+			AccessInfo |= 1 << fsaccess_DIRECT_SDMC_WRITE;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"SwitchCleanup") == 0)
-			AccessInfo |= 1 << SWITCH_CLEANUP;
+			AccessInfo |= 1 << fsaccess_SWITCH_CLEANUP;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"SaveDataMove") == 0)
-			AccessInfo |= 1 << SAVE_DATA_MOVE;
+			AccessInfo |= 1 << fsaccess_SAVE_DATA_MOVE;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"Shop") == 0)
-			AccessInfo |= 1 << SHOP;
+			AccessInfo |= 1 << fsaccess_SHOP;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"Shell") == 0)
-			AccessInfo |= 1 << SHELL;
+			AccessInfo |= 1 << fsaccess_SHELL;
 		else if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"CategoryHomeMenu") == 0)
-			AccessInfo |= 1 << CATEGORY_HOME_MENU;
+			AccessInfo |= 1 << fsaccess_CATEGORY_HOME_MENU;
 		else{
 			fprintf(stderr,"[EXHEADER ERROR] Invalid FileSystemAccess Name: '%s'\n",yaml->AccessControlInfo.FileSystemAccess[i]);
 			return EXHDR_BAD_YAML_OPT;
@@ -513,8 +510,8 @@ int SetARM11StorageInfoExtSaveDataId(exhdr_ARM11SystemLocalCapabilities *arm11, 
 			fprintf(stderr,"[EXHEADER ERROR] Failed to set ExtSaveDataId. UseExtSaveData must be true.\n");
 			return EXHDR_BAD_YAML_OPT;
 		}
-		u32 ExtdataIdLow = strtoul(yaml->AccessControlInfo.ExtSaveDataId,NULL,0);
-		u32_to_u8(arm11->StorageInfo.ExtSaveDataId,ExtdataIdLow,LE);
+		u64 ExtdataId = strtoull(yaml->AccessControlInfo.ExtSaveDataId,NULL,0);
+		u64_to_u8(arm11->StorageInfo.ExtSaveDataId,ExtdataId,LE);
 	}
 	return 0;
 }
@@ -546,6 +543,13 @@ bool CheckCondiditionsForNewAccessibleSaveDataIds(rsf_settings *yaml)
 			fprintf(stderr,"[EXHEADER ERROR] AccessibleSaveDataIds is unavailable if UseExtendedSaveDataAccessControl is false.\n");
 		return false;
 	}
+
+	/*
+	if(yaml->AccessControlInfo.AccessibleSaveDataIdsNum == 0){
+		fprintf(stderr,"[EXHEADER ERROR] AccessibleSaveDataIds must be specified if UseExtendedSaveDataAccessControl is true.\n");
+		return false;
+	}
+	*/
 
 	if(yaml->AccessControlInfo.AccessibleSaveDataIdsNum > 6){
 		fprintf(stderr,"[EXHEADER ERROR] Too many UniqueId in \"AccessibleSaveDataIds\".\n");
@@ -602,7 +606,7 @@ int SetARM11StorageInfoAccessibleSaveDataIds(exhdr_ARM11SystemLocalCapabilities 
 		}
 	}
 
-	arm11->StorageInfo.OtherAttributes |= 1 << USE_EXTENDED_SAVEDATA_ACCESS_CONTROL;
+	arm11->StorageInfo.OtherAttributes |= 1 << attribute_USE_EXTENDED_SAVEDATA_ACCESS_CONTROL;
 
 	/* UseOtherVariationSaveData Flag */
 	if(yaml->AccessControlInfo.UseOtherVariationSaveData){
@@ -618,20 +622,20 @@ int SetARM11ServiceAccessControl(exhdr_ARM11SystemLocalCapabilities *arm11, rsf_
 {
 	if(yaml->AccessControlInfo.ServiceAccessControl){
 		if(yaml->AccessControlInfo.ServiceAccessControlNum > 32){
-			fprintf(stderr,"[EXHEADER ERROR] Too Many SVC Handles, maximum is 32\n");
+			fprintf(stderr,"[EXHEADER ERROR] Too Many Service Names, maximum is 32\n");
 			return EXHDR_BAD_YAML_OPT;
 		}
 		for(int i = 0; i < yaml->AccessControlInfo.ServiceAccessControlNum; i++){
 			int svc_handle_len = strlen(yaml->AccessControlInfo.ServiceAccessControl[i]);
 			if(svc_handle_len > 8){
-				fprintf(stderr,"[EXHEADER ERROR] SVC Handle: '%s' is too long\n",yaml->AccessControlInfo.ServiceAccessControl[i]);
+				fprintf(stderr,"[EXHEADER ERROR] Service Name: \"%s\" is too long\n",yaml->AccessControlInfo.ServiceAccessControl[i]);
 				return EXHDR_BAD_YAML_OPT;
 			}
 			memcpy(arm11->ServiceAccessControl[i],yaml->AccessControlInfo.ServiceAccessControl[i],svc_handle_len);
 		}
 	}
 	else{
-		fprintf(stderr,"[EXHEADER ERROR] Parameter Not Found: 'AccessControlInfo/ServiceAccessControl'\n");
+		fprintf(stderr,"[EXHEADER ERROR] Parameter Not Found: \"AccessControlInfo/ServiceAccessControl\"\n");
 		return EXHDR_BAD_YAML_OPT;
 	}
 	return 0;
@@ -866,14 +870,17 @@ int GetARM11IOMappings(ARM11KernelCapabilityDescriptor *desc, rsf_settings *yaml
 	u16 DescUsed = 0;
 	for(int i = 0; i < yaml->AccessControlInfo.IORegisterMappingNum; i++){
 		if(strlen(yaml->AccessControlInfo.IORegisterMapping[i])){
+			// Parse Address String
 			char *AddressStartStr = yaml->AccessControlInfo.IORegisterMapping[i];
 			char *AddressEndStr = strstr(AddressStartStr,"-");
 			if(AddressEndStr){
-				if(strlen(AddressEndStr) > 1) 
-					AddressEndStr = (AddressEndStr+1);
+				if(strlen(AddressEndStr) > 1) // if not just '-'
+					AddressEndStr = (AddressEndStr+1); // Setting the str to the expected start of address string
 				else 
 					AddressEndStr = NULL;
 			}
+
+
 			u32 AddressStart = strtoul(AddressStartStr,NULL,16);
 			if(!IsStartAddress(AddressStart)){
 				fprintf(stderr,"[EXHEADER ERROR] Address 0x%x is not valid mapping start address.\n",AddressStart);
@@ -979,12 +986,12 @@ int GetARM11StaticMappings(ARM11KernelCapabilityDescriptor *desc, rsf_settings *
 
 bool IsEndAddress(u32 Address)
 {
-	return (Address & 0xfff) == 0xfff;
+	return (Address & 0x0fff) == 0x0fff;
 }
 
 bool IsStartAddress(u32 Address)
 {
-	return (Address & 0xfff) == 0;
+	return (Address & 0x0fff) == 0;
 }
 
 u32 GetIOMappingDesc(u32 Address)
@@ -1012,23 +1019,23 @@ int SetARM11KernelDescOtherCapabilities(ARM11KernelCapabilityDescriptor *desc, r
 	u32 OtherCapabilities = 0;
 	
 	if(!yaml->AccessControlInfo.DisableDebug)
-		OtherCapabilities |= 1 << PERMIT_DEBUG;
+		OtherCapabilities |= 1 << othcap_PERMIT_DEBUG;
 	if(yaml->AccessControlInfo.EnableForceDebug)
-		OtherCapabilities |= 1 << FORCE_DEBUG;
+		OtherCapabilities |= 1 << othcap_FORCE_DEBUG;
 	if(yaml->AccessControlInfo.CanUseNonAlphabetAndNumber)
-		OtherCapabilities |= 1 << CAN_USE_NON_ALPHABET_AND_NUMBER;
+		OtherCapabilities |= 1 << othcap_CAN_USE_NON_ALPHABET_AND_NUMBER;
 	if(yaml->AccessControlInfo.CanWriteSharedPage)
-		OtherCapabilities |= 1 << CAN_WRITE_SHARED_PAGE;
+		OtherCapabilities |= 1 << othcap_CAN_WRITE_SHARED_PAGE;
 	if(yaml->AccessControlInfo.CanUsePrivilegedPriority)
-		OtherCapabilities |= 1 << CAN_USE_PRIVILEGE_PRIORITY;
+		OtherCapabilities |= 1 << othcap_CAN_USE_PRIVILEGE_PRIORITY;
 	if(yaml->AccessControlInfo.PermitMainFunctionArgument)
-		OtherCapabilities |= 1 << PERMIT_MAIN_FUNCTION_ARGUMENT;
+		OtherCapabilities |= 1 << othcap_PERMIT_MAIN_FUNCTION_ARGUMENT;
 	if(yaml->AccessControlInfo.CanShareDeviceMemory)
-		OtherCapabilities |= 1 << CAN_SHARE_DEVICE_MEMORY;
+		OtherCapabilities |= 1 << othcap_CAN_SHARE_DEVICE_MEMORY;
 	if(yaml->AccessControlInfo.RunnableOnSleep)
-		OtherCapabilities |= 1 << RUNNABLE_ON_SLEEP;
+		OtherCapabilities |= 1 << othcap_RUNNABLE_ON_SLEEP;
 	if(yaml->AccessControlInfo.SpecialMemoryArrange)
-		OtherCapabilities |= 1 << SPECIAL_MEMORY_ARRANGE;
+		OtherCapabilities |= 1 << othcap_SPECIAL_MEMORY_ARRANGE;
 
 	if(yaml->AccessControlInfo.MemoryType){
 		u32 MemType = 0; 
@@ -1042,7 +1049,7 @@ int SetARM11KernelDescOtherCapabilities(ARM11KernelCapabilityDescriptor *desc, r
 			fprintf(stderr,"[EXHEADER ERROR] Invalid memory type: '%s'\n",yaml->AccessControlInfo.MemoryType);
 			return EXHDR_BAD_YAML_OPT;
 		}
-		OtherCapabilities = (OtherCapabilities & -3841) | MemType << 8;
+		OtherCapabilities = (OtherCapabilities & 0xffffff0f) | MemType << 8;
 	}
 
 	if(OtherCapabilities){
@@ -1123,21 +1130,21 @@ int get_ExHeaderARM9AccessControlInfo(exhdr_ARM9AccessControlInfo *arm9, rsf_set
 	u32 Arm9AccessControl = 0;
 	for(int i = 0; i < yaml->AccessControlInfo.IoAccessControlNum; i++){
 		if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"FsMountNand") == 0)
-			Arm9AccessControl |= 1 << FS_MOUNT_NAND;
+			Arm9AccessControl |= 1 << arm9cap_FS_MOUNT_NAND;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"FsMountNandRoWrite") == 0)
-			Arm9AccessControl |= 1 << FS_MOUNT_NAND_RO_WRITE;
+			Arm9AccessControl |= 1 << arm9cap_FS_MOUNT_NAND_RO_WRITE;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"FsMountTwln") == 0)
-			Arm9AccessControl |= 1 << FS_MOUNT_TWLN;
+			Arm9AccessControl |= 1 << arm9cap_FS_MOUNT_TWLN;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"FsMountWnand") == 0)
-			Arm9AccessControl |= 1 << FS_MOUNT_WNAND;
+			Arm9AccessControl |= 1 << arm9cap_FS_MOUNT_WNAND;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"FsMountCardSpi") == 0)
-			Arm9AccessControl |= 1 << FS_MOUNT_CARD_SPI;
+			Arm9AccessControl |= 1 << arm9cap_FS_MOUNT_CARD_SPI;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"UseSdif3") == 0)
-			Arm9AccessControl |= 1 << USE_SDIF3;
+			Arm9AccessControl |= 1 << arm9cap_USE_SDIF3;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"CreateSeed") == 0)
-			Arm9AccessControl |= 1 << CREATE_SEED;
+			Arm9AccessControl |= 1 << arm9cap_CREATE_SEED;
 		else if(strcmp(yaml->AccessControlInfo.IoAccessControl[i],"UseCardSpi") == 0)
-			Arm9AccessControl |= 1 << USE_CARD_SPI;
+			Arm9AccessControl |= 1 << arm9cap_USE_CARD_SPI;
 		else{
 			fprintf(stderr,"[EXHEADER ERROR] Invalid IoAccessControl Name: '%s'\n",yaml->AccessControlInfo.IoAccessControl[i]);
 			return EXHDR_BAD_YAML_OPT;
@@ -1146,11 +1153,11 @@ int get_ExHeaderARM9AccessControlInfo(exhdr_ARM9AccessControlInfo *arm9, rsf_set
 	
 	for(int i = 0; i < yaml->AccessControlInfo.FileSystemAccessNum; i++){
 		if(strcmp(yaml->AccessControlInfo.FileSystemAccess[i],"DirectSdmc") == 0)
-			Arm9AccessControl |= 1 << USE_DIRECT_SDMC;
+			Arm9AccessControl |= 1 << arm9cap_USE_DIRECT_SDMC;
 	}
 
 	if(yaml->Option.UseOnSD)
-		Arm9AccessControl |= 1 << SD_APPLICATION;
+		Arm9AccessControl |= 1 << arm9cap_SD_APPLICATION;
 
 	u32_to_u8(arm9->descriptors,Arm9AccessControl,LE);
 
@@ -1169,98 +1176,244 @@ int get_ExHeaderARM9AccessControlInfo(exhdr_ARM9AccessControlInfo *arm9, rsf_set
 
 int set_AccessDesc(exheader_settings *exhdrset, ncch_settings *ncchset)
 {
-	switch(ncchset->Options.accessdesc){
-		case auto_gen :
-			/* Set RSA Keys */
-			memcpy(ncchset->CxiRsaKey.PrivK,exhdrset->keys->rsa.CFA_Priv,0x100);
-			memcpy(ncchset->CxiRsaKey.PubK,exhdrset->keys->rsa.CFA_Pub,0x100);
-			memcpy(&exhdrset->ExHdr->AccessDescriptor.ncchpubkeymodulus,exhdrset->keys->rsa.CFA_Pub,0x100);
-			/* Copy Data From ExHeader */
-			memcpy(&exhdrset->ExHdr->AccessDescriptor.ARM11SystemLocalCapabilities,&exhdrset->ExHdr->ARM11SystemLocalCapabilities,sizeof(exhdr_ARM11SystemLocalCapabilities));
-			memcpy(&exhdrset->ExHdr->AccessDescriptor.ARM11KernelCapabilities,&exhdrset->ExHdr->ARM11KernelCapabilities,sizeof(exhdr_ARM11KernelCapabilities));
-			memcpy(&exhdrset->ExHdr->AccessDescriptor.ARM9AccessControlInfo,&exhdrset->ExHdr->ARM9AccessControlInfo,sizeof(exhdr_ARM9AccessControlInfo));
-			/* Sign AccessDesc */
-			return SignAccessDesc(exhdrset->ExHdr,exhdrset->keys);
-		case use_spec_file:
-			/* Yaml Option Sanity Checks */
-			if(!exhdrset->yaml->CommonHeaderKey.Found){
-				fprintf(stderr,"[EXHEADER ERROR] RSF Section 'CommonHeaderKey' not found\n");
-				return COMMON_HEADER_KEY_NOT_FOUND;
-			}
-			if(!exhdrset->yaml->CommonHeaderKey.D){
-				fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/D' not found\n");
-				return COMMON_HEADER_KEY_NOT_FOUND;
-			}
-			if(strlen(exhdrset->yaml->CommonHeaderKey.D) != 350){
-				fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/D' has invalid length (%d)\n",strlen(exhdrset->yaml->CommonHeaderKey.D));
-				return COMMON_HEADER_KEY_NOT_FOUND;
-			}
-			if(!exhdrset->yaml->CommonHeaderKey.Modulus){
-				fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/Modulus' not found\n");
-				return COMMON_HEADER_KEY_NOT_FOUND;
-			}
-			if(strlen(exhdrset->yaml->CommonHeaderKey.Modulus) != 350){
-				fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/Modulus' has invalid length (%d)\n",strlen(exhdrset->yaml->CommonHeaderKey.Modulus));
-				return COMMON_HEADER_KEY_NOT_FOUND;
-			}
-			if(!exhdrset->yaml->CommonHeaderKey.AccCtlDescSign){
-				fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/Signature' not found\n");
-				return COMMON_HEADER_KEY_NOT_FOUND;
-			}
-			if(strlen(exhdrset->yaml->CommonHeaderKey.AccCtlDescSign) != 350){
-				fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/Signature' has invalid length (%d)\n",strlen(exhdrset->yaml->CommonHeaderKey.AccCtlDescSign));
-				return COMMON_HEADER_KEY_NOT_FOUND;
-			}
-			if(!exhdrset->yaml->CommonHeaderKey.AccCtlDescBin){
-				fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/Descriptor' not found\n");
-				return COMMON_HEADER_KEY_NOT_FOUND;
-			}
-			if(strlen(exhdrset->yaml->CommonHeaderKey.AccCtlDescBin) != 695){
-				fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/Descriptor' has invalid length (%d)\n",strlen(exhdrset->yaml->CommonHeaderKey.AccCtlDescBin));
-				return COMMON_HEADER_KEY_NOT_FOUND;
-			}
-			/* Set RSA Keys */
-			int result = 0;
-			u32 out = 0x500;
-			u8 *tmp = malloc(0x500);
-			result = base64_decode(tmp,&out,(const u8*)exhdrset->yaml->CommonHeaderKey.Modulus,strlen(exhdrset->yaml->CommonHeaderKey.Modulus));
-			if(result) goto finish;
-			memcpy(ncchset->CxiRsaKey.PubK,tmp,0x100);
-			out = 0x500;
-			result = base64_decode(tmp,&out,(const u8*)exhdrset->yaml->CommonHeaderKey.D,strlen(exhdrset->yaml->CommonHeaderKey.D));
-			if(result) goto finish;
-			memcpy(ncchset->CxiRsaKey.PrivK,tmp,0x100);
-			/* Set AccessDesc */
-			out = 0x500;
-			result = base64_decode(tmp,&out,(const u8*)exhdrset->yaml->CommonHeaderKey.AccCtlDescSign,strlen(exhdrset->yaml->CommonHeaderKey.AccCtlDescSign));
-			if(result) goto finish;
-			memcpy(exhdrset->ExHdr->AccessDescriptor.signature,tmp,0x100);
-			memcpy(exhdrset->ExHdr->AccessDescriptor.ncchpubkeymodulus,ncchset->CxiRsaKey.PubK,0x100);
-			out = 0x500;
-			result = base64_decode(tmp,&out,(const u8*)exhdrset->yaml->CommonHeaderKey.AccCtlDescBin,strlen(exhdrset->yaml->CommonHeaderKey.AccCtlDescBin));
-			if(result) goto finish;
-			memcpy(&exhdrset->ExHdr->AccessDescriptor.ARM11SystemLocalCapabilities,tmp,0x200);
-finish:
-			free(tmp);
-			return result;	
-#ifndef RETAIL_FSIGN
-		case app :
-			memcpy(ncchset->CxiRsaKey.PrivK,(u8*)App_sdk5_HdrPrivK,0x100);
-			memcpy(ncchset->CxiRsaKey.PubK,(u8*)App_sdk5_HdrPubK,0x100);
-			memcpy(&exhdrset->ExHdr->AccessDescriptor.signature,(u8*)App_sdk5_AcexData,0x400);
-			return 0;
-		case demo :
-			memcpy(ncchset->CxiRsaKey.PrivK,(u8*)Demo_sdk5_HdrPrivK,0x100);
-			memcpy(ncchset->CxiRsaKey.PubK,(u8*)Demo_sdk5_HdrPubK,0x100);
-			memcpy(&exhdrset->ExHdr->AccessDescriptor.signature,(u8*)Demo_sdk5_AcexData,0x400);
-			return 0;
-		case dlp :
-			memcpy(ncchset->CxiRsaKey.PrivK,(u8*)Dlp_sdk5_HdrPrivK,0x100);
-			memcpy(ncchset->CxiRsaKey.PubK,(u8*)Dlp_sdk5_HdrPubK,0x100);
-			memcpy(&exhdrset->ExHdr->AccessDescriptor.signature,(u8*)Dlp_sdk5_AcexData,0x400);
-			return 0;		
-#endif
+	if(ncchset->keys->AccessDescSign.PresetType == not_preset){
+		if(ncchset->yaml_set->CommonHeaderKey.Found)
+			return accessdesc_GetSignFromRsf(exhdrset,ncchset);
+		else if(!ncchset->keys->rsa.RequiresPresignedDesc)
+			return accessdesc_SignWithKey(exhdrset,ncchset);
+		else{
+			fprintf(stderr,"[EXHEADER ERROR] Current keyset cannot sign AccessDesc, please appropriatly setup RSF, or specify a preset with -accessdesc\n");
+			return CANNOT_SIGN_ACCESSDESC;
+		}
 	}
+	return accessdesc_GetSignFromPreset(exhdrset,ncchset);
+}
+
+int accessdesc_SignWithKey(exheader_settings *exhdrset, ncch_settings *ncchset)
+{
+	/* Set RSA Keys */
+	memcpy(ncchset->CxiRsaKey.PrivK,exhdrset->keys->rsa.CFA_Priv,0x100);
+	memcpy(ncchset->CxiRsaKey.PubK,exhdrset->keys->rsa.CFA_Pub,0x100);
+	memcpy(&exhdrset->ExHdr->AccessDescriptor.ncchpubkeymodulus,exhdrset->keys->rsa.CFA_Pub,0x100);
+	/* Copy Data From ExHeader */
+	memcpy(&exhdrset->ExHdr->AccessDescriptor.ARM11SystemLocalCapabilities,&exhdrset->ExHdr->ARM11SystemLocalCapabilities,sizeof(exhdr_ARM11SystemLocalCapabilities));
+	u8 *byte6 = &exhdrset->ExHdr->AccessDescriptor.ARM11SystemLocalCapabilities.Flags[6];
+	u8 SystemMode = (*byte6>>4)&0xF;
+	u8 AffinityMask = (*byte6>>2)&0x3;
+	u8 IdealProcessor = ((*byte6>>0)&0x3)+1;
+	*byte6 = (u8)(SystemMode << 4 | AffinityMask << 2 | IdealProcessor);
+	
+	memcpy(&exhdrset->ExHdr->AccessDescriptor.ARM11KernelCapabilities,&exhdrset->ExHdr->ARM11KernelCapabilities,sizeof(exhdr_ARM11KernelCapabilities));
+	memcpy(&exhdrset->ExHdr->AccessDescriptor.ARM9AccessControlInfo,&exhdrset->ExHdr->ARM9AccessControlInfo,sizeof(exhdr_ARM9AccessControlInfo));
+	/* Sign AccessDesc */
+	return SignAccessDesc(exhdrset->ExHdr,exhdrset->keys);
+}
+
+int accessdesc_GetSignFromRsf(exheader_settings *exhdrset, ncch_settings *ncchset)
+{
+	/* Yaml Option Sanity Checks */
+	if(!exhdrset->yaml->CommonHeaderKey.Found){
+		fprintf(stderr,"[EXHEADER ERROR] RSF Section 'CommonHeaderKey' not found\n");
+		return COMMON_HEADER_KEY_NOT_FOUND;
+	}
+	if(!exhdrset->yaml->CommonHeaderKey.D){
+		fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/D' not found\n");
+		return COMMON_HEADER_KEY_NOT_FOUND;
+	}
+	if(strlen(exhdrset->yaml->CommonHeaderKey.D) != 350){
+		fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/D' has invalid length (%d)\n",strlen(exhdrset->yaml->CommonHeaderKey.D));
+		return COMMON_HEADER_KEY_NOT_FOUND;
+	}
+	if(!exhdrset->yaml->CommonHeaderKey.Modulus){
+		fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/Modulus' not found\n");
+		return COMMON_HEADER_KEY_NOT_FOUND;
+	}
+	if(strlen(exhdrset->yaml->CommonHeaderKey.Modulus) != 350){
+		fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/Modulus' has invalid length (%d)\n",strlen(exhdrset->yaml->CommonHeaderKey.Modulus));
+		return COMMON_HEADER_KEY_NOT_FOUND;
+	}
+	if(!exhdrset->yaml->CommonHeaderKey.AccCtlDescSign){
+		fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/Signature' not found\n");
+		return COMMON_HEADER_KEY_NOT_FOUND;
+	}
+	if(strlen(exhdrset->yaml->CommonHeaderKey.AccCtlDescSign) != 350){
+		fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/Signature' has invalid length (%d)\n",strlen(exhdrset->yaml->CommonHeaderKey.AccCtlDescSign));
+		return COMMON_HEADER_KEY_NOT_FOUND;
+	}
+	if(!exhdrset->yaml->CommonHeaderKey.AccCtlDescBin){
+		fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/Descriptor' not found\n");
+		return COMMON_HEADER_KEY_NOT_FOUND;
+	}
+	if(strlen(exhdrset->yaml->CommonHeaderKey.AccCtlDescBin) != 695){
+		fprintf(stderr,"[EXHEADER ERROR] 'CommonHeaderKey/Descriptor' has invalid length (%d)\n",strlen(exhdrset->yaml->CommonHeaderKey.AccCtlDescBin));
+		return COMMON_HEADER_KEY_NOT_FOUND;
+	}
+	/* Set RSA Keys */
+	int result = 0;
+	u32 out = 0x500;
+	u8 *tmp = malloc(0x500);
+	result = base64_decode(tmp,&out,(const u8*)exhdrset->yaml->CommonHeaderKey.Modulus,strlen(exhdrset->yaml->CommonHeaderKey.Modulus));
+	if(result) goto finish;
+	memcpy(ncchset->CxiRsaKey.PubK,tmp,0x100);
+	out = 0x500;
+	result = base64_decode(tmp,&out,(const u8*)exhdrset->yaml->CommonHeaderKey.D,strlen(exhdrset->yaml->CommonHeaderKey.D));
+	if(result) goto finish;
+	memcpy(ncchset->CxiRsaKey.PrivK,tmp,0x100);
+	/* Set AccessDesc */
+	out = 0x500;
+	result = base64_decode(tmp,&out,(const u8*)exhdrset->yaml->CommonHeaderKey.AccCtlDescSign,strlen(exhdrset->yaml->CommonHeaderKey.AccCtlDescSign));
+	if(result) goto finish;
+	memcpy(exhdrset->ExHdr->AccessDescriptor.signature,tmp,0x100);
+	memcpy(exhdrset->ExHdr->AccessDescriptor.ncchpubkeymodulus,ncchset->CxiRsaKey.PubK,0x100);
+	out = 0x500;
+	result = base64_decode(tmp,&out,(const u8*)exhdrset->yaml->CommonHeaderKey.AccCtlDescBin,strlen(exhdrset->yaml->CommonHeaderKey.AccCtlDescBin));
+	if(result) goto finish;
+	memcpy(&exhdrset->ExHdr->AccessDescriptor.ARM11SystemLocalCapabilities,tmp,0x200);
+finish:
+	free(tmp);
+	return result;	
+}
+
+int accessdesc_GetSignFromPreset(exheader_settings *exhdrset, ncch_settings *ncchset)
+{
+	u8 *AccessDescSig = NULL;
+	u8 *AccessDescData = NULL;
+	u8 *DepList = NULL;
+
+	u8 *CXI_Pubk = NULL;
+	u8 *CXI_Privk = NULL;
+
+	if(ncchset->keys->AccessDescSign.PresetType == app){
+		switch(ncchset->keys->AccessDescSign.TargetFirmware){
+			case 1:
+				AccessDescSig = (u8*)App_sdk1_AcexSig;
+				AccessDescData = (u8*)App_sdk1_AcexData;
+				DepList = (u8*)sdk1_dep_list;
+				CXI_Pubk = (u8*)App_sdk1_HdrPubK;
+				CXI_Privk = (u8*)App_sdk1_HdrPrivK;
+				break;
+			case 2:
+				AccessDescSig = (u8*)App_sdk2_AcexSig;
+				AccessDescData = (u8*)App_sdk2_AcexData;
+				DepList = (u8*)sdk2_dep_list;
+				CXI_Pubk = (u8*)App_sdk2_HdrPubK;
+				CXI_Privk = (u8*)App_sdk2_HdrPrivK;
+				break;
+			case 4:
+			case 5:
+				AccessDescSig = (u8*)App_sdk4_AcexSig;
+				AccessDescData = (u8*)App_sdk4_AcexData;
+				DepList = (u8*)sdk4_dep_list;
+				CXI_Pubk = (u8*)App_sdk4_HdrPubK;
+				CXI_Privk = (u8*)App_sdk4_HdrPrivK;
+				break;
+			case 7:
+				AccessDescSig = NULL;
+				AccessDescData = (u8*)App_sdk7_AcexData;
+				DepList = (u8*)sdk7_dep_list;
+				CXI_Pubk = NULL;
+				CXI_Privk = NULL;
+				break;
+			
+		}
+	}
+	else if(ncchset->keys->AccessDescSign.PresetType == dlp){
+		switch(ncchset->keys->AccessDescSign.TargetFirmware){
+			case 1:
+				AccessDescSig = (u8*)Dlp_sdk1_AcexSig;
+				AccessDescData = (u8*)Dlp_sdk1_AcexData;
+				DepList = (u8*)sdk1_dep_list;
+				CXI_Pubk = (u8*)Dlp_sdk1_HdrPubK;
+				CXI_Privk = (u8*)Dlp_sdk1_HdrPrivK;
+				break;
+			case 2:
+				AccessDescSig = (u8*)Dlp_sdk2_AcexSig;
+				AccessDescData = (u8*)Dlp_sdk2_AcexData;
+				DepList = (u8*)sdk2_dep_list;
+				CXI_Pubk = (u8*)Dlp_sdk2_HdrPubK;
+				CXI_Privk = (u8*)Dlp_sdk2_HdrPrivK;
+				break;
+			case 4:
+			case 5:
+				AccessDescSig = (u8*)Dlp_sdk4_AcexSig;
+				AccessDescData = (u8*)Dlp_sdk4_AcexData;
+				DepList = (u8*)sdk4_dep_list;
+				CXI_Pubk = (u8*)Dlp_sdk4_HdrPubK;
+				CXI_Privk = (u8*)Dlp_sdk4_HdrPrivK;
+				break;
+		}
+	}
+	else if(ncchset->keys->AccessDescSign.PresetType == demo){
+		switch(ncchset->keys->AccessDescSign.TargetFirmware){
+			case 4:
+			case 5:
+				AccessDescSig = (u8*)Demo_sdk4_AcexSig;
+				AccessDescData = (u8*)Demo_sdk4_AcexData;
+				DepList = (u8*)sdk4_dep_list;
+				CXI_Pubk = (u8*)Demo_sdk4_HdrPubK;
+				CXI_Privk = (u8*)Demo_sdk4_HdrPrivK;
+				break;
+		}
+	}
+
+	// Error Checking
+	if(!AccessDescData || !DepList){
+		fprintf(stderr,"[EXHEADER ERROR] AccessDesc preset is unavailable, please configure RSF file\n");
+		return CANNOT_SIGN_ACCESSDESC;
+	}
+
+	if((!CXI_Pubk || !CXI_Privk || !AccessDescSig) && ncchset->keys->rsa.RequiresPresignedDesc){
+		fprintf(stderr,"[EXHEADER ERROR] This AccessDesc preset needs to be signed, the current keyset is incapable of doing so. Please configure RSF file with the appropriate signature data.\n");
+		return CANNOT_SIGN_ACCESSDESC;
+	}
+	
+	// Setting data in Exheader
+	// Dependency List
+	memcpy(exhdrset->ExHdr->DependencyList,DepList,0x180);
+
+	// ARM11 Local Capabilities
+	exhdr_ARM11SystemLocalCapabilities *arm11local = (exhdr_ARM11SystemLocalCapabilities*)(AccessDescData);
+	// Backing Up Non Preset Details
+	u8 ProgramID[8];
+	memcpy(ProgramID,exhdrset->ExHdr->ARM11SystemLocalCapabilities.ProgramId,8);
+	exhdr_StorageInfo StorageInfoBackup;
+	memcpy(&StorageInfoBackup,&exhdrset->ExHdr->ARM11SystemLocalCapabilities.StorageInfo,sizeof(exhdr_StorageInfo));
+	
+	// Setting Preset Data
+	memcpy(&exhdrset->ExHdr->ARM11SystemLocalCapabilities,arm11local,sizeof(exhdr_ARM11SystemLocalCapabilities));
+
+	// Restoring Non Preset Data
+	memcpy(exhdrset->ExHdr->ARM11SystemLocalCapabilities.ProgramId,ProgramID,8);
+	memcpy(&exhdrset->ExHdr->ARM11SystemLocalCapabilities.StorageInfo,&StorageInfoBackup,sizeof(exhdr_StorageInfo));
+
+	// Adjusting flags to prevent errors
+	u8 *byte6 = &exhdrset->ExHdr->ARM11SystemLocalCapabilities.Flags[6];
+	u8 SystemMode = (*byte6>>4)&0xF;
+	u8 AffinityMask = (*byte6>>2)&0x3;
+	u8 IdealProcessor = ((*byte6>>0)&0x3)-1;
+	*byte6 = (u8)(SystemMode << 4 | AffinityMask << 2 | IdealProcessor);
+	exhdrset->ExHdr->ARM11SystemLocalCapabilities.Flags[7] = 0x30;
+
+	// ARM11 Kernel Capabilities
+	exhdr_ARM11KernelCapabilities *arm11kernel = (exhdr_ARM11KernelCapabilities*)(AccessDescData+sizeof(exhdr_ARM11SystemLocalCapabilities));
+	memcpy(&exhdrset->ExHdr->ARM11KernelCapabilities,arm11kernel,(sizeof(exhdr_ARM11KernelCapabilities)));
+
+	// ARM9 Access Control
+	exhdr_ARM9AccessControlInfo *arm9 = (exhdr_ARM9AccessControlInfo*)(AccessDescData+sizeof(exhdr_ARM11SystemLocalCapabilities)+sizeof(exhdr_ARM11KernelCapabilities));
+	memcpy(&exhdrset->ExHdr->ARM9AccessControlInfo,arm9,(sizeof(exhdr_ARM9AccessControlInfo)));
+
+	// Setting AccessDesc Area
+	// Signing normally if possible
+	if(!ncchset->keys->rsa.RequiresPresignedDesc) 
+		return accessdesc_SignWithKey(exhdrset,ncchset);
+
+	// Otherwise set static data & ncch hdr sig info
+	memcpy(ncchset->CxiRsaKey.PubK,CXI_Pubk,0x100);
+	memcpy(ncchset->CxiRsaKey.PrivK,CXI_Privk,0x100);
+	memcpy(&exhdrset->ExHdr->AccessDescriptor.signature,AccessDescSig,0x100);
+	memcpy(&exhdrset->ExHdr->AccessDescriptor.ncchpubkeymodulus,CXI_Pubk,0x100);
+	memcpy(&exhdrset->ExHdr->AccessDescriptor.ARM11SystemLocalCapabilities,AccessDescData,0x200);
+
 	return 0;
 }
 

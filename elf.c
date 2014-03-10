@@ -70,11 +70,17 @@ int BuildExeFsCode(ncch_settings *ncchset)
 		return result;
 	}
 
+#ifdef DEBUG
+	printf("[DEBUG] Import ELF\n");
+#endif
 	/* Import ELF */
 	u8 *ElfFile = malloc(ncchset->ComponentFilePtrs.elf_size);
 	if(!ElfFile) {fprintf(stderr,"[ELF ERROR] MEM ERROR\n"); return MEM_ERROR;}
 	ReadFile_64(ElfFile,ncchset->ComponentFilePtrs.elf_size,0,ncchset->ComponentFilePtrs.elf);
 
+#ifdef DEBUG
+	printf("[DEBUG] Create ELF Context\n");
+#endif
 	/* Create ELF Context */
 	ElfContext *elf = malloc(sizeof(ElfContext));
 	if(!elf) {fprintf(stderr,"[ELF ERROR] MEM ERROR\n"); free(ElfFile); return MEM_ERROR;}
@@ -95,9 +101,18 @@ int BuildExeFsCode(ncch_settings *ncchset)
 	PrintElfContext(elf,ElfFile);
 #endif
 
+#ifdef DEBUG
+	PrintElfContext(elf,ElfFile);
+#endif
+
+#ifdef DEBUG
+	printf("[DEBUG] Create ExeFs Code\n");
+#endif
 	result = CreateExeFsCode(elf,ElfFile,ncchset);
 	if(result) goto finish;
-
+#ifdef DEBUG
+	printf("[DEBUG] Get BSS Size\n");
+#endif
 	result = GetBSS_SizeFromElf(elf,ElfFile,ncchset);
 	if(result) goto finish;
 
@@ -110,10 +125,18 @@ finish:
 		else if(result == NOT_FIND_CODE_SECTIONS) fprintf(stderr,"[ELF ERROR] Failed to retrieve code sections from ELF\n");
 		else fprintf(stderr,"[ELF ERROR] Failed to process ELF file (%d)\n",result);
 	}
+#ifdef DEBUG
+	printf("[DEBUG] Free Segment Header/Sections\n");
+#endif
 	for(int i = 0; i < elf->ActiveSegments; i++){
-		free(elf->Segments[i].Header);
+#ifdef DEBUG
+	printf("[DEBUG] %d\n",i);
+#endif
 		free(elf->Segments[i].Sections);
 	}
+#ifdef DEBUG
+	printf("[DEBUG] Free others\n");
+#endif
 	free(ElfFile);
 	free(elf->Sections);
 	free(elf->ProgramHeaders);

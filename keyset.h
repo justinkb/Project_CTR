@@ -1,10 +1,32 @@
 #ifndef _KEYSET_H_
 #define _KEYSET_H_
 
+typedef enum
+{
+	keyset_DEBUG,
+	keyset_RETAIL,
+} keysets;
+
+typedef enum
+{
+	not_preset,
+	app,
+	dlp,
+	demo,
+} fixed_accessdesc_type;
+
 // Structs
 
 typedef struct
 {
+	keysets keyset;
+
+	struct
+	{
+		fixed_accessdesc_type PresetType;
+		u32 TargetFirmware;
+	} AccessDescSign;
+
 	struct
 	{
 		// CIA
@@ -19,6 +41,7 @@ typedef struct
 	
 	struct
 	{
+		bool FalseSign;
 		// CIA RSA
 		u8 *TMD_Priv;
 		u8 *TMD_Pub;
@@ -34,6 +57,7 @@ typedef struct
 		u8 *CCI_Pub;
 		
 		// CXI
+		bool RequiresPresignedDesc;
 		u8 *AccessDesc_Priv;
 		u8 *AccessDesc_Pub;
 	} rsa;
@@ -51,6 +75,7 @@ typedef struct
 
 // Public Prototypes
 void InitKeys(keys_struct *keys);
+void SetKeys(keys_struct *keys);
 void FreeKeys(keys_struct *keys);
 
 int SetCommonKey(keys_struct *keys, u8 *CommonKey, u8 Index);

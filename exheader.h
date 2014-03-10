@@ -5,6 +5,7 @@ typedef enum
 {
 	COMMON_HEADER_KEY_NOT_FOUND = -10,
 	EXHDR_BAD_YAML_OPT = -11,
+	CANNOT_SIGN_ACCESSDESC = -12
 } exheader_errors;
 
 typedef enum
@@ -37,60 +38,60 @@ typedef enum
 
 typedef enum
 {
-	PERMIT_DEBUG,
-	FORCE_DEBUG,
-	CAN_USE_NON_ALPHABET_AND_NUMBER,
-	CAN_WRITE_SHARED_PAGE,
-	CAN_USE_PRIVILEGE_PRIORITY,
-	PERMIT_MAIN_FUNCTION_ARGUMENT,
-	CAN_SHARE_DEVICE_MEMORY,
-	RUNNABLE_ON_SLEEP,
-	SPECIAL_MEMORY_ARRANGE = 12,
+	othcap_PERMIT_DEBUG,
+	othcap_FORCE_DEBUG,
+	othcap_CAN_USE_NON_ALPHABET_AND_NUMBER,
+	othcap_CAN_WRITE_SHARED_PAGE,
+	othcap_CAN_USE_PRIVILEGE_PRIORITY,
+	othcap_PERMIT_MAIN_FUNCTION_ARGUMENT,
+	othcap_CAN_SHARE_DEVICE_MEMORY,
+	othcap_RUNNABLE_ON_SLEEP,
+	othcap_SPECIAL_MEMORY_ARRANGE = 12,
 } OtherCapabilities_Flagbitmask;
 
 typedef enum
 {
-	CATEGORY_SYSTEM_APPLICATION,
-	CATEGORY_HARDWARE_CHECK,
-	CATEGORY_FILE_SYSTEM_TOOL,
-	DEBUG,
-	TWL_CARD_BACKUP,
-	TWL_NAND_DATA,
-	BOSS,
-	DIRECT_SDMC,
-	CORE,
-	CTR_NAND_RO,
-	CTR_NAND_RW,
-	CTR_NAND_RO_WRITE,
-	CATEGORY_SYSTEM_SETTINGS,
-	CARD_BOARD,
-	EXPORT_IMPORT_IVS,
-	DIRECT_SDMC_WRITE,
-	SWITCH_CLEANUP,
-	SAVE_DATA_MOVE,
-	SHOP,
-	SHELL,
-	CATEGORY_HOME_MENU
+	fsaccess_CATEGORY_SYSTEM_APPLICATION,
+	fsaccess_CATEGORY_HARDWARE_CHECK,
+	fsaccess_CATEGORY_FILE_SYSTEM_TOOL,
+	fsaccess_DEBUG,
+	fsaccess_TWL_CARD_BACKUP,
+	fsaccess_TWL_NAND_DATA,
+	fsaccess_BOSS,
+	fsaccess_DIRECT_SDMC,
+	fsaccess_CORE,
+	fsaccess_CTR_NAND_RO,
+	fsaccess_CTR_NAND_RW,
+	fsaccess_CTR_NAND_RO_WRITE,
+	fsaccess_CATEGORY_SYSTEM_SETTINGS,
+	fsaccess_CARD_BOARD,
+	fsaccess_EXPORT_IMPORT_IVS,
+	fsaccess_DIRECT_SDMC_WRITE,
+	fsaccess_SWITCH_CLEANUP,
+	fsaccess_SAVE_DATA_MOVE,
+	fsaccess_SHOP,
+	fsaccess_SHELL,
+	fsaccess_CATEGORY_HOME_MENU
 } FileSystemAccess;
 
 typedef enum
 {
-	NOT_USE_ROMFS,
-	USE_EXTENDED_SAVEDATA_ACCESS_CONTROL
+	attribute_NOT_USE_ROMFS,
+	attribute_USE_EXTENDED_SAVEDATA_ACCESS_CONTROL
 } AttributeName;
 
 typedef enum
 {
-	FS_MOUNT_NAND,
-	FS_MOUNT_NAND_RO_WRITE,
-	FS_MOUNT_TWLN,
-	FS_MOUNT_WNAND,
-	FS_MOUNT_CARD_SPI,
-	USE_SDIF3,
-	CREATE_SEED,
-	USE_CARD_SPI,
-	SD_APPLICATION,
-	USE_DIRECT_SDMC
+	arm9cap_FS_MOUNT_NAND,
+	arm9cap_FS_MOUNT_NAND_RO_WRITE,
+	arm9cap_FS_MOUNT_TWLN,
+	arm9cap_FS_MOUNT_WNAND,
+	arm9cap_FS_MOUNT_CARD_SPI,
+	arm9cap_USE_SDIF3,
+	arm9cap_CREATE_SEED,
+	arm9cap_USE_CARD_SPI,
+	arm9cap_SD_APPLICATION,
+	arm9cap_USE_DIRECT_SDMC
 } Arm9Capability;
 
 typedef struct
@@ -131,8 +132,6 @@ typedef struct
 	u8 ExtSaveDataId[8];
 	u8 SystemSaveDataId[8];
 	u8 StorageAccessableUniqueIds[8];
-	//u8 reserved[7];
-	//u8 flag;
 	u8 AccessInfo[7];
 	u8 OtherAttributes;
 } exhdr_StorageInfo;
@@ -203,6 +202,7 @@ typedef struct
 {
 	keys_struct *keys;
 	rsf_settings *yaml;
+	bool UseAccessDescPreset;
 
 	/* Output */
 	ExtendedHeader_Struct *ExHdr; // is the exheader output buffer ptr(in ncchset) cast as exheader struct ptr;

@@ -17,15 +17,6 @@ typedef enum
 
 typedef enum
 {
-	auto_gen,
-	use_spec_file,
-	app,
-	demo,
-	dlp,
-} fixed_accessdesc_type;
-
-typedef enum
-{
 	format_not_set,
 	CXI,
 	CFA,
@@ -39,12 +30,12 @@ typedef struct
 {	
 	struct{
 		// Booleans
-		int NoPadding;
-		int AllowUnalignedSection;
-		int EnableCrypt;
-		int EnableCompress;
-		int FreeProductCode;
-		int UseOnSD;
+		bool NoPadding; // DELETE
+		bool AllowUnalignedSection;
+		bool EnableCrypt;
+		bool EnableCompress;
+		bool FreeProductCode;
+		bool UseOnSD;
 
 		// Strings
 		char *PageSize;
@@ -56,18 +47,18 @@ typedef struct
 	
 	struct{
 		// Booleans
-		int DisableDebug;
-		int EnableForceDebug;
-		int CanWriteSharedPage;
-		int CanUsePrivilegedPriority;
-		int CanUseNonAlphabetAndNumber;
-		int PermitMainFunctionArgument;
-		int CanShareDeviceMemory;
-		int UseOtherVariationSaveData;
-		int UseExtSaveData;
-		int UseExtendedSaveDataAccessControl;
-		int RunnableOnSleep;
-		int SpecialMemoryArrange;
+		bool DisableDebug;
+		bool EnableForceDebug;
+		bool CanWriteSharedPage;
+		bool CanUsePrivilegedPriority;
+		bool CanUseNonAlphabetAndNumber;
+		bool PermitMainFunctionArgument;
+		bool CanShareDeviceMemory;
+		bool UseOtherVariationSaveData;
+		bool UseExtSaveData;
+		bool UseExtendedSaveDataAccessControl;
+		bool RunnableOnSleep;
+		bool SpecialMemoryArrange;
 		
 		// Strings
 		char *ProgramId; // DELETE
@@ -127,7 +118,7 @@ typedef struct
 	
 	struct{
 		// Booleans
-		int MediaFootPadding;
+		bool MediaFootPadding;
 		
 		// Strings
 		char *Title;
@@ -136,8 +127,8 @@ typedef struct
 		char *MediaSize;
 		char *ContentType;
 		char *Logo;
-		char *BackupMemoryType;
-		char *InitialCode;
+		char *BackupMemoryType;// Delete
+		char *InitialCode;// Delete
 	} BasicInfo;
 	
 	struct{
@@ -171,7 +162,7 @@ typedef struct
 	
 	struct{
 		// Strings
-		char *Platform;
+		char *Platform; // DELETE
 		char *Category;
 		char *UniqueId;
 		char *Version;
@@ -240,7 +231,6 @@ typedef struct
 	char *banner_path;
 	char *logo_path;
 
-	fixed_accessdesc_type accessdesc;
 	bool include_exefs_logo;
 	
 	char *exefs_code_path;
@@ -272,5 +262,4 @@ void free_UserSettings(user_settings *usr_settings);
 int ParseArgs(int argc, char *argv[], user_settings *usr_settings);
 void ReadYAMLtest(char *filepath);
 
-void InvalidateRSFBooleans(rsf_settings *rsf_set);
 void free_RsfSettings(rsf_settings *set);

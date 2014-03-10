@@ -26,12 +26,7 @@
 #include "types.h"
 #include "utils.h"
 #include "crypto.h"
-#ifdef RETAIL_FSIGN
-#include "keys_retail.h"
-#else
-#include "keys_debug.h"
-#include "accessdesc_sig.h"
-#endif
+
 #include "keyset.h"
 #include "usersettings.h"
 #include "libyaml/yaml.h"

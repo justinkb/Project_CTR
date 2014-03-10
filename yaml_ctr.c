@@ -12,7 +12,6 @@ void BadYamlFormatting(void);
 int GetYamlSettings(user_settings *set)
 {
 	memset(&set->yaml_set,0,sizeof(rsf_settings));
-	InvalidateRSFBooleans(&set->yaml_set);
 	int ret = 0;
 	if(set->rsf_path) {
 		FILE *tmp = fopen(set->rsf_path,"rb");

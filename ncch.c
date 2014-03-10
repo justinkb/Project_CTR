@@ -5,7 +5,8 @@
 #include "exefs.h"
 #include "romfs.h"
 #include "titleid.h"
-#include "logo_data.h"
+
+#include "logo_data.h" // Contains Logos
 
 // Private Prototypes
 int SignCFA(u8 *Signature, u8 *CFA_HDR, keys_struct *keys);
@@ -57,16 +58,23 @@ int CheckCXISignature(u8 *Signature, u8 *CXI_HDR, u8 *PubK)
 int build_NCCH(user_settings *usrset)
 {
 	int result;
-
+#ifdef DEBUG
+	printf("[DEBUG] Init Settings\n");
+#endif
 	// Init Settings
 	ncch_settings *ncchset = malloc(sizeof(ncch_settings));
 	if(!ncchset) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 	init_NCCHSettings(ncchset);
 
+#ifdef DEBUG
+	printf("[DEBUG] Get Settings\n");
+#endif
 	// Get Settings
 	result = get_NCCHSettings(ncchset,usrset);
 	if(result) goto finish;
-
+#ifdef DEBUG
+	printf("[DEBUG] Build ExeFS Code/PlainRegion\n");
+#endif
 	// Build ExeFs Code Section
 	result = BuildExeFsCode(ncchset);
 	if(result) goto finish;
@@ -82,25 +90,46 @@ int build_NCCH(user_settings *usrset)
 	memdump(stdout,"Code Hash: ",hash,0x20);
 #endif
 	
+#ifdef DEBUG
+	printf("[DEBUG] Build Exheader\n");
+#endif
 	// Build ExHeader
 	result = BuildExHeader(ncchset);
 	if(result) goto finish;
 	
-	
+
+#ifdef DEBUG
+	printf("[DEBUG] Exefs\n");
+#endif
 	// Build ExeFs/RomFs
 	result = BuildExeFs(ncchset);
 	if(result) goto finish;
+#ifdef DEBUG
+	printf("[DEBUG] Build Romfs\n");
+#endif
 	result = BuildRomFs(ncchset);
 	if(result) goto finish;
 	
 	// Final Steps
+#ifdef DEBUG
+	printf("[DEBUG] Build common header\n");
+#endif
 	result = BuildCommonHeader(ncchset);
 	if(result) goto finish;
+#ifdef DEBUG
+	printf("[DEBUG] Encrypt Sections\n");
+#endif
 	result = EncryptNCCHSections(ncchset);
 	if(result) goto finish;
+#ifdef DEBUG
+	printf("[DEBUG] Write Sections\n");
+#endif
 	result = WriteNCCHSectionsToBuffer(ncchset);
 	if(result) goto finish;
 finish:
+#ifdef DEBUG
+	printf("[DEBUG] Finish Building\n");
+#endif
 	if(result) fprintf(stderr,"[NCCH ERROR] NCCH Build Process Failed\n");
 	free_NCCHSettings(ncchset);
 	return result;
@@ -194,8 +223,6 @@ int SetBasicOptions(ncch_settings *ncchset, user_settings *usrset)
 		return NCCH_BAD_YAML_SET;
 	}
 
-	ncchset->Options.accessdesc = usrset->accessdesc;
-
 	ncchset->CxiRsaKey.PrivK = malloc(0x100);
 	ncchset->CxiRsaKey.PubK = malloc(0x100);
 
@@ -204,6 +231,15 @@ int SetBasicOptions(ncch_settings *ncchset, user_settings *usrset)
 
 int CreateInputFilePtrs(ncch_settings *ncchset, user_settings *usrset)
 {
+	if(usrset->romfs_path){
+		ncchset->ComponentFilePtrs.romfs_size = GetFileSize_u64(usrset->romfs_path);
+		ncchset->ComponentFilePtrs.romfs = fopen(usrset->romfs_path,"rb");
+		if(!ncchset->ComponentFilePtrs.romfs){
+			fprintf(stderr,"[NCCH ERROR] Failed to open RomFs file '%s'\n",usrset->romfs_path);
+			return FAILED_TO_IMPORT_FILE;
+		}
+	}
+	if(ncchset->Options.IsCfa) return 0;
 	if(usrset->elf_path){
 		ncchset->ComponentFilePtrs.elf_size = GetFileSize_u64(usrset->elf_path);
 		ncchset->ComponentFilePtrs.elf = fopen(usrset->elf_path,"rb");
@@ -253,14 +289,6 @@ int CreateInputFilePtrs(ncch_settings *ncchset, user_settings *usrset)
 			return FAILED_TO_IMPORT_FILE;
 		}
 	}
-	if(usrset->romfs_path){
-		ncchset->ComponentFilePtrs.romfs_size = GetFileSize_u64(usrset->romfs_path);
-		ncchset->ComponentFilePtrs.romfs = fopen(usrset->romfs_path,"rb");
-		if(!ncchset->ComponentFilePtrs.romfs){
-			fprintf(stderr,"[NCCH ERROR] Failed to open RomFs file '%s'\n",usrset->romfs_path);
-			return FAILED_TO_IMPORT_FILE;
-		}
-	}
 	if(usrset->plain_region_path){
 		ncchset->ComponentFilePtrs.plainregion_size = GetFileSize_u64(usrset->plain_region_path);
 		ncchset->ComponentFilePtrs.plainregion = fopen(usrset->plain_region_path,"rb");
@@ -274,6 +302,7 @@ int CreateInputFilePtrs(ncch_settings *ncchset, user_settings *usrset)
 
 int ImportNonCodeExeFsSections(ncch_settings *ncchset)
 {
+	if(ncchset->Options.IsCfa) return 0;
 	if(ncchset->ComponentFilePtrs.banner){
 		ncchset->ExeFs_Sections.Banner.size = ncchset->ComponentFilePtrs.banner_size;
 		ncchset->ExeFs_Sections.Banner.buffer = malloc(ncchset->ExeFs_Sections.Banner.size);
@@ -291,6 +320,7 @@ int ImportNonCodeExeFsSections(ncch_settings *ncchset)
 
 int ImportLogo(ncch_settings *ncchset)
 {
+	if(ncchset->Options.IsCfa) return 0;
 	if(ncchset->ComponentFilePtrs.logo){
 		ncchset->Sections.Logo.size = ncchset->ComponentFilePtrs.logo_size;
 		ncchset->Sections.Logo.buffer = malloc(ncchset->Sections.Logo.size);
@@ -599,14 +629,10 @@ int VerifyNCCH(u8 *ncch, keys_struct *keys, bool SuppressOutput)
 	GetCXIStruct(ncch_ctx,hdr);
 
 	if(IsCfa(hdr)){
-		if(CheckCFASignature(hdr_sig,(u8*)hdr,keys) != Good){
-#ifdef RETAIL_FSIGN
-			if(!SuppressOutput) fprintf(stderr,"[NCCH WARNING] CFA Sigcheck Failed\n");
-#else
+		if(CheckCFASignature(hdr_sig,(u8*)hdr,keys) != Good && !keys->rsa.FalseSign){
 			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] CFA Sigcheck Failed\n");
 			free(ncch_ctx);
 			return NCCH_HDR_SIG_BAD;
-#endif
 		}
 		if(!ncch_ctx->romfs_size){
 			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] CFA is corrupt\n");
@@ -692,17 +718,13 @@ int VerifyNCCH(u8 *ncch, keys_struct *keys, bool SuppressOutput)
 		// Checking RSA Sigs
 		u8 *hdr_pubk = GetNcchHdrPubKey_frm_exhdr(ExHeader);
 
-		if(CheckAccessDescSignature(ExHeader,keys) != 0){
-#ifdef RETAIL_FSIGN
-			if(!SuppressOutput) fprintf(stderr,"[NCCH WARNING] AccessDesc Sigcheck Failed\n");
-#else
+		if(CheckAccessDescSignature(ExHeader,keys) != 0 && !keys->rsa.FalseSign){
 			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] AccessDesc Sigcheck Failed\n");
 			free(ncch_ctx);
 			free(ExHeader);
 			return ACCESSDESC_SIG_BAD;
-#endif
 		}
-		if(CheckCXISignature(hdr_sig,(u8*)hdr,hdr_pubk) != 0){
+		if(CheckCXISignature(hdr_sig,(u8*)hdr,hdr_pubk) != 0 /* && !keys->rsa.FalseSign*/){
 			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] CXI Header Sigcheck Failed\n");
 			free(ncch_ctx);
 			free(ExHeader);
@@ -780,8 +802,8 @@ u8* RetargetNCCH(FILE *fp, u64 size, u8 *TitleId, u8 *ProgramId, keys_struct *ke
 	NCCH_Header *hdr = NULL;
 	hdr = GetNCCH_CommonHDR(NULL,NULL,ncch);
 	
-	if(!IsCfa(hdr)){
-		fprintf(stderr,"[NCCH ERROR] CXI's ID cannot be modified\n"); // Not yet yet, requires AccessDesc Privk, may implement anyway later
+	if(/*keys->rsa.RequiresPresignedDesc && */!IsCfa(hdr)){
+		fprintf(stderr,"[NCCH ERROR] CXI's ID cannot be modified without the ability to resign the AccessDesc\n"); // Not yet yet, requires AccessDesc Privk, may implement anyway later
 		free(ncch);
 		return NULL;
 	}
@@ -1060,4 +1082,6 @@ void ncch_get_counter(NCCH_STRUCT *ctx, u8 counter[16], u8 type)
 		for(i=0; i<4; i++)
 			counter[12+i] = x>>((3-i)*8);
 	}
+	
+	//memdump(stdout,"CTR: ",counter,16);
 }
