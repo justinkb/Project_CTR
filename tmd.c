@@ -4,31 +4,31 @@
 
 // Private Prototypes
 int SetupTMDBuffer(COMPONENT_STRUCT *tik);
-int SetupTMDHeader(TMD_Struct *hdr, TMD_CONTENT_INFO_RECORD *info_record, cia_settings *ciaset);
-int SignTMDHeader(TMD_Struct *hdr, TMD_SignatureStruct *sig, keys_struct *keys);
-int SetupTMDInfoRecord(TMD_CONTENT_INFO_RECORD *info_record, u8 *content_record, u16 ContentCount);
+int SetupTMDHeader(tmd_hdr *hdr, tmd_content_info_record *info_record, cia_settings *ciaset);
+int SignTMDHeader(tmd_hdr *hdr, tmd_signature *sig, keys_struct *keys);
+int SetupTMDInfoRecord(tmd_content_info_record *info_record, u8 *content_record, u16 ContentCount);
 int SetupTMDContentRecord(u8 *content_record, cia_settings *ciaset);
 
 u32 PredictTMDSize(u16 ContentCount)
 {
-	return sizeof(TMD_SignatureStruct) + sizeof(TMD_Struct) + sizeof(TMD_CONTENT_INFO_RECORD)*64 + sizeof(TMD_CONTENT_CHUNK_STRUCT)*ContentCount;
+	return sizeof(tmd_signature) + sizeof(tmd_hdr) + sizeof(tmd_content_info_record)*64 + sizeof(tmd_content_chunk)*ContentCount;
 }
 
 int BuildTMD(cia_settings *ciaset)
 {
 	int result = 0;
-	result = SetupTMDBuffer(&ciaset->CIA_Sections.TitleMetaData);
+	result = SetupTMDBuffer(&ciaset->ciaSections.tmd);
 	if(result) return result;
 
 	// Setting TMD Struct Ptrs
-	TMD_SignatureStruct *sig = (TMD_SignatureStruct*)ciaset->CIA_Sections.TitleMetaData.buffer;
-	TMD_Struct *hdr = (TMD_Struct*)(ciaset->CIA_Sections.TitleMetaData.buffer+sizeof(TMD_SignatureStruct));
-	TMD_CONTENT_INFO_RECORD *info_record = (TMD_CONTENT_INFO_RECORD*)(ciaset->CIA_Sections.TitleMetaData.buffer+sizeof(TMD_SignatureStruct)+sizeof(TMD_Struct));
-	u8 *content_record = (u8*)(ciaset->CIA_Sections.TitleMetaData.buffer+sizeof(TMD_SignatureStruct)+sizeof(TMD_Struct)+sizeof(TMD_CONTENT_INFO_RECORD)*64);
+	tmd_signature *sig = (tmd_signature*)ciaset->ciaSections.tmd.buffer;
+	tmd_hdr *hdr = (tmd_hdr*)(ciaset->ciaSections.tmd.buffer+sizeof(tmd_signature));
+	tmd_content_info_record *info_record = (tmd_content_info_record*)(ciaset->ciaSections.tmd.buffer+sizeof(tmd_signature)+sizeof(tmd_hdr));
+	u8 *content_record = (u8*)(ciaset->ciaSections.tmd.buffer+sizeof(tmd_signature)+sizeof(tmd_hdr)+sizeof(tmd_content_info_record)*64);
 
 
 	SetupTMDContentRecord(content_record,ciaset);
-	SetupTMDInfoRecord(info_record,content_record,ciaset->content.ContentCount);
+	SetupTMDInfoRecord(info_record,content_record,ciaset->content.contentCount);
 	result = SetupTMDHeader(hdr,info_record,ciaset);
 	if(result) return result;
 	result = SignTMDHeader(hdr,sig,ciaset->keys);
@@ -37,56 +37,58 @@ int BuildTMD(cia_settings *ciaset)
 
 int SetupTMDBuffer(COMPONENT_STRUCT *tmd)
 {
-	tmd->buffer = malloc(tmd->size); // already set before
+	tmd->buffer = malloc(tmd->size); // tmd->size is already set before
 	if(!tmd->buffer) { fprintf(stderr,"[ERROR] MEM ERROR\n"); return MEM_ERROR; }
 	memset(tmd->buffer,0,tmd->size);
 	return 0;
 }
 
-int SetupTMDHeader(TMD_Struct *hdr, TMD_CONTENT_INFO_RECORD *info_record, cia_settings *ciaset)
+int SetupTMDHeader(tmd_hdr *hdr, tmd_content_info_record *info_record, cia_settings *ciaset)
 {
-	memset(hdr,0,sizeof(TMD_Struct));
+	memset(hdr,0,sizeof(tmd_hdr));
 
-	memcpy(hdr->Issuer,ciaset->tmd.TMDIssuer,0x40);
-	hdr->TMDFormatVersion = ciaset->tmd.tmd_format_ver;
-	hdr->ca_crl_version = ciaset->cert.ca_crl_version;
-	hdr->signer_crl_version = ciaset->cert.signer_crl_version;
-	memcpy(hdr->TitleID,ciaset->TitleID,8);
-	memcpy(hdr->TitleType,ciaset->Title_type,4);
-	memcpy(hdr->SaveDataSize,ciaset->tmd.SaveDataSize,4);
-	memcpy(hdr->PrivSaveDataSize,ciaset->tmd.PrivSaveDataSize,4);
-	hdr->TWL_Flag = ciaset->tmd.twl_flag;
-	memcpy(hdr->TitleVersion,ciaset->tmd.TitleVersion,2);
-	u16_to_u8(hdr->ContentCount,ciaset->content.ContentCount,BE);
-	ctr_sha(info_record,sizeof(TMD_CONTENT_INFO_RECORD)*64,hdr->sha_256_hash,CTR_SHA_256);
+	memcpy(hdr->issuer,ciaset->tmd.issuer,0x40);
+	hdr->formatVersion = ciaset->tmd.formatVersion;
+	hdr->caCrlVersion = ciaset->cert.caCrlVersion;
+	hdr->signerCrlVersion = ciaset->cert.signerCrlVersion;
+	//u8 dummy[8] = {0x00,0x04,0x00,0x00,0x00,0x00,0x01,0x00};
+	//memcpy(hdr->TitleID,dummy,8);
+	memcpy(hdr->titleID,ciaset->common.titleId,8);
+	memcpy(hdr->titleType,ciaset->tmd.titleType,4);
+	memcpy(hdr->savedataSize,ciaset->tmd.savedataSize,4);
+	memcpy(hdr->privSavedataSize,ciaset->tmd.privSavedataSize,4);
+	hdr->twlFlag = ciaset->tmd.twlFlag;
+	u16_to_u8(hdr->titleVersion,ciaset->tmd.version,BE);
+	u16_to_u8(hdr->contentCount,ciaset->content.contentCount,BE);
+	ctr_sha(info_record,sizeof(tmd_content_info_record)*64,hdr->infoRecordHash,CTR_SHA_256);
 	return 0;
 }
 
-int SignTMDHeader(TMD_Struct *hdr, TMD_SignatureStruct *sig, keys_struct *keys)
+int SignTMDHeader(tmd_hdr *hdr, tmd_signature *sig, keys_struct *keys)
 {
-	memset(sig,0,sizeof(TMD_SignatureStruct));
-	u32_to_u8(sig->sig_type,RSA_2048_SHA256,BE);
-	return ctr_sig((u8*)hdr,sizeof(TMD_Struct),sig->data,keys->rsa.TMD_Pub,keys->rsa.TMD_Priv,RSA_2048_SHA256,CTR_RSA_SIGN);
+	memset(sig,0,sizeof(tmd_signature));
+	u32_to_u8(sig->sigType,RSA_2048_SHA256,BE);
+	return ctr_sig((u8*)hdr,sizeof(tmd_hdr),sig->data,keys->rsa.cpPub,keys->rsa.cpPvt,RSA_2048_SHA256,CTR_RSA_SIGN);
 }
 
-int SetupTMDInfoRecord(TMD_CONTENT_INFO_RECORD *info_record, u8 *content_record, u16 ContentCount)
+int SetupTMDInfoRecord(tmd_content_info_record *info_record, u8 *content_record, u16 ContentCount)
 {
-	memset(info_record,0x0,sizeof(TMD_CONTENT_INFO_RECORD)*0x40);
-	u16_to_u8(info_record->content_index_offset,0x0,BE);
-	u16_to_u8(info_record->content_command_count,ContentCount,BE);
-	ctr_sha(content_record,sizeof(TMD_CONTENT_CHUNK_STRUCT)*ContentCount,info_record->sha_256_hash,CTR_SHA_256);
+	memset(info_record,0x0,sizeof(tmd_content_info_record)*0x40);
+	u16_to_u8(info_record->contentIndexOffset,0x0,BE);
+	u16_to_u8(info_record->contentCommandCount,ContentCount,BE);
+	ctr_sha(content_record,sizeof(tmd_content_chunk)*ContentCount,info_record->contentChunkHash,CTR_SHA_256);
 	return 0;
 }
 
 int SetupTMDContentRecord(u8 *content_record, cia_settings *ciaset)
 {
-	for(int i = 0; i < ciaset->content.ContentCount; i++){
-		TMD_CONTENT_CHUNK_STRUCT *ptr = (TMD_CONTENT_CHUNK_STRUCT*)(content_record+sizeof(TMD_CONTENT_CHUNK_STRUCT)*i);
-		u32_to_u8(ptr->content_id,ciaset->content.ContentId[i],BE);
-		u16_to_u8(ptr->content_index,ciaset->content.ContentIndex[i],BE);
-		u16_to_u8(ptr->content_type,ciaset->content.ContentType[i],BE);
-		u64_to_u8(ptr->content_size,ciaset->content.ContentSize[i],BE);
-		memcpy(ptr->sha_256_hash,ciaset->content.ContentHash[i],0x20);
+	for(int i = 0; i < ciaset->content.contentCount; i++){
+		tmd_content_chunk *ptr = (tmd_content_chunk*)(content_record+sizeof(tmd_content_chunk)*i);
+		u32_to_u8(ptr->contentID,ciaset->content.contentId[i],BE);
+		u16_to_u8(ptr->contentIndex,ciaset->content.contentIndex[i],BE);
+		u16_to_u8(ptr->contentFlags,ciaset->content.contentFlags[i],BE);
+		u64_to_u8(ptr->contentSize,ciaset->content.contentSize[i],BE);
+		memcpy(ptr->contentHash,ciaset->content.contentHash[i],0x20);
 	}
 	return 0;
 }

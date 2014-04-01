@@ -34,7 +34,7 @@ int TruncateFile_u64(char *filename, u64 filelen);
 int fseek_64(FILE *fp, u64 file_pos, int whence);
 int makedir(const char* dir);
 char *getcwdir(char *buffer,int maxlen);
-//Data Size conversion
+//Data Size contitleVersion
 u16 u8_to_u16(u8 *value, u8 endianness);
 u32 u8_to_u32(u8 *value, u8 endianness);
 u64 u8_to_u64(u8 *value, u8 endianness);

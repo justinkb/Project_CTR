@@ -10,23 +10,23 @@ typedef enum
 
 typedef enum
 {
-	ExeFsCodeCompress = 1,
+	Compress = 1,
 	RetailSDAppFlag = 2,
-} SystemInfoFlags_Flagbitmask;
+} system_info_flags;
 
 typedef enum
 {
 	memtype_APPLICATION = 1,
     memtype_SYSTEM = 2,
     memtype_BASE = 3
-} MemoryTypeName;
+} memory_type;
 
 typedef enum
 {
 	processtype_DEFAULT = -1,
 	processtype_SYSTEM = 0,
 	processtype_APPLICATION = 1
-} ProcessTypeName;
+} process_type;
 
 typedef enum
 {
@@ -34,65 +34,65 @@ typedef enum
 	resrc_limit_SYS_APPLET,
 	resrc_limit_LIB_APPLET,
 	resrc_limit_OTHER
-} ResourceLimitCategoryName;
+} resource_limit_category;
 
 typedef enum
 {
-	othcap_PERMIT_DEBUG,
-	othcap_FORCE_DEBUG,
-	othcap_CAN_USE_NON_ALPHABET_AND_NUMBER,
-	othcap_CAN_WRITE_SHARED_PAGE,
-	othcap_CAN_USE_PRIVILEGE_PRIORITY,
-	othcap_PERMIT_MAIN_FUNCTION_ARGUMENT,
-	othcap_CAN_SHARE_DEVICE_MEMORY,
-	othcap_RUNNABLE_ON_SLEEP,
-	othcap_SPECIAL_MEMORY_ARRANGE = 12,
-} OtherCapabilities_Flagbitmask;
+	othcap_PERMIT_DEBUG = (1 << 0),
+	othcap_FORCE_DEBUG = (1 << 1),
+	othcap_CAN_USE_NON_ALPHABET_AND_NUMBER = (1 << 2),
+	othcap_CAN_WRITE_SHARED_PAGE = (1 << 3),
+	othcap_CAN_USE_PRIVILEGE_PRIORITY = (1 << 4),
+	othcap_PERMIT_MAIN_FUNCTION_ARGUMENT = (1 << 5),
+	othcap_CAN_SHARE_DEVICE_MEMORY = (1 << 6),
+	othcap_RUNNABLE_ON_SLEEP = (1 << 7),
+	othcap_SPECIAL_MEMORY_ARRANGE = (1 << 12),
+} other_capabilities_flags;
 
 typedef enum
 {
-	fsaccess_CATEGORY_SYSTEM_APPLICATION,
-	fsaccess_CATEGORY_HARDWARE_CHECK,
-	fsaccess_CATEGORY_FILE_SYSTEM_TOOL,
-	fsaccess_DEBUG,
-	fsaccess_TWL_CARD_BACKUP,
-	fsaccess_TWL_NAND_DATA,
-	fsaccess_BOSS,
-	fsaccess_DIRECT_SDMC,
-	fsaccess_CORE,
-	fsaccess_CTR_NAND_RO,
-	fsaccess_CTR_NAND_RW,
-	fsaccess_CTR_NAND_RO_WRITE,
-	fsaccess_CATEGORY_SYSTEM_SETTINGS,
-	fsaccess_CARD_BOARD,
-	fsaccess_EXPORT_IMPORT_IVS,
-	fsaccess_DIRECT_SDMC_WRITE,
-	fsaccess_SWITCH_CLEANUP,
-	fsaccess_SAVE_DATA_MOVE,
-	fsaccess_SHOP,
-	fsaccess_SHELL,
-	fsaccess_CATEGORY_HOME_MENU
-} FileSystemAccess;
+	fsaccess_CATEGORY_SYSTEM_APPLICATION = (1 << 0), // 0x00000001
+	fsaccess_CATEGORY_HARDWARE_CHECK = (1 << 1), // 0x00000002
+	fsaccess_CATEGORY_FILE_SYSTEM_TOOL = (1 << 2), // 0x00000004
+	fsaccess_DEBUG = (1 << 3), // 0x00000008
+	fsaccess_TWL_CARD_BACKUP = (1 << 4), // 0x00000010
+	fsaccess_TWL_NAND_DATA = (1 << 5), // 0x00000020
+	fsaccess_BOSS = (1 << 6), // 0x00000040
+	fsaccess_DIRECT_SDMC = (1 << 7), // 0x00000080
+	fsaccess_CORE = (1 << 8), // 0x00000100
+	fsaccess_CTR_NAND_RO = (1 << 9), // 0x00000200
+	fsaccess_CTR_NAND_RW = (1 << 10), // 0x00000400
+	fsaccess_CTR_NAND_RO_WRITE = (1 << 11), // 0x00000800
+	fsaccess_CATEGORY_SYSTEM_SETTINGS = (1 << 12), // 0x00001000
+	fsaccess_CARD_BOARD = (1 << 13), // 0x00002000
+	fsaccess_EXPORT_IMPORT_IVS = (1 << 14), // 0x00004000
+	fsaccess_DIRECT_SDMC_WRITE = (1 << 15), // 0x00008000
+	fsaccess_SWITCH_CLEANUP = (1 << 16), // 0x00010000
+	fsaccess_SAVE_DATA_MOVE = (1 << 17), // 0x00020000
+	fsaccess_SHOP = (1 << 18), // 0x00040000
+	fsaccess_SHELL = (1 << 19), // 0x00080000
+	fsaccess_CATEGORY_HOME_MENU = (1 << 20), // 0x00100000
+} file_system_access;
 
 typedef enum
 {
-	attribute_NOT_USE_ROMFS,
-	attribute_USE_EXTENDED_SAVEDATA_ACCESS_CONTROL
-} AttributeName;
+	attribute_NOT_USE_ROMFS = (1 << 0),
+	attribute_USE_EXTENDED_SAVEDATA_ACCESS_CONTROL = (1 << 1),
+} attribute_name;
 
 typedef enum
 {
-	arm9cap_FS_MOUNT_NAND,
-	arm9cap_FS_MOUNT_NAND_RO_WRITE,
-	arm9cap_FS_MOUNT_TWLN,
-	arm9cap_FS_MOUNT_WNAND,
-	arm9cap_FS_MOUNT_CARD_SPI,
-	arm9cap_USE_SDIF3,
-	arm9cap_CREATE_SEED,
-	arm9cap_USE_CARD_SPI,
-	arm9cap_SD_APPLICATION,
-	arm9cap_USE_DIRECT_SDMC
-} Arm9Capability;
+	arm9cap_FS_MOUNT_NAND = (1 << 0),
+	arm9cap_FS_MOUNT_NAND_RO_WRITE = (1 << 1),
+	arm9cap_FS_MOUNT_TWLN = (1 << 2),
+	arm9cap_FS_MOUNT_WNAND = (1 << 3),
+	arm9cap_FS_MOUNT_CARD_SPI = (1 << 4),
+	arm9cap_USE_SDIF3 = (1 << 5),
+	arm9cap_CREATE_SEED = (1 << 6),
+	arm9cap_USE_CARD_SPI = (1 << 7),
+	arm9cap_SD_APPLICATION = (1 << 8),
+	arm9cap_USE_DIRECT_SDMC = (1 << 9),
+} arm9_capability;
 
 typedef struct
 {
@@ -103,48 +103,48 @@ typedef struct
 
 typedef struct
 {
-	u8 Address[4]; // le u32
-	u8 NumMaxPages[4]; // le u32
-	u8 CodeSize[4]; // le u32
+	u8 address[4]; // le u32
+	u8 numMaxPages[4]; // le u32
+	u8 codeSize[4]; // le u32
 } exhdr_CodeSegmentInfo;
 
 typedef struct
 {
-	u8 Name[8];
-	exhdr_SystemInfoFlags Flags;
-	exhdr_CodeSegmentInfo TextSectionInfo;
-	u8 StackSize[4]; // le u32
-	exhdr_CodeSegmentInfo ReadOnlySectionInfo;
-	u8 Reserved[4];
-	exhdr_CodeSegmentInfo DataSectionInfo;
-	u8 BssSize[4]; // le u32
+	u8 name[8];
+	exhdr_SystemInfoFlags flags;
+	exhdr_CodeSegmentInfo textSectionInfo;
+	u8 stackSize[4]; // le u32
+	exhdr_CodeSegmentInfo readOnlySectionInfo;
+	u8 padding0[4];
+	exhdr_CodeSegmentInfo dataSectionInfo;
+	u8 bssSize[4]; // le u32
 } exhdr_CodeSetInfo;
 
 typedef struct
 {
-	u8 SaveDataSize[8];
-	u8 JumpId[8];
-	u8 Reserved[0x30];
+	u8 savedataSize[8];
+	u8 jumpId[8];
+	u8 padding0[0x30];
 } exhdr_SystemInfo;
 
 typedef struct
 {
-	u8 ExtSaveDataId[8];
-	u8 SystemSaveDataId[8];
-	u8 StorageAccessableUniqueIds[8];
-	u8 AccessInfo[7];
-	u8 OtherAttributes;
+	u8 extSavedataId[8];
+	u8 systemSavedataId[8];
+	u8 storageAccessableUniqueIds[8];
+	u8 accessInfo[7];
+	u8 otherAttributes;
 } exhdr_StorageInfo;
 
 typedef struct
 {
-	u8 ProgramId[8];
-	u8 Flags[8];
-	u8 ResourceLimitDescriptor[16][2];
-	exhdr_StorageInfo StorageInfo;
-	u8 ServiceAccessControl[32][8]; // Those char[8] svc handles
-	u8 Reserved1[0x1f];
-	u8 ResourceLimitCategory;
+	u8 programId[8];
+	u8 flags[8];
+	u8 resourceLimitDescriptor[16][2];
+	exhdr_StorageInfo storageInfo;
+	u8 serviceAccessControl[32][8]; // Those char[8] svc handles
+	u8 padding0[0x1f];
+	u8 resourceLimitCategory;
 } exhdr_ARM11SystemLocalCapabilities;
 
 typedef struct
@@ -179,55 +179,56 @@ typedef struct
 {
 	// systemcontrol info {
 	// coreinfo {
-	exhdr_CodeSetInfo CodeSetInfo;
-	u8 DependencyList[0x30][8];
+	exhdr_CodeSetInfo codeSetInfo;
+	u8 dependencyList[0x30][8];
 	// }
-	exhdr_SystemInfo SystemInfo;
+	exhdr_SystemInfo systemInfo;
 	// }
 	// accesscontrolinfo {
-	exhdr_ARM11SystemLocalCapabilities ARM11SystemLocalCapabilities;
-	exhdr_ARM11KernelCapabilities ARM11KernelCapabilities;
-	exhdr_ARM9AccessControlInfo ARM9AccessControlInfo;
+	exhdr_ARM11SystemLocalCapabilities arm11SystemLocalCapabilities;
+	exhdr_ARM11KernelCapabilities arm11KernelCapabilities;
+	exhdr_ARM9AccessControlInfo arm9AccessControlInfo;
 	// }
 	struct {
 		u8 signature[0x100];
-		u8 ncchpubkeymodulus[0x100];
-		exhdr_ARM11SystemLocalCapabilities ARM11SystemLocalCapabilities;
-		exhdr_ARM11KernelCapabilities ARM11KernelCapabilities;
-		exhdr_ARM9AccessControlInfo ARM9AccessControlInfo;
-	} AccessDescriptor;
-} ExtendedHeader_Struct;
+		u8 ncchRsaPubKey[0x100];
+		exhdr_ARM11SystemLocalCapabilities arm11SystemLocalCapabilities;
+		exhdr_ARM11KernelCapabilities arm11KernelCapabilities;
+		exhdr_ARM9AccessControlInfo arm9AccessControlInfo;
+	} accessDescriptor;
+} extended_hdr;
 
 typedef struct
 {
 	keys_struct *keys;
-	rsf_settings *yaml;
-	bool UseAccessDescPreset;
+	rsf_settings *rsf;
+	bool useAccessDescPreset;
 
 	/* Output */
-	ExtendedHeader_Struct *ExHdr; // is the exheader output buffer ptr(in ncchset) cast as exheader struct ptr;
+	extended_hdr *exHdr; // is the exheader output buffer ptr(in ncchset) cast as exheader struct ptr;
 } exheader_settings;
 
 #endif
 /* ExHeader Signature Functions */
-int SignAccessDesc(ExtendedHeader_Struct *ExHdr, keys_struct *keys);
-int CheckAccessDescSignature(ExtendedHeader_Struct *ExHdr, keys_struct *keys);
+int SignAccessDesc(extended_hdr *ExHdr, keys_struct *keys);
+int CheckaccessDescSignature(extended_hdr *ExHdr, keys_struct *keys);
 
 /* ExHeader Build Functions */
 int BuildExHeader(ncch_settings *ncchset);
 
 /* ExHeader Binary Print Functions */
-void exhdr_Print_ServiceAccessControl(ExtendedHeader_Struct *hdr);
+void exhdr_Print_ServiceAccessControl(extended_hdr *hdr);
 
 /* ExHeader Binary Read Functions */
-u8* GetAccessDescSig_frm_exhdr(ExtendedHeader_Struct *hdr);
-u8* GetNcchHdrPubKey_frm_exhdr(ExtendedHeader_Struct *hdr);
-u8* GetAccessDesc_frm_exhdr(ExtendedHeader_Struct *hdr);
-u16 GetRemasterVersion_frm_exhdr(ExtendedHeader_Struct *hdr);
-u64 GetSaveDataSize_frm_exhdr(ExtendedHeader_Struct *hdr);
-int GetDependancyList_frm_exhdr(u8 *Dest,ExtendedHeader_Struct *hdr);
-int GetCoreVersion_frm_exhdr(u8 *Dest, ExtendedHeader_Struct *hdr);
+u8* GetAccessDescSig_frm_exhdr(extended_hdr *hdr);
+u8* GetNcchHdrPubKey_frm_exhdr(extended_hdr *hdr);
+u8* GetAccessDesc_frm_exhdr(extended_hdr *hdr);
+u16 GetRemasterVersion_frm_exhdr(extended_hdr *hdr);
+u64 GetSaveDataSize_frm_exhdr(extended_hdr *hdr);
+int GetDependencyList_frm_exhdr(u8 *Dest,extended_hdr *hdr);
+int GetCoreVersion_frm_exhdr(u8 *Dest, extended_hdr *hdr);
 
 /* ExHeader Settings Read from Yaml */
-int GetSaveDataSize_yaml(u64 *SaveDataSize, user_settings *usrset);
-int GetRemasterVersion_yaml(u16 *RemasterVersion, user_settings *usrset);
+int GetSaveDataSize_rsf(u64 *SaveDataSize, user_settings *usrset);
+int GetSaveDataSizeFromString(u64 *out, char *string);
+int GetRemasterVersion_rsf(u16 *RemasterVersion, user_settings *usrset);

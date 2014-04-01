@@ -16,7 +16,7 @@ u64 ConvertTwlIdToCtrId(u64 pgid)
 int GetProgramID(u64 *dest, rsf_settings *yaml, bool IsForExheader)
 {
 	if(yaml->TitleInfo.Category && yaml->TitleInfo.CategoryFlags){
-		fprintf(stderr,"[ERROR] Can not set Cateory and CategoryFlags at the same time.\n");
+		fprintf(stderr,"[ERROR] Can not set \"Cateory\" and \"CategoryFlags\" at the same time.\n");
 		return PID_BAD_YAML_SET;
 	}
 	u16 Type = 0x0004;
@@ -37,7 +37,7 @@ int GetProgramID(u64 *dest, rsf_settings *yaml, bool IsForExheader)
 	// Getting UniqueId
 	if(yaml->TitleInfo.UniqueId) UniqueId = SetPIDUniqueId(yaml->TitleInfo.UniqueId);
 	else{
-		fprintf(stderr,"[ERROR] ParameterNotFound: TitleInfo/UniqueId\n");
+		fprintf(stderr,"[ERROR] ParameterNotFound: \"TitleInfo/UniqueId\"\n");
 		return PID_BAD_YAML_SET;
 	}
 
@@ -63,7 +63,7 @@ int GetUniqueID(u32 *dest, rsf_settings *yaml)
 {
 	if(yaml->TitleInfo.UniqueId) *dest = 0xffffff & SetPIDUniqueId(yaml->TitleInfo.UniqueId);
 	else{
-		fprintf(stderr,"[ERROR] ParameterNotFound: TitleInfo/UniqueId\n");
+		fprintf(stderr,"[ERROR] ParameterNotFound: \"TitleInfo/UniqueId\"\n");
 		return PID_BAD_YAML_SET;
 	}
 	return 0;
@@ -85,7 +85,7 @@ u32 SetPIDCategoryFromName(char *Category)
 	else if(strcmp(Category,"Patch") == 0) return PROGRAM_ID_CATEGORY_PATCH;
 	else if(strcmp(Category,"AutoUpdateContents") == 0) return PROGRAM_ID_CATEGORY_AUTO_UPDATE_CONTENT;
 	else {
-		fprintf(stderr,"[ERROR] Invalid Category: %s\n",Category);
+		fprintf(stderr,"[ERROR] Invalid Category: \"%s\"\n",Category);
 		return PID_INVALID_CATEGORY;
 	}
 }
@@ -120,7 +120,7 @@ u32 SetPIDCategoryFromFlags(char **CategoryFlags, u32 FlagNum)
 			Category = SetPIDCategoryFromFlag(Category,PROGRAM_ID_CATEGORY_FLAG_CAN_SKIP_CONVERT_JUMP_ID,"CanSkipConvertJumpId");
 		
 		else {
-			fprintf(stderr,"[ERROR] Invalid CategoryFlag: %s\n",CategoryFlags[i]);
+			fprintf(stderr,"[ERROR] Invalid CategoryFlag: \"%s\"\n",CategoryFlags[i]);
 			return PID_INVALID_CATEGORY;
 		}
 
@@ -133,7 +133,7 @@ u32 SetPIDCategoryFromFlag(u32 Category, u32 Flag, char *FlagName)
 {
 	if(!Flag) return Category;
 	if((Category & Flag) == Flag){
-		fprintf(stderr,"[ERROR] Failed to set '%s' for category. CategoryFlag was already set.\n",FlagName);
+		fprintf(stderr,"[ERROR] Failed to set \"%s\" for category. CategoryFlag was already set.\n",FlagName);
 		return PID_INVALID_CATEGORY;
 	}
 	return Category |= Flag;
@@ -150,13 +150,13 @@ u16 SetTitleVariation(u16 Category, rsf_settings *yaml_set)
 		if(yaml_set->TitleInfo.DemoIndex){
 			u16 DemoIndex = strtol(yaml_set->TitleInfo.DemoIndex,NULL,10);
 			if(DemoIndex > 255 || DemoIndex == 0){
-				fprintf(stderr,"[ERROR] Invalid demo index '%d'\n",DemoIndex);
+				fprintf(stderr,"[ERROR] Invalid demo index \"%d\"\n",DemoIndex);
 				return PID_INVALID_VARIATION;
 			}
 			return DemoIndex;
 		}
 		else{
-			fprintf(stderr,"[ERROR] ParameterNotFound: 'TitleInfo/DemoIndex'\n");
+			fprintf(stderr,"[ERROR] ParameterNotFound: \"TitleInfo/DemoIndex\"\n");
 			return PID_INVALID_VARIATION;
 		}
 	}
@@ -165,7 +165,7 @@ u16 SetTitleVariation(u16 Category, rsf_settings *yaml_set)
 		if(yaml_set->TitleInfo.ChildIndex){
 			u16 ChildIndex = strtol(yaml_set->TitleInfo.ChildIndex,NULL,10);
 			if(ChildIndex > 255){
-				fprintf(stderr,"[ERROR] Invalid child index '%d'\n",ChildIndex);
+				fprintf(stderr,"[ERROR] Invalid child index \"%d\"\n",ChildIndex);
 				return PID_INVALID_VARIATION;
 			}
 			return ChildIndex;
@@ -177,7 +177,7 @@ u16 SetTitleVariation(u16 Category, rsf_settings *yaml_set)
 		if(yaml_set->TitleInfo.Variation){ // Might Rename to DataTitleIndex
 			u16 DataTitleIndex = strtol(yaml_set->TitleInfo.Variation,NULL,10);
 			if(DataTitleIndex > 255){
-				fprintf(stderr,"[ERROR] Invalid variation '%d'\n",DataTitleIndex);
+				fprintf(stderr,"[ERROR] Invalid variation \"%d\"\n",DataTitleIndex);
 				return PID_INVALID_VARIATION;
 			}
 			return DataTitleIndex;
@@ -189,7 +189,7 @@ u16 SetTitleVariation(u16 Category, rsf_settings *yaml_set)
 		if(yaml_set->TitleInfo.ContentsIndex){
 			u16 ContentsIndex = strtol(yaml_set->TitleInfo.ContentsIndex,NULL,10);
 			if(ContentsIndex > 255){
-				fprintf(stderr,"[ERROR] Invalid content index '%d'\n",ContentsIndex);
+				fprintf(stderr,"[ERROR] Invalid content index \"%d\"\n",ContentsIndex);
 				return PID_INVALID_VARIATION;
 			}
 			return ContentsIndex;
@@ -201,7 +201,7 @@ u16 SetTitleVariation(u16 Category, rsf_settings *yaml_set)
 		if(yaml_set->TitleInfo.Version){
 			u16 Version = strtol(yaml_set->TitleInfo.Version,NULL,10);
 			if(Version > 255){
-				fprintf(stderr,"[ERROR] Invalid version '%d'\n",Version);
+				fprintf(stderr,"[ERROR] Invalid Version \"%d\"\n",Version);
 				return PID_INVALID_VARIATION;
 			}
 			return Version;

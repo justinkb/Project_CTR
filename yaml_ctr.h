@@ -19,6 +19,7 @@ typedef struct
 	int error;
 	
 	// Important Details
+	dname_struct *dname;
 	bool IsSequence;
 	bool IsKey;
 	yaml_event_type_t prev_event;

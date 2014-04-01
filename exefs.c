@@ -17,30 +17,30 @@ int BuildExeFs(ncch_settings *ncchset)
 	ExeFs_BuildContext *ctx = malloc(sizeof(ExeFs_BuildContext));
 	if(!ctx) {fprintf(stderr,"[EXEFS ERROR] MEM ERROR\n"); return MEM_ERROR;}
 	InitialiseExeFSContext(ctx);
-	ctx->media_unit = ncchset->Options.MediaSize;
+	ctx->media_unit = ncchset->options.mediaSize;
 
 	/* Importing ExeFs */
-	if(ncchset->ExeFs_Sections.Code.size) 
-		ImportToExeFSContext(ctx,".code",ncchset->ExeFs_Sections.Code.buffer,ncchset->ExeFs_Sections.Code.size);
-	if(ncchset->ExeFs_Sections.Banner.size) 
-		ImportToExeFSContext(ctx,"banner",ncchset->ExeFs_Sections.Banner.buffer,ncchset->ExeFs_Sections.Banner.size);
-	if(ncchset->ExeFs_Sections.Icon.size) 
-		ImportToExeFSContext(ctx,"icon",ncchset->ExeFs_Sections.Icon.buffer,ncchset->ExeFs_Sections.Icon.size);
-	if(ncchset->Sections.Logo.size && ncchset->Options.IncludeExeFsLogo) 
-		ImportToExeFSContext(ctx,"logo",ncchset->Sections.Logo.buffer,ncchset->Sections.Logo.size);
+	if(ncchset->exefsSections.code.size) 
+		ImportToExeFSContext(ctx,".code",ncchset->exefsSections.code.buffer,ncchset->exefsSections.code.size);
+	if(ncchset->exefsSections.banner.size) 
+		ImportToExeFSContext(ctx,"banner",ncchset->exefsSections.banner.buffer,ncchset->exefsSections.banner.size);
+	if(ncchset->exefsSections.icon.size) 
+		ImportToExeFSContext(ctx,"icon",ncchset->exefsSections.icon.buffer,ncchset->exefsSections.icon.size);
+	if(ncchset->sections.logo.size && ncchset->options.IncludeExeFsLogo) 
+		ImportToExeFSContext(ctx,"logo",ncchset->sections.logo.buffer,ncchset->sections.logo.size);
 
 	/* Allocating Memory for ExeFs */
-	ncchset->Sections.ExeFs.size = PredictExeFS_Size(ctx);
-	ncchset->Sections.ExeFs.buffer = malloc(ncchset->Sections.ExeFs.size);
-	if(!ncchset->Sections.ExeFs.buffer){
+	ncchset->sections.exeFs.size = PredictExeFS_Size(ctx);
+	ncchset->sections.exeFs.buffer = malloc(ncchset->sections.exeFs.size);
+	if(!ncchset->sections.exeFs.buffer){
 		printf("[EXEFS ERROR] Could Not Allocate Memory for ExeFS\n");
 		return Fail;
 	}
-	memset(ncchset->Sections.ExeFs.buffer,0,ncchset->Sections.ExeFs.size);
+	memset(ncchset->sections.exeFs.buffer,0,ncchset->sections.exeFs.size);
 
 	/* Generating Header, and writing sections to buffer */
-	GenerateExeFS_Header(ctx,ncchset->Sections.ExeFs.buffer);
-	ImportDatatoExeFS(ctx,ncchset->Sections.ExeFs.buffer);
+	GenerateExeFS_Header(ctx,ncchset->sections.exeFs.buffer);
+	ImportDatatoExeFS(ctx,ncchset->sections.exeFs.buffer);
 
 	/* Finish */
 	FreeExeFSContext(ctx);

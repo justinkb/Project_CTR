@@ -3,7 +3,7 @@
 
 // Private Prototypes
 void InitYamlContext(ctr_yaml_context *ctx);
-int ParseSpecFile(rsf_settings *set, char *path);
+int ParseSpecFile(rsf_settings *set, char *path, dname_struct *dname);
 void CheckEvent(ctr_yaml_context *ctx);
 
 void BadYamlFormatting(void);
@@ -11,21 +11,21 @@ void BadYamlFormatting(void);
 // Code
 int GetYamlSettings(user_settings *set)
 {
-	memset(&set->yaml_set,0,sizeof(rsf_settings));
+	memset(&set->common.rsfSet,0,sizeof(rsf_settings));
 	int ret = 0;
-	if(set->rsf_path) {
-		FILE *tmp = fopen(set->rsf_path,"rb");
-		if(!tmp) {
-			fprintf(stderr,"[YAML ERROR] Failed to open %s\n",set->rsf_path);
+	if(set->common.rsfPath) {
+		FILE *rsf = fopen(set->common.rsfPath,"rb");
+		if(!rsf) {
+			fprintf(stderr,"[YAML ERROR] Failed to open %s\n",set->common.rsfPath);
 			return FAILED_TO_OPEN_FILE;
 		}
-		fclose(tmp);
-		ret = ParseSpecFile(&set->yaml_set,set->rsf_path);
+		fclose(rsf);
+		ret = ParseSpecFile(&set->common.rsfSet,set->common.rsfPath, &set->dname);
 	}
 	return ret;
 }
 
-int ParseSpecFile(rsf_settings *set, char *path)
+int ParseSpecFile(rsf_settings *set, char *path, dname_struct *dname)
 {
 	ctr_yaml_context *ctx = malloc(sizeof(ctr_yaml_context));
 	InitYamlContext(ctx);
@@ -40,6 +40,7 @@ int ParseSpecFile(rsf_settings *set, char *path)
 	yaml_parser_set_input_file(&ctx->parser, input);
 	
 	
+	ctx->dname = dname;
 	ctx->IsSequence = false;
 	ctx->IsKey = true;
 	ctx->prev_event = 0;
@@ -100,21 +101,32 @@ void InitYamlContext(ctr_yaml_context *ctx)
 
 char *GetYamlString(ctr_yaml_context *ctx)
 {
-	/*
-	if(EventIsScalar(ctx)){
-		if(!GetYamlStringSize(ctx) && !ctx->event.data.scalar.value)
-			return ctx->event.data.scalar.value;
-	}
+	//return (char*)ctx->event.data.scalar.value;
 	
-	return NULL;
-	*/
-	return (char*)ctx->event.data.scalar.value;
+	if(!ctx->event.data.scalar.value)
+		return NULL;
+
+	// Intercept values set from -DNAME=VALUE
+	char *start = strstr((char*)ctx->event.data.scalar.value,"$(");
+	char *end = strstr((char*)ctx->event.data.scalar.value,")");
+	if(!start || !end)
+		return (char*)ctx->event.data.scalar.value;
+
+	char *name = (start + 2);
+	u32 name_len = (end - 1 - name);
+
+	for(u32 i = 0; i < ctx->dname->u_items; i++){
+		if(strncmp(ctx->dname->items[i].name,name,name_len) == 0)
+			return ctx->dname->items[i].value;
+	}
+
+	return "";
 }
 
 
 u32 GetYamlStringSize(ctr_yaml_context *ctx)
 {
-	return ctx->event.data.scalar.length;
+	return strlen(GetYamlString(ctx)); // can't read size from yaml, as string may have been intercepted
 }
 
 void GetEvent(ctr_yaml_context *ctx)

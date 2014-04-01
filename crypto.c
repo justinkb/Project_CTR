@@ -10,6 +10,43 @@ void ctr_sha(void *data, u64 size, u8 *hash, int mode)
 	}
 }
 
+u8* AesKeyScrambler(u8 *KeyX, u8 *KeyY)
+{
+	u32 *KeyX_u32 = (u32*) KeyX;
+	u32 *KeyY_u32 = (u32*) KeyY;
+	u32 *Key = malloc(16);
+		
+	for(int i = 0,j; i < 4; i++)
+	{
+		switch(i)
+		{
+			///* Type 1
+			case 0 : j = 2; break;
+			case 1 : j = 3; break;
+			case 2 : j = 0; break;
+			case 3 : j = 1; break;
+			//*/
+			/* Type 2
+			case 0 : j = 3; break;
+			case 1 : j = 2; break;
+			case 2 : j = 1; break;
+			case 3 : j = 0; break;
+			//*/
+			/* Type 3
+			case 0 : j = 1; break;
+			case 1 : j = 0; break;
+			case 2 : j = 3; break;
+			case 3 : j = 2; break;
+			//*/
+		}
+		
+		Key[j] = KeyX_u32[i] ^ KeyY_u32[i];
+	}
+	
+	// Done Stuff
+	return (u8*)Key;
+}
+
 void ctr_add_counter(ctr_aes_context* ctx, u32 carry)
 {
 	u32 counter[4];

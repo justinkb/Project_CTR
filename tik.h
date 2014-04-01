@@ -1,7 +1,7 @@
 #ifndef _TIK_H_
 #define _TIK_H_
 
-static const unsigned char normal_static_ticket_data[0x30] =
+static const unsigned char default_contentIndex[0x30] =
 {
 	0x00, 0x01, 0x00, 0x14, 0x00, 0x00, 0x00, 0xAC, 
 	0x00, 0x00, 0x00, 0x14, 0x00, 0x01, 0x00, 0x14, 
@@ -11,17 +11,6 @@ static const unsigned char normal_static_ticket_data[0x30] =
 	0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00
 };
 
-/*
-static const unsigned char system_static_ticket_data[0x30] =
-{
-	0x00, 0x01, 0x00, 0x14, 0x00, 0x00, 0x00, 0xAC, 
-	0x00, 0x00, 0x00, 0x14, 0x00, 0x01, 0x00, 0x14, 
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x28, 
-	0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x84, 
-	0x00, 0x00, 0x00, 0x84, 0x00, 0x03, 0x00, 0x00, 
-	0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00
-};
-*/
 typedef enum
 {
 	lic_Permanent = 0,
@@ -31,7 +20,7 @@ typedef enum
 	lic_Subscription = 4,
 	lic_Service = 5,
 	lic_Mask = 15
-} ticket_license_type;
+} tik_license_type;
 
 typedef enum
 {
@@ -40,38 +29,40 @@ typedef enum
 	right_Content = 3,
 	right_ContentConsumption = 4,
 	right_AccessTitle = 5
-} ticket_item_rights;
+} tik_item_rights;
 
 typedef struct
 {
-	u8 sig_type[4];
+	u8 sigType[4];
 	u8 data[0x100];
 	u8 padding[0x3C];
-} TicketSignatureStruct;
+} tik_signature;
 
 typedef struct
 {
-	u8 Issuer[0x40];
-	u8 ECDH[0x3c];
-	u8 TicketFormatVersion;
-	u8 ca_crl_version;
-	u8 signer_crl_version;
-	u8 EncryptedTitleKey[0x10];
-	u8 unknown_0;
-	u8 TicketID[8];
-	u8 DeviceID[4];
-	u8 TitleID[8];
-	u8 unknown_1[2];
-	u8 TicketVersion[2];
-	u8 unused_0[8];
-	u8 unused_1;
-	u8 CommonKeyID;
-	u8 unused_2[0x2F];
-	u8 unknown_2;
-	u8 unused_3[0x82];
-	u8 StaticData[0x30];
-	u8 unused_4[0x7C];
-} TicketStruct;
+	u8 issuer[0x40];
+	u8 eccPubKey[0x3c];
+	u8 formatVersion;
+	u8 caCrlVersion;
+	u8 signerCrlVersion;
+	u8 encryptedTitleKey[0x10];
+	u8 padding0;
+	u8 ticketId[8];
+	u8 deviceId[4];
+	u8 titleId[8];
+	u8 padding1[2];
+	u8 ticketVersion[2];
+	u8 padding2[8];
+	u8 licenceType;
+	u8 keyId;
+	u8 padding3[0x2A];
+	u8 eshopAccId[4];
+	u8 padding4;
+	u8 audit;
+	u8 padding5[0x42];
+	u8 limits[0x40];
+	u8 contentIndex[0xAC];
+} tik_hdr;
 
 #endif
 

@@ -228,7 +228,7 @@ char *getcwdir(char *buffer,int maxlen)
 #endif
 }
 
-//Data Size conversion
+//Data Size contitleVersion
 u16 u8_to_u16(u8 *value, u8 endianness)
 {
 	u16 new_value;

@@ -16,69 +16,69 @@ typedef enum
 
 typedef struct
 {
-	char *Name;
-	u64 Type;
-	u64 Flags;
-	u8 *Ptr;
-	u64 OffsetInFile;
-	u64 Size;
-	u64 Address;
-	u64 Alignment;
+	char *name;
+	u64 type;
+	u64 flags;
+	u8 *ptr;
+	u64 offsetInFile;
+	u64 size;
+	u64 address;
+	u64 alignment;
 } ElfSectionEntry;
 
 typedef struct
 {
-	u64 Type;
-	u64 Flags;
-	u8 *Ptr;
-	u64 OffsetInFile;
-	u64 SizeInFile;
-	u64 VirtualAddress;
-	u64 PhysicalAddress;
-	u64 SizeInMemory;
-	u64 Alignment;
+	u64 type;
+	u64 flags;
+	u8 *ptr;
+	u64 offsetInFile;
+	u64 sizeInFile;
+	u64 virtualAddress;
+	u64 physicalAddress;
+	u64 sizeInMemory;
+	u64 alignment;
 	
 } ElfProgramEntry;
 
 typedef struct
 {
-	char *Name;
-	u64 VAddr;
+	char *name;
+	u64 vAddr;
 
-	ElfProgramEntry *Header;
-	u32 SectionNum;
-	ElfSectionEntry *Sections;
+	ElfProgramEntry *header;
+	u32 sectionNum;
+	ElfSectionEntry *sections;
 } ElfSegment;
 
 typedef struct
 {
-	u32 Address;
-	u32 Size;
-	u32 MaxPageNum;
-	u8 *Data;
+	u32 address;
+	u32 size;
+	u32 maxPageNum;
+	u8 *data;
 } CodeSegment;
 
 typedef struct
 {
-	u32 PageSize;
+	u32 pageSize;
 	bool IsLittleEndian;
 	bool Is64bit;
 		
-	u64 ProgramTableOffset;
-	u16 ProgramTableEntrySize;
-	u16 ProgramTableEntryCount;
+	u64 programTableOffset;
+	u16 programTableEntrySize;
+	u16 programTableEntryCount;
 	
-	u64 SectionTableOffset;
-	u16 SectionTableEntrySize;
-	u16 SectionTableEntryCount;
+	u64 sectionTableOffset;
+	u16 sectionTableEntrySize;
+	u16 sectionTableEntryCount;
 	
-	u16 SectionHeaderNameEntryIndex;
+	u16 sectionHeaderNameEntryIndex;
 
-	ElfSectionEntry *Sections;
-	ElfProgramEntry *ProgramHeaders;
+	ElfSectionEntry *sections;
+	ElfProgramEntry *programHeaders;
 
-	u16 ActiveSegments;
-	ElfSegment *Segments;
+	u16 activeSegments;
+	ElfSegment *segments;
 
 } ElfContext;
 

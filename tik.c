@@ -4,20 +4,21 @@
 
 // Private Prototypes
 int SetupTicketBuffer(COMPONENT_STRUCT *tik);
-int SetupTicketHeader(TicketStruct *hdr, cia_settings *ciaset);
-int SignTicketHeader(TicketStruct *hdr, TicketSignatureStruct *sig, keys_struct *keys);
-void SetContentIndexData(u8 *dest);
+int SetupTicketHeader(tik_hdr *hdr, cia_settings *ciaset);
+int SignTicketHeader(tik_hdr *hdr, tik_signature *sig, keys_struct *keys);
+void SetLimits(tik_hdr *hdr, cia_settings *ciaset);
+void SetContentIndexData(tik_hdr *hdr, cia_settings *ciaset);
 
 
 int BuildTicket(cia_settings *ciaset)
 {
 	int result = 0;
-	result = SetupTicketBuffer(&ciaset->CIA_Sections.Ticket);
+	result = SetupTicketBuffer(&ciaset->ciaSections.tik);
 	if(result) return result;
 	
 	// Setting Ticket Struct Ptrs
-	TicketSignatureStruct *sig = (TicketSignatureStruct*)ciaset->CIA_Sections.Ticket.buffer;
-	TicketStruct *hdr = (TicketStruct*)(ciaset->CIA_Sections.Ticket.buffer+sizeof(TicketSignatureStruct));
+	tik_signature *sig = (tik_signature*)ciaset->ciaSections.tik.buffer;
+	tik_hdr *hdr = (tik_hdr*)(ciaset->ciaSections.tik.buffer+sizeof(tik_signature));
 
 	result = SetupTicketHeader(hdr,ciaset);
 	if(result) return result;
@@ -27,37 +28,41 @@ int BuildTicket(cia_settings *ciaset)
 
 int SetupTicketBuffer(COMPONENT_STRUCT *tik)
 {
-	tik->size = sizeof(TicketSignatureStruct) + sizeof(TicketStruct);
+	tik->size = sizeof(tik_signature) + sizeof(tik_hdr);
 	tik->buffer = malloc(tik->size);
 	if(!tik->buffer) { fprintf(stderr,"[ERROR] MEM ERROR\n"); return MEM_ERROR; }
 	memset(tik->buffer,0,tik->size);
 	return 0;
 }
 
-int SetupTicketHeader(TicketStruct *hdr, cia_settings *ciaset)
+int SetupTicketHeader(tik_hdr *hdr, cia_settings *ciaset)
 {
-	memset(hdr,0,sizeof(TicketStruct));
+	memset(hdr,0,sizeof(tik_hdr));
 
-	memcpy(hdr->Issuer,ciaset->tik.TicketIssuer,0x40);
-	hdr->TicketFormatVersion = ciaset->tik.ticket_format_ver;
-	hdr->ca_crl_version = ciaset->cert.ca_crl_version;
-	hdr->signer_crl_version = ciaset->cert.signer_crl_version;
-	if(ciaset->content.EncryptContents)
-		CryptTitleKey(hdr->EncryptedTitleKey, ciaset->tik.TitleKey,ciaset->TitleID,ciaset->keys,ENC);
-	memcpy(hdr->TicketID,ciaset->tik.TicketID,8);
-	memcpy(hdr->DeviceID,ciaset->tik.DeviceID,8);
-	memcpy(hdr->TitleID,ciaset->TitleID,8);
-	memcpy(hdr->TicketVersion,ciaset->tik.TicketVersion,2);
-	hdr->CommonKeyID = ciaset->keys->aes.CurrentCommonKey;
-	SetContentIndexData(hdr->StaticData);
+	memcpy(hdr->issuer,ciaset->tik.issuer,0x40);
+	hdr->formatVersion = ciaset->tik.formatVersion;
+	hdr->caCrlVersion = ciaset->cert.caCrlVersion;
+	hdr->signerCrlVersion = ciaset->cert.signerCrlVersion;
+	if(ciaset->content.encryptCia)
+		CryptTitleKey(hdr->encryptedTitleKey, ciaset->common.titleKey,ciaset->common.titleId,ciaset->keys,ENC);
+	memcpy(hdr->ticketId,ciaset->tik.ticketId,8);
+	memcpy(hdr->deviceId,ciaset->tik.deviceId,8);
+	memcpy(hdr->titleId,ciaset->common.titleId,8);
+	u16_to_u8(hdr->ticketVersion,ciaset->tik.version,BE);
+	hdr->licenceType = ciaset->tik.licenceType;
+	hdr->keyId = ciaset->keys->aes.currentCommonKey;
+	memcpy(hdr->eshopAccId,ciaset->tik.eshopAccId,4);
+	hdr->audit = ciaset->tik.audit;
+	SetLimits(hdr,ciaset);
+	SetContentIndexData(hdr,ciaset);
 	return 0;
 }
 
-int SignTicketHeader(TicketStruct *hdr, TicketSignatureStruct *sig, keys_struct *keys)
+int SignTicketHeader(tik_hdr *hdr, tik_signature *sig, keys_struct *keys)
 {
-	memset(sig,0,sizeof(TicketSignatureStruct));
-	u32_to_u8(sig->sig_type,RSA_2048_SHA256,BE);
-	return ctr_sig((u8*)hdr,sizeof(TicketStruct),sig->data,keys->rsa.TIK_Pub,keys->rsa.TIK_Priv,RSA_2048_SHA256,CTR_RSA_SIGN);
+	memset(sig,0,sizeof(tik_signature));
+	u32_to_u8(sig->sigType,RSA_2048_SHA256,BE);
+	return ctr_sig((u8*)hdr,sizeof(tik_hdr),sig->data,keys->rsa.xsPub,keys->rsa.xsPvt,RSA_2048_SHA256,CTR_RSA_SIGN);
 }
 
 int CryptTitleKey(u8 *EncTitleKey, u8 *DecTitleKey, u8 *TitleID, keys_struct *keys, u8 mode)
@@ -72,7 +77,7 @@ int CryptTitleKey(u8 *EncTitleKey, u8 *DecTitleKey, u8 *TitleID, keys_struct *ke
 	memset(&ctx,0x0,sizeof(ctr_aes_context));
 	
 	//Crypting TitleKey
-	ctr_init_aes_cbc(&ctx,keys->aes.CommonKey[keys->aes.CurrentCommonKey],iv,mode);
+	ctr_init_aes_cbc(&ctx,keys->aes.commonKey[keys->aes.currentCommonKey],iv,mode);
 	if(mode == ENC) ctr_aes_cbc(&ctx,DecTitleKey,EncTitleKey,0x10,ENC);
 	else ctr_aes_cbc(&ctx,EncTitleKey,DecTitleKey,0x10,DEC);
 
@@ -80,7 +85,13 @@ int CryptTitleKey(u8 *EncTitleKey, u8 *DecTitleKey, u8 *TitleID, keys_struct *ke
 	return 0;
 }
 
-void SetContentIndexData(u8 *dest)
+void SetLimits(tik_hdr *hdr, cia_settings *ciaset)
 {
-	memcpy(dest,normal_static_ticket_data,0x30);
+	memset(hdr->limits,0,0x40);
+}
+
+void SetContentIndexData(tik_hdr *hdr, cia_settings *ciaset)
+{
+	memset(hdr->contentIndex,0,0xAC);
+	memcpy(hdr->contentIndex,default_contentIndex,0x30);
 }

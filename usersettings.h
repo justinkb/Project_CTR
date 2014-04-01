@@ -17,6 +17,14 @@ typedef enum
 
 typedef enum
 {
+	infile_none,
+	infile_ncch,
+	infile_ncsd,
+	infile_srl,
+} infile_type;
+
+typedef enum
+{
 	format_not_set,
 	CXI,
 	CFA,
@@ -24,8 +32,23 @@ typedef enum
 	CIA
 } output_format;
 
+typedef struct
+{
+	char *name;
+	char *value;
+} dname_item;
+
+
+typedef struct
+{ 
+	dname_item *items;
+	u32 m_items;
+	u32 u_items;
+} dname_struct; 
+
 static const char output_extention[4][5] = {".cxi",".cfa",".cci",".cia"};
 
+/* This does not follow style, so the rsf string names match the variables where they're stored */
 typedef struct
 {	
 	struct{
@@ -206,52 +229,63 @@ typedef struct
 
 typedef struct
 {
-	// General Settings
-	char *rsf_path;
-	bool outfile_mallocd;
-	char *outfile;
-	output_format out_format;
+	struct{
+		char *rsfPath;
+		bool outFileName_mallocd;
+		char *outFileName;
+		output_format outFormat;
 
-	// Content0
-	bool ConvertCci;
-	char *CciPath;
-	bool Content0IsSrl;
-	char *SrlPath;
-
-	bool Content0IsNcch;
-	COMPONENT_STRUCT Content0;
-	char **ContentPath;
-	u64 ContentID[CIA_MAX_CONTENT]; // For CIA
-
-	// Ncch0 Build
-	bool IsBuildingNCCH0;
-	output_format build_ncch_type;
-	char *elf_path;
-	char *icon_path;
-	char *banner_path;
-	char *logo_path;
-
-	bool include_exefs_logo;
+		// Keys
+		keys_struct keys; 
 	
-	char *exefs_code_path;
-	char *exheader_path;
-	char *plain_region_path;
-	char *romfs_path;
-	
-	// CCI Settings
-	bool GenSDKCardInfoHeader;
-	bool OmitImportedNcchHdr;
+		// RSF Imported Settings
+		rsf_settings rsfSet;
 
-	// CIA Settings
-	bool RandomTitleKey;
-	bool EncryptContents;
-	u16 Version[3];
+		// Content Details
+		char **contentPath;
 
-	// Keys
-	keys_struct keys; 
+		char *workingFilePath;
+		infile_type workingFileType; // Could Be ncch/ncsd/srl. This is mainly used for CIA gen
+		COMPONENT_STRUCT workingFile;
+	} common;
 	
-	// RSF/DESC Imported Settings
-	rsf_settings yaml_set;
+	dname_struct dname; // For RSF value subsitution
+
+	struct{
+		bool buildNcch0;
+		output_format ncchType;
+		char *elfPath;
+		char *iconPath;
+		char *bannerPath;
+		char *logoPath; // override logo specs in RSF
+
+		bool includeExefsLogo; // for <5.x compatibility
+	
+		// ncch rebuild settings
+		char *codePath; // uncompressed exefs .code
+		char *exheaderPath; // for .code details
+		char *plainRegionPath; // prebuilt Plain Region
+		char *romfsPath; // Prebuild _cleartext_ romfs binary
+	} ncch; // Ncch0 Build
+	
+	struct{ 
+		bool useSDKStockData;  // incase we want to use the SDK stock data, for whatever reason.
+	} cci; // CCI Settings
+	
+	struct{
+		char *overideSaveDataSize;
+		bool randomTitleKey;
+		bool encryptCia;
+		bool DlcContent;
+
+		bool useNormTitleVer;
+		bool useDataTitleVer;
+		u16 titleVersion[3];
+
+		u64 contentId[CIA_MAX_CONTENT]; // For CIA
+	} cia; // CIA Settings
+	
+	
 } user_settings;
 #endif
 

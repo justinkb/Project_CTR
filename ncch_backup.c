@@ -81,12 +81,12 @@ int build_NCCH(user_settings *usrset)
 
 #ifdef ELF_DEBUG
 	FILE *code = fopen("code.bin","wb");
-	fwrite(ncchset->exefsSections.code.buffer,ncchset->exefsSections.code.size,1,code);
+	fwrite(ncchset->ExeFs_Sections.Code.buffer,ncchset->ExeFs_Sections.Code.size,1,code);
 	fclose(code);
 	u8 hash[0x20];
-	ctr_sha(ncchset->exefsSections.code.buffer,ncchset->exefsSections.code.size,hash,CTR_SHA_256);
-	printf("BSS Size:  0x%x\n",ncchset->codeDetails.bssSize);
-	printf("Code Size: 0x%x\n",ncchset->exefsSections.code.size);
+	ctr_sha(ncchset->ExeFs_Sections.Code.buffer,ncchset->ExeFs_Sections.Code.size,hash,CTR_SHA_256);
+	printf("BSS Size:  0x%x\n",ncchset->CodeDetails.BSS_Size);
+	printf("Code Size: 0x%x\n",ncchset->ExeFs_Sections.Code.size);
 	memdump(stdout,"Code Hash: ",hash,0x20);
 #endif
 	
@@ -142,25 +142,25 @@ void init_NCCHSettings(ncch_settings *set)
 
 void free_NCCHSettings(ncch_settings *set)
 {
-	if(set->componentFilePtrs.elf) fclose(set->componentFilePtrs.elf);
-	if(set->componentFilePtrs.banner) fclose(set->componentFilePtrs.banner);
-	if(set->componentFilePtrs.icon) fclose(set->componentFilePtrs.icon);
-	if(set->componentFilePtrs.logo) fclose(set->componentFilePtrs.logo);
-	if(set->componentFilePtrs.code) fclose(set->componentFilePtrs.code);
-	if(set->componentFilePtrs.exhdr) fclose(set->componentFilePtrs.exhdr);
-	if(set->componentFilePtrs.romfs) fclose(set->componentFilePtrs.romfs);
-	if(set->componentFilePtrs.plainregion) fclose(set->componentFilePtrs.plainregion);
+	if(set->ComponentFilePtrs.elf) fclose(set->ComponentFilePtrs.elf);
+	if(set->ComponentFilePtrs.banner) fclose(set->ComponentFilePtrs.banner);
+	if(set->ComponentFilePtrs.icon) fclose(set->ComponentFilePtrs.icon);
+	if(set->ComponentFilePtrs.logo) fclose(set->ComponentFilePtrs.logo);
+	if(set->ComponentFilePtrs.code) fclose(set->ComponentFilePtrs.code);
+	if(set->ComponentFilePtrs.exheader) fclose(set->ComponentFilePtrs.exheader);
+	if(set->ComponentFilePtrs.romfs) fclose(set->ComponentFilePtrs.romfs);
+	if(set->ComponentFilePtrs.plainregion) fclose(set->ComponentFilePtrs.plainregion);
 
-	if(set->exefsSections.code.size) free(set->exefsSections.code.buffer);
-	if(set->exefsSections.banner.size) free(set->exefsSections.banner.buffer);
-	if(set->exefsSections.icon.size) free(set->exefsSections.icon.buffer);
+	if(set->ExeFs_Sections.Code.size) free(set->ExeFs_Sections.Code.buffer);
+	if(set->ExeFs_Sections.Banner.size) free(set->ExeFs_Sections.Banner.buffer);
+	if(set->ExeFs_Sections.Icon.size) free(set->ExeFs_Sections.Icon.buffer);
 
-	if(set->sections.ncchHdr.size) free(set->sections.ncchHdr.buffer);
-	if(set->sections.exhdr.size) free(set->sections.exhdr.buffer);
-	if(set->sections.logo.size) free(set->sections.logo.buffer);
-	if(set->sections.plainRegion.size) free(set->sections.plainRegion.buffer);
-	if(set->sections.exeFs.size) free(set->sections.exeFs.buffer);
-	if(set->sections.romFs.size) free(set->sections.romFs.buffer);
+	if(set->Sections.CommonHeader.size) free(set->Sections.CommonHeader.buffer);
+	if(set->Sections.ExHeader.size) free(set->Sections.ExHeader.buffer);
+	if(set->Sections.Logo.size) free(set->Sections.Logo.buffer);
+	if(set->Sections.PlainRegion.size) free(set->Sections.PlainRegion.buffer);
+	if(set->Sections.ExeFs.size) free(set->Sections.ExeFs.buffer);
+	if(set->Sections.RomFs.size) free(set->Sections.RomFs.buffer);
 
 	memset(set,0,sizeof(ncch_settings));
 
@@ -170,9 +170,9 @@ void free_NCCHSettings(ncch_settings *set)
 int get_NCCHSettings(ncch_settings *ncchset, user_settings *usrset)
 {
 	int result = 0;
-	ncchset->out = &usrset->common.workingFile;
-	ncchset->rsfSet = &usrset->common.rsfSet;
-	ncchset->keys = &usrset->common.keys;
+	ncchset->out = &usrset->Content0;
+	ncchset->yaml_set = &usrset->yaml_set;
+	ncchset->keys = &usrset->keys;
 
 	result = SetBasicOptions(ncchset,usrset);
 	if(result) return result;
@@ -192,30 +192,30 @@ int SetBasicOptions(ncch_settings *ncchset, user_settings *usrset)
 	int result = 0;
 
 	/* Options */
-	ncchset->options.mediaSize = 0x200;
+	ncchset->Options.MediaSize = 0x200;
 
-	ncchset->options.IncludeExeFsLogo = usrset->ncch.includeExefsLogo;
+	ncchset->Options.IncludeExeFsLogo = usrset->include_exefs_logo;
 	
-	if(usrset->common.rsfSet.Option.EnableCompress != -1) ncchset->options.CompressCode = usrset->common.rsfSet.Option.EnableCompress;
-	else ncchset->options.CompressCode = true;
+	if(usrset->yaml_set.Option.EnableCompress != -1) ncchset->Options.CompressCode = usrset->yaml_set.Option.EnableCompress;
+	else ncchset->Options.CompressCode = true;
 
-	if(usrset->common.rsfSet.Option.UseOnSD != -1) ncchset->options.UseOnSD = usrset->common.rsfSet.Option.UseOnSD;
-	else ncchset->options.UseOnSD = false;
-	usrset->common.rsfSet.Option.UseOnSD = ncchset->options.UseOnSD;
+	if(usrset->yaml_set.Option.UseOnSD != -1) ncchset->Options.UseOnSD = usrset->yaml_set.Option.UseOnSD;
+	else ncchset->Options.UseOnSD = false;
+	usrset->yaml_set.Option.UseOnSD = ncchset->Options.UseOnSD;
 
-	if(usrset->common.rsfSet.Option.EnableCrypt != -1) ncchset->options.Encrypt = usrset->common.rsfSet.Option.EnableCrypt;
-	else ncchset->options.Encrypt = true;
+	if(usrset->yaml_set.Option.EnableCrypt != -1) ncchset->Options.Encrypt = usrset->yaml_set.Option.EnableCrypt;
+	else ncchset->Options.Encrypt = true;
 
-	if(usrset->common.rsfSet.Option.FreeProductCode != -1) ncchset->options.FreeProductCode = usrset->common.rsfSet.Option.FreeProductCode;
-	else ncchset->options.FreeProductCode = false;
+	if(usrset->yaml_set.Option.FreeProductCode != -1) ncchset->Options.FreeProductCode = usrset->yaml_set.Option.FreeProductCode;
+	else ncchset->Options.FreeProductCode = false;
 
-	ncchset->options.IsCfa = (usrset->ncch.ncchType == CFA);
+	ncchset->Options.IsCfa = (usrset->build_ncch_type == CFA);
 	
-	ncchset->options.IsBuildingCodeSection = (usrset->ncch.elfPath != NULL);
+	ncchset->Options.IsBuildingCodeSection = (usrset->elf_path != NULL);
 
-	ncchset->options.UseRomFS = ((ncchset->rsfSet->Rom.HostRoot && strlen(ncchset->rsfSet->Rom.HostRoot) > 0) || usrset->ncch.romfsPath);
+	ncchset->Options.UseRomFS = ((ncchset->yaml_set->Rom.HostRoot && strlen(ncchset->yaml_set->Rom.HostRoot) > 0) || usrset->romfs_path);
 	
-	if(ncchset->options.IsCfa && !ncchset->options.UseRomFS){
+	if(ncchset->Options.IsCfa && !ncchset->Options.UseRomFS){
 		fprintf(stderr,"[NCCH ERROR] 'Rom/HostRoot' must be set\n");
 		return NCCH_BAD_YAML_SET;
 	}
@@ -225,68 +225,69 @@ int SetBasicOptions(ncch_settings *ncchset, user_settings *usrset)
 
 int CreateInputFilePtrs(ncch_settings *ncchset, user_settings *usrset)
 {
-	if(usrset->ncch.romfsPath){
-		ncchset->componentFilePtrs.romfsSize = GetFileSize_u64(usrset->ncch.romfsPath);
-		ncchset->componentFilePtrs.romfs = fopen(usrset->ncch.romfsPath,"rb");
-		if(!ncchset->componentFilePtrs.romfs){
-			fprintf(stderr,"[NCCH ERROR] Failed to open RomFs file '%s'\n",usrset->ncch.romfsPath);
+	if(usrset->romfs_path){
+		ncchset->ComponentFilePtrs.romfs_size = GetFileSize_u64(usrset->romfs_path);
+		ncchset->ComponentFilePtrs.romfs = fopen(usrset->romfs_path,"rb");
+		if(!ncchset->ComponentFilePtrs.romfs){
+			fprintf(stderr,"[NCCH ERROR] Failed to open RomFs file '%s'\n",usrset->romfs_path);
 			return FAILED_TO_IMPORT_FILE;
 		}
 	}
-	if(usrset->ncch.elfPath){
-		ncchset->componentFilePtrs.elfSize = GetFileSize_u64(usrset->ncch.elfPath);
-		ncchset->componentFilePtrs.elf = fopen(usrset->ncch.elfPath,"rb");
-		if(!ncchset->componentFilePtrs.elf){
-			fprintf(stderr,"[NCCH ERROR] Failed to open elf file '%s'\n",usrset->ncch.elfPath);
+	if(ncchset->Options.IsCfa) return 0;
+	if(usrset->elf_path){
+		ncchset->ComponentFilePtrs.elf_size = GetFileSize_u64(usrset->elf_path);
+		ncchset->ComponentFilePtrs.elf = fopen(usrset->elf_path,"rb");
+		if(!ncchset->ComponentFilePtrs.elf){
+			fprintf(stderr,"[NCCH ERROR] Failed to open elf file '%s'\n",usrset->elf_path);
 			return FAILED_TO_IMPORT_FILE;
 		}
 	}
-	if(usrset->ncch.bannerPath){
-		ncchset->componentFilePtrs.bannerSize = GetFileSize_u64(usrset->ncch.bannerPath);
-		ncchset->componentFilePtrs.banner = fopen(usrset->ncch.bannerPath,"rb");
-		if(!ncchset->componentFilePtrs.banner){
-			fprintf(stderr,"[NCCH ERROR] Failed to open banner file '%s'\n",usrset->ncch.bannerPath);
+	if(usrset->banner_path){
+		ncchset->ComponentFilePtrs.banner_size = GetFileSize_u64(usrset->banner_path);
+		ncchset->ComponentFilePtrs.banner = fopen(usrset->banner_path,"rb");
+		if(!ncchset->ComponentFilePtrs.banner){
+			fprintf(stderr,"[NCCH ERROR] Failed to open banner file '%s'\n",usrset->banner_path);
 			return FAILED_TO_IMPORT_FILE;
 		}
 	}
-	if(usrset->ncch.iconPath){
-		ncchset->componentFilePtrs.iconSize = GetFileSize_u64(usrset->ncch.iconPath);
-		ncchset->componentFilePtrs.icon = fopen(usrset->ncch.iconPath,"rb");
-		if(!ncchset->componentFilePtrs.icon){
-			fprintf(stderr,"[NCCH ERROR] Failed to open icon file '%s'\n",usrset->ncch.iconPath);
+	if(usrset->icon_path){
+		ncchset->ComponentFilePtrs.icon_size = GetFileSize_u64(usrset->icon_path);
+		ncchset->ComponentFilePtrs.icon = fopen(usrset->icon_path,"rb");
+		if(!ncchset->ComponentFilePtrs.icon){
+			fprintf(stderr,"[NCCH ERROR] Failed to open icon file '%s'\n",usrset->icon_path);
 			return FAILED_TO_IMPORT_FILE;
 		}
 	}
-	if(usrset->ncch.logoPath){
-		ncchset->componentFilePtrs.logoSize = GetFileSize_u64(usrset->ncch.logoPath);
-		ncchset->componentFilePtrs.logo = fopen(usrset->ncch.logoPath,"rb");
-		if(!ncchset->componentFilePtrs.logo){
-			fprintf(stderr,"[NCCH ERROR] Failed to open logo file '%s'\n",usrset->ncch.logoPath);
+	if(usrset->logo_path){
+		ncchset->ComponentFilePtrs.logo_size = GetFileSize_u64(usrset->logo_path);
+		ncchset->ComponentFilePtrs.logo = fopen(usrset->logo_path,"rb");
+		if(!ncchset->ComponentFilePtrs.logo){
+			fprintf(stderr,"[NCCH ERROR] Failed to open logo file '%s'\n",usrset->logo_path);
 			return FAILED_TO_IMPORT_FILE;
 		}
 	}
 
-	if(usrset->ncch.codePath){
-		ncchset->componentFilePtrs.codeSize = GetFileSize_u64(usrset->ncch.codePath);
-		ncchset->componentFilePtrs.code = fopen(usrset->ncch.codePath,"rb");
-		if(!ncchset->componentFilePtrs.code){
-			fprintf(stderr,"[NCCH ERROR] Failed to open ExeFs Code file '%s'\n",usrset->ncch.codePath);
+	if(usrset->exefs_code_path){
+		ncchset->ComponentFilePtrs.code_size = GetFileSize_u64(usrset->exefs_code_path);
+		ncchset->ComponentFilePtrs.code = fopen(usrset->exefs_code_path,"rb");
+		if(!ncchset->ComponentFilePtrs.code){
+			fprintf(stderr,"[NCCH ERROR] Failed to open ExeFs Code file '%s'\n",usrset->exefs_code_path);
 			return FAILED_TO_IMPORT_FILE;
 		}
 	}
-	if(usrset->ncch.exheaderPath){
-		ncchset->componentFilePtrs.exhdrSize = GetFileSize_u64(usrset->ncch.exheaderPath);
-		ncchset->componentFilePtrs.exhdr = fopen(usrset->ncch.exheaderPath,"rb");
-		if(!ncchset->componentFilePtrs.exhdr){
-			fprintf(stderr,"[NCCH ERROR] Failed to open ExHeader file '%s'\n",usrset->ncch.exheaderPath);
+	if(usrset->exheader_path){
+		ncchset->ComponentFilePtrs.exheader_size = GetFileSize_u64(usrset->exheader_path);
+		ncchset->ComponentFilePtrs.exheader = fopen(usrset->exheader_path,"rb");
+		if(!ncchset->ComponentFilePtrs.exheader){
+			fprintf(stderr,"[NCCH ERROR] Failed to open ExHeader file '%s'\n",usrset->exheader_path);
 			return FAILED_TO_IMPORT_FILE;
 		}
 	}
-	if(usrset->ncch.plainRegionPath){
-		ncchset->componentFilePtrs.plainregionSize = GetFileSize_u64(usrset->ncch.plainRegionPath);
-		ncchset->componentFilePtrs.plainregion = fopen(usrset->ncch.plainRegionPath,"rb");
-		if(!ncchset->componentFilePtrs.plainregion){
-			fprintf(stderr,"[NCCH ERROR] Failed to open PlainRegion file '%s'\n",usrset->ncch.plainRegionPath);
+	if(usrset->plain_region_path){
+		ncchset->ComponentFilePtrs.plainregion_size = GetFileSize_u64(usrset->plain_region_path);
+		ncchset->ComponentFilePtrs.plainregion = fopen(usrset->plain_region_path,"rb");
+		if(!ncchset->ComponentFilePtrs.plainregion){
+			fprintf(stderr,"[NCCH ERROR] Failed to open PlainRegion file '%s'\n",usrset->plain_region_path);
 			return FAILED_TO_IMPORT_FILE;
 		}
 	}
@@ -295,86 +296,63 @@ int CreateInputFilePtrs(ncch_settings *ncchset, user_settings *usrset)
 
 int ImportNonCodeExeFsSections(ncch_settings *ncchset)
 {
-	if(ncchset->componentFilePtrs.banner){
-		ncchset->exefsSections.banner.size = ncchset->componentFilePtrs.bannerSize;
-		ncchset->exefsSections.banner.buffer = malloc(ncchset->exefsSections.banner.size);
-		if(!ncchset->exefsSections.banner.buffer) {
-			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
-			return MEM_ERROR;
-		}
-		ReadFile_64(ncchset->exefsSections.banner.buffer,ncchset->exefsSections.banner.size,0,ncchset->componentFilePtrs.banner);
+	if(ncchset->Options.IsCfa) return 0;
+	if(ncchset->ComponentFilePtrs.banner){
+		ncchset->ExeFs_Sections.Banner.size = ncchset->ComponentFilePtrs.banner_size;
+		ncchset->ExeFs_Sections.Banner.buffer = malloc(ncchset->ExeFs_Sections.Banner.size);
+		if(!ncchset->ExeFs_Sections.Banner.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
+		ReadFile_64(ncchset->ExeFs_Sections.Banner.buffer,ncchset->ExeFs_Sections.Banner.size,0,ncchset->ComponentFilePtrs.banner);
 	}
-	if(ncchset->componentFilePtrs.icon){
-		ncchset->exefsSections.icon.size = ncchset->componentFilePtrs.iconSize;
-		ncchset->exefsSections.icon.buffer = malloc(ncchset->exefsSections.icon.size);
-		if(!ncchset->exefsSections.icon.buffer) {
-			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n");
-			return MEM_ERROR;
-		}
-		ReadFile_64(ncchset->exefsSections.icon.buffer,ncchset->exefsSections.icon.size,0,ncchset->componentFilePtrs.icon);
+	if(ncchset->ComponentFilePtrs.icon){
+		ncchset->ExeFs_Sections.Icon.size = ncchset->ComponentFilePtrs.icon_size;
+		ncchset->ExeFs_Sections.Icon.buffer = malloc(ncchset->ExeFs_Sections.Icon.size);
+		if(!ncchset->ExeFs_Sections.Icon.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
+		ReadFile_64(ncchset->ExeFs_Sections.Icon.buffer,ncchset->ExeFs_Sections.Icon.size,0,ncchset->ComponentFilePtrs.icon);
 	}
 	return 0;
 }
 
 int ImportLogo(ncch_settings *ncchset)
 {
-	if(ncchset->options.IsCfa) return 0;
-	if(ncchset->componentFilePtrs.logo){
-		ncchset->sections.logo.size = ncchset->componentFilePtrs.logoSize;
+	if(ncchset->Options.IsCfa) return 0;
+	if(ncchset->ComponentFilePtrs.logo){
+		ncchset->sections.logo.size = ncchset->ComponentFilePtrs.logo_size;
 		ncchset->sections.logo.buffer = malloc(ncchset->sections.logo.size);
-		if(!ncchset->sections.logo.buffer) {
-			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n");
-			return MEM_ERROR;
-		}
-		ReadFile_64(ncchset->sections.logo.buffer,ncchset->sections.logo.size,0,ncchset->componentFilePtrs.logo);
+		if(!ncchset->sections.logo.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
+		ReadFile_64(ncchset->sections.logo.buffer,ncchset->sections.logo.size,0,ncchset->ComponentFilePtrs.logo);
 	}
-	else if(ncchset->rsfSet->BasicInfo.Logo){
-		if(strcasecmp(ncchset->rsfSet->BasicInfo.Logo,"nintendo") == 0){
+	else if(ncchset->yaml_set->BasicInfo.Logo){
+		if(strcasecmp(ncchset->yaml_set->BasicInfo.Logo,"nintendo") == 0){
 			ncchset->sections.logo.size = 0x2000;
 			ncchset->sections.logo.buffer = malloc(ncchset->sections.logo.size);
-			if(!ncchset->sections.logo.buffer) {
-				fprintf(stderr,"[NCCH ERROR] MEM ERROR\n");
-				return MEM_ERROR;
-			}
+			if(!ncchset->sections.logo.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 			memcpy(ncchset->sections.logo.buffer,Nintendo_LZ,0x2000);
 		}
-		else if(strcasecmp(ncchset->rsfSet->BasicInfo.Logo,"licensed") == 0){
+		else if(strcasecmp(ncchset->yaml_set->BasicInfo.Logo,"licensed") == 0){
 			ncchset->sections.logo.size = 0x2000;
 			ncchset->sections.logo.buffer = malloc(ncchset->sections.logo.size);
-			if(!ncchset->sections.logo.buffer) {
-				fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
-				return MEM_ERROR;
-			}
+			if(!ncchset->sections.logo.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 			memcpy(ncchset->sections.logo.buffer,Nintendo_LicensedBy_LZ,0x2000);
 		}
-		else if(strcasecmp(ncchset->rsfSet->BasicInfo.Logo,"distributed") == 0){
+		else if(strcasecmp(ncchset->yaml_set->BasicInfo.Logo,"distributed") == 0){
 			ncchset->sections.logo.size = 0x2000;
 			ncchset->sections.logo.buffer = malloc(ncchset->sections.logo.size);
-			if(!ncchset->sections.logo.buffer) {
-				fprintf(stderr,"[NCCH ERROR] MEM ERROR\n");
-				return MEM_ERROR;
-			}
+			if(!ncchset->sections.logo.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 			memcpy(ncchset->sections.logo.buffer,Nintendo_DistributedBy_LZ,0x2000);
 		}
-		else if(strcasecmp(ncchset->rsfSet->BasicInfo.Logo,"ique") == 0){
+		else if(strcasecmp(ncchset->yaml_set->BasicInfo.Logo,"ique") == 0){
 			ncchset->sections.logo.size = 0x2000;
 			ncchset->sections.logo.buffer = malloc(ncchset->sections.logo.size);
-			if(!ncchset->sections.logo.buffer) {
-				fprintf(stderr,"[NCCH ERROR] MEM ERROR\n");
-				return MEM_ERROR;
-			}
+			if(!ncchset->sections.logo.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 			memcpy(ncchset->sections.logo.buffer,iQue_with_ISBN_LZ,0x2000);
 		}
-		else if(strcasecmp(ncchset->rsfSet->BasicInfo.Logo,"iqueforsystem") == 0){
+		else if(strcasecmp(ncchset->yaml_set->BasicInfo.Logo,"iqueforsystem") == 0){
 			ncchset->sections.logo.size = 0x2000;
 			ncchset->sections.logo.buffer = malloc(ncchset->sections.logo.size);
-			if(!ncchset->sections.logo.buffer) {
-				fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
-				return MEM_ERROR;
-			}
+			if(!ncchset->sections.logo.buffer) {fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 			memcpy(ncchset->sections.logo.buffer,iQue_without_ISBN_LZ,0x2000);
 		}
-		else if(strcasecmp(ncchset->rsfSet->BasicInfo.Logo,"none") != 0){
+		else if(strcasecmp(ncchset->yaml_set->BasicInfo.Logo,"none") != 0){
 			fprintf(stderr,"[NCCH ERROR] Invalid logo name\n");
 			return NCCH_BAD_YAML_SET;
 		}
@@ -385,59 +363,67 @@ int ImportLogo(ncch_settings *ncchset)
 int SetCommonHeaderBasicData(ncch_settings *ncchset, ncch_hdr *hdr)
 {
 	/* NCCH Format titleVersion */
-	u16_to_u8(hdr->formatVersion,0x2,LE);
+	u16_to_u8(hdr->titleVersion,0x2,LE);
 	
 	/* Setting ProgramId/TitleId */
 	u64 ProgramId = 0;
-	int result = GetProgramID(&ProgramId,ncchset->rsfSet,false); 
+	int result = GetProgramID(&ProgramId,ncchset->yaml_set,false); 
 	if(result) return result;
 
-	u64_to_u8(hdr->programId,ProgramId,LE);
-	u64_to_u8(hdr->titleId,ProgramId,LE);
+	u64_to_u8(hdr->program_id,ProgramId,LE);
+	u64_to_u8(hdr->title_id,ProgramId,LE);
 
 	/* Get Product Code and Maker Code */
-	if(ncchset->rsfSet->BasicInfo.ProductCode){
-		if(!IsValidProductCode((char*)ncchset->rsfSet->BasicInfo.ProductCode,ncchset->options.FreeProductCode)){
+	if(ncchset->yaml_set->BasicInfo.ProductCode){
+		if(!IsValidProductCode((char*)ncchset->yaml_set->BasicInfo.ProductCode,ncchset->Options.FreeProductCode)){
 			fprintf(stderr,"[NCCH ERROR] Invalid Product Code\n");
 			return NCCH_BAD_YAML_SET;
 		}
-		memcpy(hdr->productCode,ncchset->rsfSet->BasicInfo.ProductCode,strlen((char*)ncchset->rsfSet->BasicInfo.ProductCode));
+		memcpy(hdr->product_code,ncchset->yaml_set->BasicInfo.ProductCode,strlen((char*)ncchset->yaml_set->BasicInfo.ProductCode));
 	}
-	else memcpy(hdr->productCode,"CTR-P-CTAP",10);
+	else memcpy(hdr->product_code,"CTR-P-CTAP",10);
 
-	if(ncchset->rsfSet->BasicInfo.CompanyCode){
-		if(strlen((char*)ncchset->rsfSet->BasicInfo.CompanyCode) != 2){
+	if(ncchset->yaml_set->BasicInfo.CompanyCode){
+		if(strlen((char*)ncchset->yaml_set->BasicInfo.CompanyCode) != 2){
 			fprintf(stderr,"[NCCH ERROR] Company code length must be 2\n");
 			return NCCH_BAD_YAML_SET;
 		}
-		memcpy(hdr->makerCode,ncchset->rsfSet->BasicInfo.CompanyCode,2);
+		memcpy(hdr->maker_code,ncchset->yaml_set->BasicInfo.CompanyCode,2);
 	}
-	else memcpy(hdr->makerCode,"00",2);
+	else memcpy(hdr->maker_code,"00",2);
 
 	/* Set ContentUnitSize */
-	hdr->flags[ContentUnitSize] = 0; // 0x200
+	hdr->flags[ContentUnitSize] = 0;
 
 	/* Setting ContentPlatform */
-	hdr->flags[ContentPlatform] = 1; // CTR
+	if(ncchset->yaml_set->TitleInfo.Platform){
+		if(strcasecmp(ncchset->yaml_set->TitleInfo.Platform,"ctr") == 0) hdr->flags[ContentPlatform] = 1;
+		else{
+			fprintf(stderr,"[NCCH ERROR] Invalid Platform: %s\n",ncchset->yaml_set->TitleInfo.Platform);
+			return NCCH_BAD_YAML_SET;
+		}
+	}
+	else
+		hdr->flags[ContentPlatform] = 1; // CTR
 
 	/* Setting OtherFlag */
 	hdr->flags[OtherFlag] = FixedCryptoKey;
-	if(!ncchset->options.Encrypt) hdr->flags[OtherFlag] |= NoCrypto;
+	if(!ncchset->Options.Encrypt) hdr->flags[OtherFlag] |= NoCrypto;
 	if(!ncchset->sections.romFs.size) hdr->flags[OtherFlag] |= NoMountRomFs;
 
 
 	/* Setting ContentType */
 	hdr->flags[ContentType] = 0;
-	if(ncchset->sections.romFs.size || ncchset->options.IsCfa) hdr->flags[ContentType] |= content_Data;
-	if(!ncchset->options.IsCfa) hdr->flags[ContentType] |= content_Executable;
-	if(ncchset->rsfSet->BasicInfo.ContentType){
-		if(strcmp(ncchset->rsfSet->BasicInfo.ContentType,"Application") == 0) hdr->flags[ContentType] |= 0;
-		else if(strcmp(ncchset->rsfSet->BasicInfo.ContentType,"SystemUpdate") == 0) hdr->flags[ContentType] |= content_SystemUpdate;
-		else if(strcmp(ncchset->rsfSet->BasicInfo.ContentType,"Manual") == 0) hdr->flags[ContentType] |= content_Manual;
-		else if(strcmp(ncchset->rsfSet->BasicInfo.ContentType,"Child") == 0) hdr->flags[ContentType] |= content_Child;
-		else if(strcmp(ncchset->rsfSet->BasicInfo.ContentType,"Trial") == 0) hdr->flags[ContentType] |= content_Trial;
+	if(ncchset->sections.romFs.size) hdr->flags[ContentType] |= RomFS;
+	if(ncchset->sections.exeFs.size) hdr->flags[ContentType] |= ExeFS;
+	if(ncchset->yaml_set->BasicInfo.ContentType){
+		if(strcmp(ncchset->yaml_set->BasicInfo.ContentType,"Application") == 0) hdr->flags[ContentType] |= 0;
+		else if(strcmp(ncchset->yaml_set->BasicInfo.ContentType,"SystemUpdate") == 0) hdr->flags[ContentType] |= SystemUpdate;
+		else if(strcmp(ncchset->yaml_set->BasicInfo.ContentType,"Manual") == 0) hdr->flags[ContentType] |= Manual;
+		else if(strcmp(ncchset->yaml_set->BasicInfo.ContentType,"Child") == 0) hdr->flags[ContentType] |= Child;
+		else if(strcmp(ncchset->yaml_set->BasicInfo.ContentType,"Trial") == 0) hdr->flags[ContentType] |= Trial;
 		else{
-			fprintf(stderr,"[NCCH ERROR] Invalid ContentType '%s'\n",ncchset->rsfSet->BasicInfo.ContentType);
+			fprintf(stderr,"[NCCH ERROR] Invalid ContentType '%s'\n",ncchset->yaml_set->BasicInfo.ContentType);
 			return NCCH_BAD_YAML_SET;
 		}
 	}
@@ -450,31 +436,50 @@ int SetCommonHeaderSectionData(ncch_settings *ncchset, ncch_hdr *hdr)
 	/* Set Sizes/Hashes to Hdr */
 
 	u32 ExHeaderSize,LogoSize,PlainRegionSize,ExeFsSize,ExeFsHashSize,RomFsSize,RomFsHashSize;
+
+	if(ncchset->Options.IsCfa)
+	{
+		if(ncchset->sections.exhdr.size)
+		{
+			free(ncchset->sections.exhdr.buffer);
+		}
+		ncchset->sections.exhdr.size = 0;
+		if(ncchset->sections.logo.size)
+		{
+			free(ncchset->sections.logo.buffer);
+		}
+		ncchset->sections.logo.size = 0;
+		if(ncchset->sections.exeFs.size)
+		{
+			free(ncchset->sections.exeFs.buffer);
+		}
+		ncchset->sections.exeFs.size = 0;
+	}
 	
 	ExHeaderSize = ncchset->sections.exhdr.size ? ((u32) ncchset->sections.exhdr.size - 0x400) : 0;
-	LogoSize = ncchset->sections.logo.size ? ((u32) (ncchset->sections.logo.size/ncchset->options.mediaSize)) : 0;
-	PlainRegionSize = ncchset->sections.plainRegion.size ? ((u32) (ncchset->sections.plainRegion.size/ncchset->options.mediaSize)) : 0;
-	ExeFsSize = ncchset->sections.exeFs.size ? ((u32) (ncchset->sections.exeFs.size/ncchset->options.mediaSize)) : 0;
-	ExeFsHashSize = (u32) ExeFsSize? ncchset->options.mediaSize/ncchset->options.mediaSize : 0;
-	RomFsSize = ncchset->sections.romFs.size ? ((u32) (ncchset->sections.romFs.size/ncchset->options.mediaSize)) : 0;
-	RomFsHashSize = (u32) RomFsSize? ncchset->options.mediaSize/ncchset->options.mediaSize : 0;
+	LogoSize = ncchset->sections.logo.size ? ((u32) (ncchset->sections.logo.size/ncchset->Options.MediaSize)) : 0;
+	PlainRegionSize = ncchset->sections.plainRegion.size ? ((u32) (ncchset->sections.plainRegion.size/ncchset->Options.MediaSize)) : 0;
+	ExeFsSize = ncchset->sections.exeFs.size ? ((u32) (ncchset->sections.exeFs.size/ncchset->Options.MediaSize)) : 0;
+	ExeFsHashSize = (u32) ExeFsSize? ncchset->Options.MediaSize/ncchset->Options.MediaSize : 0;
+	RomFsSize = ncchset->sections.romFs.size ? ((u32) (ncchset->sections.romFs.size/ncchset->Options.MediaSize)) : 0;
+	RomFsHashSize = (u32) RomFsSize? ncchset->Options.MediaSize/ncchset->Options.MediaSize : 0;
 	
 
-	u32_to_u8(hdr->exhdrSize,ExHeaderSize,LE);
-	if(ExHeaderSize) ctr_sha(ncchset->sections.exhdr.buffer,ExHeaderSize,hdr->exhdrHash,CTR_SHA_256);
+	u32_to_u8(hdr->extended_header_size,ExHeaderSize,LE);
+	if(ExHeaderSize) ctr_sha(ncchset->sections.exhdr.buffer,ExHeaderSize,hdr->extended_header_sha_256_hash,CTR_SHA_256);
 
-	u32_to_u8(hdr->logoSize,LogoSize,LE);
-	if(LogoSize) ctr_sha(ncchset->sections.logo.buffer,ncchset->sections.logo.size,hdr->logoHash,CTR_SHA_256);
+	u32_to_u8(hdr->logo_region_size,LogoSize,LE);
+	if(LogoSize) ctr_sha(ncchset->sections.logo.buffer,ncchset->sections.logo.size,hdr->logo_sha_256_hash,CTR_SHA_256);
 
-	u32_to_u8(hdr->plainRegionSize,PlainRegionSize,LE);
+	u32_to_u8(hdr->plain_region_size,PlainRegionSize,LE);
 
-	u32_to_u8(hdr->exefsSize,ExeFsSize,LE);
-	u32_to_u8(hdr->exefsHashSize,ExeFsHashSize,LE);
-	if(ExeFsSize) ctr_sha(ncchset->sections.exeFs.buffer,ncchset->options.mediaSize,hdr->exefsHash,CTR_SHA_256);
+	u32_to_u8(hdr->exefs_size,ExeFsSize,LE);
+	u32_to_u8(hdr->exefs_hash_size,ExeFsHashSize,LE);
+	if(ExeFsSize) ctr_sha(ncchset->sections.exeFs.buffer,ncchset->Options.MediaSize,hdr->exefs_sha_256_hash,CTR_SHA_256);
 
-	u32_to_u8(hdr->romfsSize,RomFsSize,LE);
-	u32_to_u8(hdr->romfsHashSize,RomFsHashSize,LE);
-	if(RomFsSize) ctr_sha(ncchset->sections.romFs.buffer,ncchset->options.mediaSize,hdr->romfsHash,CTR_SHA_256);
+	u32_to_u8(hdr->romfs_size,RomFsSize,LE);
+	u32_to_u8(hdr->romfs_hash_size,RomFsHashSize,LE);
+	if(RomFsSize) ctr_sha(ncchset->sections.romFs.buffer,ncchset->Options.MediaSize,hdr->romfs_sha_256_hash,CTR_SHA_256);
 
 
 	/* Get Section Offsets */
@@ -483,32 +488,32 @@ int SetCommonHeaderSectionData(ncch_settings *ncchset, ncch_hdr *hdr)
 		size += 4;
 
 	if (LogoSize){
-		u32_to_u8(hdr->logoOffset,size,LE);
-		ncchset->sections.logoOffset = size*ncchset->options.mediaSize;
+		u32_to_u8(hdr->logo_region_offset,size,LE);
+		ncchset->sections.logoOffset = size*ncchset->Options.MediaSize;
 		size += LogoSize;
 	}
 
 	if(PlainRegionSize){
-		u32_to_u8(hdr->plainRegionOffset,size,LE);
-		ncchset->sections.plainRegionOffset = size*ncchset->options.mediaSize;
+		u32_to_u8(hdr->plain_region_offset,size,LE);
+		ncchset->sections.plainRegionOffset = size*ncchset->Options.MediaSize;
 		size += PlainRegionSize;
 	}
 
 	if (ExeFsSize){
-		u32_to_u8(hdr->exefsOffset,size,LE);
-		ncchset->sections.exeFsOffset = size*ncchset->options.mediaSize;
+		u32_to_u8(hdr->exefs_offset,size,LE);
+		ncchset->sections.exeFsOffset = size*ncchset->Options.MediaSize;
 		size += ExeFsSize;
 	}
 
 	if (RomFsSize){
-		u32_to_u8(hdr->romfsOffset,size,LE);
-		ncchset->sections.romFsOffset = size*ncchset->options.mediaSize;
+		u32_to_u8(hdr->romfs_offset,size,LE);
+		ncchset->sections.romFsOffset = size*ncchset->Options.MediaSize;
 		size += RomFsSize;
 	}
 
-	u32_to_u8(hdr->ncchSize,size,LE);
+	u32_to_u8(hdr->content_size,size,LE);
 
-	ncchset->sections.totalNcchSize = size * ncchset->options.mediaSize;
+	ncchset->Sections.TotalContentSize = size * ncchset->Options.MediaSize;
 
 	return 0;
 }
@@ -557,10 +562,10 @@ int BuildCommonHeader(ncch_settings *ncchset)
 
 	// Signing Hdr
 	int sig_result = Good;
-	if(ncchset->options.IsCfa) sig_result = SignCFA(sig,(u8*)hdr,ncchset->keys);
+	if(ncchset->Options.IsCfa) sig_result = SignCFA(sig,(u8*)hdr,ncchset->keys);
 	else sig_result = SignCXI(sig,(u8*)hdr,ncchset->keys);
 	if(sig_result != Good){
-		fprintf(stderr,"[NCCH ERROR] Failed to sign %s header\n",ncchset->options.IsCfa ? "CFA" : "CXI");
+		fprintf(stderr,"[NCCH ERROR] Failed to sign %s header\n",ncchset->Options.IsCfa ? "CFA" : "CXI");
 		return sig_result;
 	}
 
@@ -569,7 +574,7 @@ int BuildCommonHeader(ncch_settings *ncchset)
 
 int EncryptNCCHSections(ncch_settings *ncchset)
 {
-	if(!ncchset->options.Encrypt) return 0;
+	if(!ncchset->Options.Encrypt) return 0;
 
 	/* Getting ncch_struct */
 	ncch_hdr *hdr = GetNCCH_CommonHDR(NULL,NULL,ncchset->sections.ncchHdr.buffer);
@@ -581,7 +586,7 @@ int EncryptNCCHSections(ncch_settings *ncchset)
 	u8 *ncch_key = GetNCCHKey(hdr,ncchset->keys);
 
 	if(ncchset->sections.exhdr.size)
-		CryptNCCHSection(ncchset->sections.exhdr.buffer,ncchset->sections.exhdr.size,0,ncch,ncch_key,ncch_exhdr);
+		CryptNCCHSection(ncchset->sections.exhdr.buffer,ncchset->sections.exhdr.size,0,ncch,ncch_key,ncch_ExHeader);
 
 	if(ncchset->sections.exeFs.size)
 		CryptNCCHSection(ncchset->sections.exeFs.buffer,ncchset->sections.exeFs.size,0,ncch,ncch_key,ncch_exefs);
@@ -595,7 +600,7 @@ int EncryptNCCHSections(ncch_settings *ncchset)
 int WriteNCCHSectionsToBuffer(ncch_settings *ncchset)
 {
 	/* Allocating Memory for NCCH, and clearing */
-	ncchset->out->size = ncchset->sections.totalNcchSize;
+	ncchset->out->size = ncchset->Sections.TotalContentSize;
 	ncchset->out->buffer = malloc(ncchset->out->size);
 	if(!ncchset->out->buffer) { fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR;}
 	memset(ncchset->out->buffer,0,ncchset->out->size);
@@ -646,32 +651,59 @@ int VerifyNCCH(u8 *ncch, keys_struct *keys, bool SuppressOutput)
 			free(ncch_ctx);
 			return NCCH_HDR_SIG_BAD;
 		}
-		if(!ncch_ctx->romfsSize){
+		if(!ncch_ctx->romfs_size){
 			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] CFA is corrupt\n");
 			free(ncch_ctx);
 			return NO_ROMFS_IN_CFA;
 		}
+		u8 *RomFs = malloc(ncch_ctx->romfs_hash_src_size);
+		if(!RomFs){ 
+			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
+			free(ncch_ctx);
+			return MEM_ERROR; 
+		}
+		int ret = GetNCCHSection(RomFs,ncch_ctx->romfs_hash_src_size,0,ncch,ncch_ctx,keys,ncch_romfs);
+		if(ret != 0 && ret != UNABLE_TO_LOAD_NCCH_KEY){
+			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] CFA is corrupt\n");
+			free(ncch_ctx);
+			free(RomFs);
+			return CXI_CORRUPT;
+		}
+		else if(ret == UNABLE_TO_LOAD_NCCH_KEY){
+			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] Failed to load ncch aes key.\n");
+			free(ncch_ctx);
+			free(RomFs);
+			return UNABLE_TO_LOAD_NCCH_KEY;
+		}
+
+		ctr_sha(RomFs,ncch_ctx->romfs_hash_src_size,Hash,CTR_SHA_256);
+		free(RomFs);
+		if(memcmp(Hash,hdr->romfs_sha_256_hash,0x20) != 0){
+			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] RomFs Hashcheck Failed\n");
+			free(ncch_ctx);
+			return ExeFs_Hashfail;
+		}
 	}
 	else{ // IsCxi
 		// Checking for necessary sections
-		if(!ncch_ctx->exhdrSize){
+		if(!ncch_ctx->exheader_size){
 			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] CXI is corrupt\n");
 			free(ncch_ctx);
 			return NO_EXHEADER_IN_CXI;
 		}
-		if(!ncch_ctx->exefsSize){
+		if(!ncch_ctx->exefs_size){
 			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] CXI is corrupt\n");
 			free(ncch_ctx);
 			return NO_EXEFS_IN_CXI;
 		}
 		// Get ExHeader
-		extended_hdr *ExHeader = malloc(ncch_ctx->exhdrSize);
+		ExtendedHeader_Struct *ExHeader = malloc(ncch_ctx->exheader_size);
 		if(!ExHeader){ 
 			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
 			free(ncch_ctx);
 			return MEM_ERROR; 
 		}
-		int ret = GetNCCHSection((u8*)ExHeader,ncch_ctx->exhdrSize,0,ncch,ncch_ctx,keys,ncch_exhdr);
+		int ret = GetNCCHSection((u8*)ExHeader,ncch_ctx->exheader_size,0,ncch,ncch_ctx,keys,ncch_ExHeader);
 		if(ret != 0 && ret != UNABLE_TO_LOAD_NCCH_KEY){
 			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] CXI is corrupt\n");
 			free(ncch_ctx);
@@ -687,7 +719,7 @@ int VerifyNCCH(u8 *ncch, keys_struct *keys, bool SuppressOutput)
 
 		// Checking Exheader Hash to see if decryption was sucessful
 		ctr_sha(ExHeader,0x400,Hash,CTR_SHA_256);
-		if(memcmp(Hash,hdr->exhdrHash,0x20) != 0){
+		if(memcmp(Hash,hdr->extended_header_sha_256_hash,0x20) != 0){
 			//memdump(stdout,"Expected Hash: ",hdr->extended_header_sha_256_hash,0x20);
 			//memdump(stdout,"Actual Hash:   ",Hash,0x20);
 			//memdump(stdout,"Exheader:      ",(u8*)ExHeader,0x400);
@@ -709,62 +741,61 @@ int VerifyNCCH(u8 *ncch, keys_struct *keys, bool SuppressOutput)
 			free(ExHeader);
 			return ACCESSDESC_SIG_BAD;
 		}
-		if(CheckCXISignature(hdr_sig,(u8*)hdr,hdr_pubk) != 0 /* && !keys->rsa.isFalseSign*/){ // This should always be correct
+		if(CheckCXISignature(hdr_sig,(u8*)hdr,hdr_pubk) != 0 /* && !keys->rsa.isFalseSign*/){
 			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] CXI Header Sigcheck Failed\n");
 			free(ncch_ctx);
 			free(ExHeader);
 			return NCCH_HDR_SIG_BAD;
 		}
 		free(ExHeader);
-	}
-	/* Checking ExeFs Hash, if present */
-	if(ncch_ctx->exefsSize)
-	{
-		u8 *ExeFs = malloc(ncch_ctx->exefsHashDataSize);
+
+		// It is assumed by this point, everything is fine
+		
+		/* Checking ExeFs Hash */
+		u8 *ExeFs = malloc(ncch_ctx->exefs_hash_src_size);
 		if(!ExeFs){ 
 			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
 			free(ncch_ctx);
 			return MEM_ERROR; 
 		}
-		GetNCCHSection(ExeFs,ncch_ctx->exefsHashDataSize,0,ncch,ncch_ctx,keys,ncch_exefs);
-		ctr_sha(ExeFs,ncch_ctx->exefsHashDataSize,Hash,CTR_SHA_256);
+		GetNCCHSection(ExeFs,ncch_ctx->exefs_hash_src_size,0,ncch,ncch_ctx,keys,ncch_exefs);
+		ctr_sha(ExeFs,ncch_ctx->exefs_hash_src_size,Hash,CTR_SHA_256);
 		free(ExeFs);
-		if(memcmp(Hash,hdr->exefsHash,0x20) != 0){
+		if(memcmp(Hash,hdr->exefs_sha_256_hash,0x20) != 0){
 			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] ExeFs Hashcheck Failed\n");
 			free(ncch_ctx);
 			return ExeFs_Hashfail;
 		}
-	}
 
-	/* Checking RomFs hash, if present */
-	if(ncch_ctx->romfsSize){
-		u8 *RomFs = malloc(ncch_ctx->romfsHashDataSize);
-		if(!RomFs){ 
-			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
-			free(ncch_ctx);
-			return MEM_ERROR; 
+		/* Checking RomFs hash, if present */
+		if(ncch_ctx->romfs_size){
+			u8 *RomFs = malloc(ncch_ctx->romfs_hash_src_size);
+			if(!RomFs){ 
+				fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
+				free(ncch_ctx);
+				return MEM_ERROR; 
+			}
+			GetNCCHSection(RomFs,ncch_ctx->romfs_hash_src_size,0,ncch,ncch_ctx,keys,ncch_romfs);
+			ctr_sha(RomFs,ncch_ctx->romfs_hash_src_size,Hash,CTR_SHA_256);
+			free(RomFs);
+			if(memcmp(Hash,hdr->romfs_sha_256_hash,0x20) != 0){
+				if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] RomFs Hashcheck Failed\n");
+				free(ncch_ctx);
+				return ExeFs_Hashfail;
+			}
 		}
-		GetNCCHSection(RomFs,ncch_ctx->romfsHashDataSize,0,ncch,ncch_ctx,keys,ncch_romfs);
-		ctr_sha(RomFs,ncch_ctx->romfsHashDataSize,Hash,CTR_SHA_256);
-		free(RomFs);
-		if(memcmp(Hash,hdr->romfsHash,0x20) != 0){
-			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] RomFs Hashcheck Failed\n");
-			free(ncch_ctx);
-			return ExeFs_Hashfail;
-		}
-	}
 
-	/* Checking the Logo Hash, if present */
-	if(ncch_ctx->logoSize){
-		u8 *logo = (ncch+ncch_ctx->logoOffset);
-		ctr_sha(logo,ncch_ctx->logoSize,Hash,CTR_SHA_256);
-		if(memcmp(Hash,hdr->logoHash,0x20) != 0){
-			if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] Logo Hashcheck Failed\n");
-			free(ncch_ctx);
-			return Logo_Hashfail;
-		}
-	} 
-	
+		/* Checking the Logo Hash, if present */
+		if(ncch_ctx->logo_size){
+			u8 *logo = (ncch+ncch_ctx->logo_offset);
+			ctr_sha(logo,ncch_ctx->logo_size,Hash,CTR_SHA_256);
+			if(memcmp(Hash,hdr->logo_sha_256_hash,0x20) != 0){
+				if(!SuppressOutput) fprintf(stderr,"[NCCH ERROR] Logo Hashcheck Failed\n");
+				free(ncch_ctx);
+				return Logo_Hashfail;
+			}
+		} 
+	}
 	
 	free(ncch_ctx);
 	return 0;
@@ -794,11 +825,11 @@ u8* RetargetNCCH(FILE *fp, u64 size, u8 *TitleId, u8 *ProgramId, keys_struct *ke
 		return NULL;
 	}
 	
-	if((memcmp(TitleId,hdr->titleId,8) == 0) && (memcmp(ProgramId,hdr->programId,8) == 0)) 
+	if((memcmp(TitleId,hdr->title_id,8) == 0) && (memcmp(ProgramId,hdr->program_id,8) == 0)) 
 		return ncch;// if no modification is required don't do anything
 
-	if(memcmp(TitleId,hdr->titleId,8) == 0){ // If TitleID Same, no crypto required, just resign.
-		memcpy(hdr->programId,ProgramId,8);
+	if(memcmp(TitleId,hdr->title_id,8) == 0){ // If TitleID Same, no crypto required, just resign.
+		memcpy(hdr->program_id,ProgramId,8);
 		SignCFA(ncch,(u8*)hdr,keys);
 		return ncch;
 	}
@@ -816,33 +847,33 @@ u8* RetargetNCCH(FILE *fp, u64 size, u8 *TitleId, u8 *ProgramId, keys_struct *ke
 	ncch_struct ncch_struct;
 	if(keytype != NoKey){ //Decrypting if necessary
 		GetCXIStruct(&ncch_struct,hdr);
-		u8 *romfs = (ncch+ncch_struct.romfsOffset);
+		u8 *romfs = (ncch+ncch_struct.romfs_offset);
 		key = GetNCCHKey(hdr,keys);
 		if(key == NULL){
 			fprintf(stderr,"[NCCH ERROR] Failed to load ncch aes key\n");
 			free(ncch);
 			return NULL;
 		}
-		CryptNCCHSection(romfs,ncch_struct.romfsSize,0,&ncch_struct,key,ncch_romfs);
+		CryptNCCHSection(romfs,ncch_struct.romfs_size,0,&ncch_struct,key,ncch_romfs);
 	}
 	
 	
-	memcpy(hdr->titleId,TitleId,8);
-	memcpy(hdr->programId,ProgramId,8);
+	memcpy(hdr->title_id,TitleId,8);
+	memcpy(hdr->program_id,ProgramId,8);
 	
 	//Checking New Fixed Key Type
 	keytype = GetNCCHKeyType(hdr);
 	
 	if(keytype != NoKey){ // Re-encrypting if necessary
 		GetCXIStruct(&ncch_struct,hdr);
-		u8 *romfs = (ncch+ncch_struct.romfsOffset);
+		u8 *romfs = (ncch+ncch_struct.romfs_offset);
 		key = GetNCCHKey(hdr,keys);
 		if(key == NULL){
 			fprintf(stderr,"[NCCH ERROR] Failed to load ncch aes key\n");
 			free(ncch);
 			return NULL;
 		}
-		CryptNCCHSection(romfs,ncch_struct.romfsSize,0,&ncch_struct,key,ncch_romfs);
+		CryptNCCHSection(romfs,ncch_struct.romfs_size,0,&ncch_struct,key,ncch_romfs);
 	}
 	
 	SignCFA(ncch,(u8*)hdr,keys);
@@ -885,12 +916,12 @@ bool IsNCCH(FILE *fp, u8 *buf)
 
 bool IsCfa(ncch_hdr* hdr)
 {
-	return (((hdr->flags[ContentType] & content_Data) == content_Data) && ((hdr->flags[ContentType] & content_Executable) != content_Executable));
+	return (((hdr->flags[ContentType] & RomFS) == RomFS) && ((hdr->flags[ContentType] & ExeFS) != ExeFS));
 }
 
 u32 GetNCCH_MediaUnitSize(ncch_hdr* hdr)
 {
-	u16 titleVersion = u8_to_u16(hdr->formatVersion,LE);
+	u16 titleVersion = u8_to_u16(hdr->titleVersion,LE);
 	u32 ret = 0;
 	if (titleVersion == 1)
 		ret = 1;
@@ -902,24 +933,20 @@ u32 GetNCCH_MediaUnitSize(ncch_hdr* hdr)
 
 u32 GetNCCH_MediaSize(ncch_hdr* hdr)
 {
-	return u8_to_u32(hdr->ncchSize,LE);
+	return u8_to_u32(hdr->content_size,LE);
 }
 
 ncch_key_type GetNCCHKeyType(ncch_hdr* hdr)
 {	
 	// Non-Secure Key Options
-	if((hdr->flags[OtherFlag] & NoCrypto) == NoCrypto) 
-		return NoKey;
+	if((hdr->flags[OtherFlag] & NoCrypto) == NoCrypto) return NoKey;
 	if((hdr->flags[OtherFlag] & FixedCryptoKey) == FixedCryptoKey){
-		if((hdr->programId[4] & 0x10) == 0x10) 
-			return KeyIsSystemFixed;
-		else 
-			return KeyIsNormalFixed;
+		if((hdr->program_id[4] & 0x10) == 0x10) return KeyIsSystemFixed;
+		else return KeyIsNormalFixed;
 	}
 
 	// Secure Key Options
-	if(hdr->flags[SecureCrypto2]) 
-		return KeyIsUnFixed2;
+	if(hdr->flags[SecureCrypto2] == 1) return KeyIsUnFixed2;
 	return KeyIsUnFixed;
 }
 
@@ -933,10 +960,8 @@ u8* GetNCCHKey(ncch_hdr* hdr, keys_struct *keys)
 			if(!keys->aes.systemFixedKey) fprintf(stderr,"[NCCH WARNING] Unable to load SystemFixed Key\n");
 			return keys->aes.systemFixedKey;
 		case KeyIsUnFixed:
-			fprintf(stderr,"[NCCH WARNING] Unable to load UnFixed Key\n");
-			return NULL;
-			//if(!keys->aes.unFixedKey0) fprintf(stderr,"[NCCH WARNING] Unable to load UnFixed Key\n");
-			//return keys->aes.unFixedKey0;
+			if(!keys->aes.unFixedKey) fprintf(stderr,"[NCCH WARNING] Unable to load UnFixed Key\n");
+			return keys->aes.unFixedKey;
 		case KeyIsUnFixed2:
 			fprintf(stderr,"[NCCH WARNING] Crypto method (Secure2) not supported yet\n");
 			return NULL;
@@ -951,7 +976,7 @@ int GetNCCHSection(u8 *dest, u64 dest_max_size, u64 src_pos, u8 *ncch, ncch_stru
 	ncch_hdr* hdr = GetNCCH_CommonHDR(NULL,NULL,ncch);
 	ncch_key_type keytype = GetNCCHKeyType(hdr);
 
-	if(keytype != NoKey && (section == ncch_exhdr || section == ncch_exefs || section == ncch_romfs)){
+	if(keytype != NoKey && (section == ncch_ExHeader || section == ncch_exefs || section == ncch_romfs)){
 		key = GetNCCHKey(hdr,keys);
 		if(key == NULL){
 			//fprintf(stderr,"[NCCH ERROR] Failed to load ncch aes key.\n");
@@ -962,25 +987,25 @@ int GetNCCHSection(u8 *dest, u64 dest_max_size, u64 src_pos, u8 *ncch, ncch_stru
 	u64 offset = 0;
 	u64 size = 0;
 	switch(section){
-		case ncch_exhdr:
-			offset = ncch_ctx->exhdrOffset;
-			size = ncch_ctx->exhdrSize;
+		case ncch_ExHeader:
+			offset = ncch_ctx->exheader_offset;
+			size = ncch_ctx->exheader_size;
 			break;
 		case ncch_Logo:
-			offset = ncch_ctx->logoOffset;
-			size = ncch_ctx->logoSize;
+			offset = ncch_ctx->logo_offset;
+			size = ncch_ctx->logo_size;
 			break;
 		case ncch_PlainRegion:
-			offset = ncch_ctx->plainRegionOffset;
-			size = ncch_ctx->plainRegionSize;
+			offset = ncch_ctx->plain_region_offset;
+			size = ncch_ctx->plain_region_size;
 			break;
 		case ncch_exefs:
-			offset = ncch_ctx->exefsOffset;
-			size = ncch_ctx->exefsSize;
+			offset = ncch_ctx->exefs_offset;
+			size = ncch_ctx->exefs_size;
 			break;
 		case ncch_romfs:
-			offset = ncch_ctx->romfsOffset;
-			size = ncch_ctx->romfsSize;
+			offset = ncch_ctx->romfs_offset;
+			size = ncch_ctx->romfs_size;
 			break;
 	}
 	if(!offset || !size) return NCCH_SECTION_NOT_EXIST; 
@@ -994,39 +1019,38 @@ int GetNCCHSection(u8 *dest, u64 dest_max_size, u64 src_pos, u8 *ncch, ncch_stru
 	memcpy(dest,section_pos,size);
 
 	//printf("decrypting if needed\n");
-	if(keytype != NoKey && (section == ncch_exhdr || section == ncch_exefs || section == ncch_romfs)){ // Decrypt
+	if(keytype != NoKey && (section == ncch_ExHeader || section == ncch_exefs || section == ncch_romfs)){ // Decrypt
 		//memdump(stdout,"Key: ",key,16);
 		CryptNCCHSection(dest,size,src_pos,ncch_ctx,key,section);
 		//printf("no cigar\n");
 	}
-	//printf("Got thing okay\n");
+
 	return 0;
 }
 
 int GetCXIStruct(ncch_struct *ctx, ncch_hdr *header)
 {
-	memcpy(ctx->titleId,header->titleId,8);
-	memcpy(ctx->programId,header->programId,8);
+	memcpy(ctx->titleID,header->title_id,8);
+	memcpy(ctx->programID,header->program_id,8);
 
 	
 	u32 media_unit = GetNCCH_MediaUnitSize(header);
 	
-	ctx->formatVersion = u8_to_u16(header->formatVersion,LE);
+	ctx->titleVersion = u8_to_u16(header->titleVersion,LE);
 	if(!IsCfa(header)){
-		ctx->exhdrOffset = 0x200;
-		ctx->exhdrSize = u8_to_u32(header->exhdrSize,LE) + 0x400;
-		ctx->plainRegionOffset = (u64)(u8_to_u32(header->plainRegionOffset,LE)*media_unit);
-		ctx->plainRegionSize = (u64)(u8_to_u32(header->plainRegionSize,LE)*media_unit);
+		ctx->exheader_offset = 0x200;
+		ctx->exheader_size = u8_to_u32(header->extended_header_size,LE) + 0x400;
+		ctx->logo_offset = (u64)(u8_to_u32(header->logo_region_offset,LE)*media_unit);
+		ctx->logo_size = (u64)(u8_to_u32(header->logo_region_size,LE)*media_unit);
+		ctx->plain_region_offset = (u64)(u8_to_u32(header->plain_region_offset,LE)*media_unit);
+		ctx->plain_region_size = (u64)(u8_to_u32(header->plain_region_size,LE)*media_unit);
+		ctx->exefs_offset = (u64)(u8_to_u32(header->exefs_offset,LE)*media_unit);
+		ctx->exefs_size = (u64)(u8_to_u32(header->exefs_size,LE)*media_unit);
+		ctx->exefs_hash_src_size = (u64)(u8_to_u32(header->exefs_hash_size,LE)*media_unit);
 	}
-
-	ctx->logoOffset = (u64)(u8_to_u32(header->logoOffset,LE)*media_unit);
-	ctx->logoSize = (u64)(u8_to_u32(header->logoSize,LE)*media_unit);
-	ctx->exefsOffset = (u64)(u8_to_u32(header->exefsOffset,LE)*media_unit);
-	ctx->exefsSize = (u64)(u8_to_u32(header->exefsSize,LE)*media_unit);
-	ctx->exefsHashDataSize = (u64)(u8_to_u32(header->exefsHashSize,LE)*media_unit);
-	ctx->romfsOffset = (u64) (u8_to_u32(header->romfsOffset,LE)*media_unit);
-	ctx->romfsSize = (u64) (u8_to_u32(header->romfsSize,LE)*media_unit);
-	ctx->romfsHashDataSize = (u64)(u8_to_u32(header->romfsHashSize,LE)*media_unit);
+	ctx->romfs_offset = (u64) (u8_to_u32(header->romfs_offset,LE)*media_unit);
+	ctx->romfs_size = (u64) (u8_to_u32(header->romfs_size,LE)*media_unit);
+	ctx->romfs_hash_src_size = (u64)(u8_to_u32(header->romfs_hash_size,LE)*media_unit);
 	return 0;
 }
 
@@ -1042,7 +1066,7 @@ void CryptNCCHSection(u8 *buffer, u64 size, u64 src_pos, ncch_struct *ctx, u8 ke
 	if(src_pos > 0){
 		u32 carry = 0;
 		carry = align_value(src_pos,0x10);
-		carry /= 0x10;
+		carry = carry/0x10;
 		ctr_add_counter(&aes_ctx,carry);
 	}
 	ctr_crypt_counter(&aes_ctx, buffer, buffer, size);
@@ -1051,27 +1075,27 @@ void CryptNCCHSection(u8 *buffer, u64 size, u64 src_pos, ncch_struct *ctx, u8 ke
 
 void ncch_get_counter(ncch_struct *ctx, u8 counter[16], u8 type)
 {
-	u8 *titleId = ctx->titleId;
+	u8 *titleID = ctx->titleID;
 	u32 i;
 	u32 x = 0;
 
 	memset(counter, 0, 16);
 
-	if (ctx->formatVersion == 2 || ctx->formatVersion == 0)
+	if (ctx->titleVersion == 2 || ctx->titleVersion == 0)
 	{
 		for(i=0; i<8; i++)
-			counter[i] = titleId[7-i];
+			counter[i] = titleID[7-i];
 		counter[8] = type;
 	}
-	else if (ctx->formatVersion == 1)
+	else if (ctx->titleVersion == 1)
 	{
 		switch(type){
-			case ncch_exhdr : x = ctx->exhdrOffset; break;
-			case ncch_exefs : x = ctx->exefsOffset; break;
-			case ncch_romfs : x = ctx->romfsOffset; break;
+			case ncch_ExHeader : x = ctx->exheader_offset; break;
+			case ncch_exefs : x = ctx->exefs_offset; break;
+			case ncch_romfs : x = ctx->romfs_offset; break;
 		}
 		for(i=0; i<8; i++)
-			counter[i] = titleId[i];
+			counter[i] = titleID[i];
 		for(i=0; i<4; i++)
 			counter[12+i] = x>>((3-i)*8);
 	}

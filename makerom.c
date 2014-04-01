@@ -29,46 +29,30 @@ int main(int argc, char *argv[])
 	if(result < 0) goto finish;
 
 	// Setup Content 0
-	if(!usrset->IsBuildingNCCH0){ // Import Content 0
-		if(usrset->Content0IsNcch){
-#ifdef DEBUG
-				printf("[DEBUG] Import NCCH0\n");
-#endif
-			FILE *ncch0 = fopen(usrset->ContentPath[0],"rb");
-			if(!ncch0) {fprintf(stderr,"[MAKEROM ERROR] Failed to open Content 0: %s\n",usrset->ContentPath[0]); goto finish;}
+	if(!usrset->ncch.buildNcch0){ // Import Content
+		if(usrset->common.workingFileType == infile_ncch){
+			FILE *ncch0 = fopen(usrset->common.contentPath[0],"rb");
+			if(!ncch0) {fprintf(stderr,"[MAKEROM ERROR] Failed to open Content 0: %s\n",usrset->common.contentPath[0]); goto finish;}
 			fclose(ncch0);
-			usrset->Content0.size = GetFileSize_u64(usrset->ContentPath[0]);
-			usrset->Content0.buffer = malloc(usrset->Content0.size);
-			ncch0 = fopen(usrset->ContentPath[0],"rb");
-			ReadFile_64(usrset->Content0.buffer, usrset->Content0.size,0,ncch0);
+			usrset->common.workingFile.size = GetFileSize_u64(usrset->common.contentPath[0]);
+			usrset->common.workingFile.buffer = malloc(usrset->common.workingFile.size);
+			ncch0 = fopen(usrset->common.contentPath[0],"rb");
+			ReadFile_64(usrset->common.workingFile.buffer, usrset->common.workingFile.size,0,ncch0);
 			fclose(ncch0);
 		}
-		else if(usrset->Content0IsSrl){
-#ifdef DEBUG
-	printf("[DEBUG] Import SRL\n");
-#endif
-			FILE *srl = fopen(usrset->SrlPath,"rb");
-			if(!srl) {fprintf(stderr,"[MAKEROM ERROR] Failed to open SRL: %s\n",usrset->SrlPath); goto finish;}
-			fclose(srl);
-			u64 size = GetFileSize_u64(usrset->SrlPath);
-			usrset->Content0.size = align_value(size,0x10);
-			usrset->Content0.buffer = malloc(usrset->Content0.size);
-			srl = fopen(usrset->SrlPath,"rb");
-			ReadFile_64(usrset->Content0.buffer,size,0,srl);
-			fclose(srl);
-		}
-		else if(usrset->ConvertCci){
-#ifdef DEBUG
-	printf("[DEBUG] Import CCI\n");
-#endif
-			FILE *cci = fopen(usrset->CciPath,"rb");
-			if(!cci) {fprintf(stderr,"[MAKEROM ERROR] Failed to open CCI: %s\n",usrset->CciPath); goto finish;}
-			fclose(cci);
-			usrset->Content0.size = GetFileSize_u64(usrset->CciPath);
-			usrset->Content0.buffer = malloc(usrset->Content0.size);
-			cci = fopen(usrset->CciPath,"rb");
-			ReadFile_64(usrset->Content0.buffer, usrset->Content0.size,0,cci);
-			fclose(cci);
+		else if(usrset->common.workingFileType == infile_srl || usrset->common.workingFileType == infile_ncsd){
+			FILE *fp = fopen(usrset->common.workingFilePath,"rb");
+			if(!fp) {
+				fprintf(stderr,"[MAKEROM ERROR] Failed to open %s: %s\n",usrset->common.workingFileType == infile_srl? "SRL":"CCI",usrset->common.workingFilePath); 
+				goto finish;
+			}
+			fclose(fp);
+			u64 size = GetFileSize_u64(usrset->common.workingFilePath);
+			usrset->common.workingFile.size = align_value(size,0x10);
+			usrset->common.workingFile.buffer = malloc(usrset->common.workingFile.size);
+			fp = fopen(usrset->common.workingFilePath,"rb");
+			ReadFile_64(usrset->common.workingFile.buffer,size,0,fp);
+			fclose(fp);
 		}
 	}
 	else{// Build Content 0
@@ -83,7 +67,7 @@ int main(int argc, char *argv[])
 		}	
 	}
 	// Make CCI
-	if(usrset->out_format == CCI){
+	if(usrset->common.outFormat == CCI){
 #ifdef DEBUG
 	printf("[DEBUG] Building CCI\n");
 #endif
@@ -91,7 +75,7 @@ int main(int argc, char *argv[])
 		if(result < 0) { fprintf(stderr,"[RESULT] Failed to build CCI\n"); goto finish; }
 	}
 	// Make CIA
-	else if(usrset->out_format == CIA){
+	else if(usrset->common.outFormat == CIA){
 #ifdef DEBUG
 	printf("[DEBUG] Building CIA\n");
 #endif
@@ -99,18 +83,18 @@ int main(int argc, char *argv[])
 		if(result < 0) { fprintf(stderr,"[RESULT] Failed to build CIA\n"); goto finish; }
 	}
 	// No Container Raw CXI/CFA
-	else if(usrset->out_format == CXI || usrset->out_format == CFA){
+	else if(usrset->common.outFormat == CXI || usrset->common.outFormat == CFA){
 #ifdef DEBUG
 	printf("[DEBUG] Outputting NCCH, because No Container\n");
 #endif
-		FILE *ncch_out = fopen(usrset->outfile,"wb");
+		FILE *ncch_out = fopen(usrset->common.outFileName,"wb");
 		if(!ncch_out) {
-			fprintf(stderr,"[ERROR] Failed to create '%s'\n",usrset->outfile); 
-			fprintf(stderr,"[RESULT] Failed to build '%s'\n",usrset->out_format == CXI? "CXI" : "CFA"); 
+			fprintf(stderr,"[ERROR] Failed to create '%s'\n",usrset->common.outFileName); 
+			fprintf(stderr,"[RESULT] Failed to build '%s'\n",usrset->common.outFormat == CXI? "CXI" : "CFA"); 
 			result = FAILED_TO_CREATE_OUTFILE; 
 			goto finish;
 		}
-		WriteBuffer(usrset->Content0.buffer,usrset->Content0.size,0,ncch_out);
+		WriteBuffer(usrset->common.workingFile.buffer,usrset->common.workingFile.size,0,ncch_out);
 		fclose(ncch_out);
 	}
 	

@@ -27,7 +27,7 @@ typedef enum
 
 typedef enum
 {
-	ncch_ExHeader = 1,
+	ncch_exhdr = 1,
 	ncch_exefs,
 	ncch_romfs,
 	ncch_Logo,
@@ -61,80 +61,75 @@ typedef enum
 
 typedef enum
 {
-	RomFS = 0x1,
-	ExeFS = 0x2,
-	SystemUpdate = 0x4,
-	Manual = 0x8,
-	Child = (0x4|0x8),
-	Trial = 0x10
+	content_Data = 0x1,
+	content_Executable = 0x2,
+	content_SystemUpdate = 0x4,
+	content_Manual = 0x8,
+	content_Child = (0x4|0x8),
+	content_Trial = 0x10
 } ncch_content_bitmask;
 
 typedef struct
 {
-	u16 version;
-	u32 exheader_offset;
-	u32 exheader_size;
-	u64 logo_offset;
-	u64 logo_size;
-	u64 plain_region_offset;
-	u64 plain_region_size;
-	u64 exefs_offset;
-	u64 exefs_size;
-	u64 exefs_hash_src_size;
-	u64 romfs_offset;
-	u64 romfs_size;
-	u64 romfs_hash_src_size;
-	u8 titleID[8];
-	u8 programID[8];
-}NCCH_STRUCT;
+	u16 formatVersion;
+	u32 exhdrOffset;
+	u32 exhdrSize;
+	u64 logoOffset;
+	u64 logoSize;
+	u64 plainRegionOffset;
+	u64 plainRegionSize;
+	u64 exefsOffset;
+	u64 exefsSize;
+	u64 exefsHashDataSize;
+	u64 romfsOffset;
+	u64 romfsSize;
+	u64 romfsHashDataSize;
+	u8 titleId[8];
+	u8 programId[8];
+} ncch_struct;
 
 typedef struct
 {
 	u8 magic[4];
-	u8 content_size[4];
-	u8 title_id[8];
-	u8 maker_code[2];
-	u8 version[2];
-	u8 reserved_0[4];
-	u8 program_id[8];
-	u8 reserved_1[0x10];
-	u8 logo_sha_256_hash[0x20];
-	u8 product_code[0x10];
-	u8 extended_header_sha_256_hash[0x20];
-	u8 extended_header_size[4];
-	u8 reserved_2[4];
+	u8 ncchSize[4];
+	u8 titleId[8];
+	u8 makerCode[2];
+	u8 formatVersion[2];
+	u8 padding0[4];
+	u8 programId[8];
+	u8 padding1[0x10];
+	u8 logoHash[0x20]; // SHA-256 over the entire logo region
+	u8 productCode[0x10];
+	u8 exhdrHash[0x20]; // SHA-256 over exhdrSize of the exhdr region
+	u8 exhdrSize[4];
+	u8 padding2[4];
 	u8 flags[8];
-	u8 plain_region_offset[4];
-	u8 plain_region_size[4];
-	u8 logo_region_offset[4];
-	u8 logo_region_size[4];
-	u8 exefs_offset[4];
-	u8 exefs_size[4];
-	u8 exefs_hash_size[4];
-	u8 reserved_4[4];
-	u8 romfs_offset[4];
-	u8 romfs_size[4];
-	u8 romfs_hash_size[4];
-	u8 reserved_5[4];
-	u8 exefs_sha_256_hash[0x20];
-	u8 romfs_sha_256_hash[0x20];
-} NCCH_Header;
+	u8 plainRegionOffset[4];
+	u8 plainRegionSize[4];
+	u8 logoOffset[4];
+	u8 logoSize[4];
+	u8 exefsOffset[4];
+	u8 exefsSize[4];
+	u8 exefsHashSize[4];
+	u8 padding4[4];
+	u8 romfsOffset[4];
+	u8 romfsSize[4];
+	u8 romfsHashSize[4];
+	u8 padding5[4];
+	u8 exefsHash[0x20];
+	u8 romfsHash[0x20];
+} ncch_hdr;
 
 
 typedef struct
 {
 	keys_struct *keys;
-	rsf_settings *yaml_set;
+	rsf_settings *rsfSet;
 	COMPONENT_STRUCT *out;
-
-	struct{
-		u8 *PubK;
-		u8 *PrivK;
-	} CxiRsaKey;
 
 	struct
 	{
-		u32 MediaSize;
+		u32 mediaSize;
 		bool IncludeExeFsLogo;
 		bool CompressCode;
 		bool UseOnSD;
@@ -143,70 +138,70 @@ typedef struct
 		bool IsCfa;
 		bool IsBuildingCodeSection;
 		bool UseRomFS;
-	} Options;
+	} options;
 
 	struct
 	{
 		FILE *elf;
-		u64 elf_size;
+		u64 elfSize;
 
 		FILE *banner;
-		u64 banner_size;
+		u64 bannerSize;
 
 		FILE *icon;
-		u64 icon_size;
+		u64 iconSize;
 
 		FILE *logo;
-		u64 logo_size;
+		u64 logoSize;
 
 		FILE *code;
-		u64 code_size;
+		u64 codeSize;
 
-		FILE *exheader;
-		u64 exheader_size;
+		FILE *exhdr;
+		u64 exhdrSize;
 
 		FILE *romfs;
-		u64 romfs_size;
+		u64 romfsSize;
 
 		FILE *plainregion;
-		u64 plainregion_size;
-	} ComponentFilePtrs;
+		u64 plainregionSize;
+	} componentFilePtrs;
 
 	struct
 	{
-		COMPONENT_STRUCT Code;
-		COMPONENT_STRUCT Banner;
-		COMPONENT_STRUCT Icon;
-	} ExeFs_Sections;
+		COMPONENT_STRUCT code;
+		COMPONENT_STRUCT banner;
+		COMPONENT_STRUCT icon;
+	} exefsSections;
 
 	struct
 	{
-		u32 TextAddress;
-		u32 TextSize;
-		u32 TextMaxPages;
-		u32 ROAddress;
-		u32 ROSize;
-		u32 ROMaxPages;
-		u32 DataAddress;
-		u32 DataSize;
-		u32 DataMaxPages;
-		u32 BSS_Size;
-	} CodeDetails;
+		u32 textAddress;
+		u32 textSize;
+		u32 textMaxPages;
+		u32 roAddress;
+		u32 roSize;
+		u32 roMaxPages;
+		u32 rwAddress;
+		u32 rwSize;
+		u32 rwMaxPages;
+		u32 bssSize;
+	} codeDetails;
 
 	struct
 	{
-		u64 TotalContentSize;
-		COMPONENT_STRUCT CommonHeader;
-		COMPONENT_STRUCT ExHeader;
-		u64 LogoOffset;
-		COMPONENT_STRUCT Logo;
-		u64 PlainRegionOffset;
-		COMPONENT_STRUCT PlainRegion;
-		u64 ExeFsOffset;
-		COMPONENT_STRUCT ExeFs;
-		u64 RomFsOffset;
-		COMPONENT_STRUCT RomFs;
-	} Sections;
+		u64 totalNcchSize;
+		COMPONENT_STRUCT ncchHdr;
+		COMPONENT_STRUCT exhdr;
+		u64 logoOffset;
+		COMPONENT_STRUCT logo;
+		u64 plainRegionOffset;
+		COMPONENT_STRUCT plainRegion;
+		u64 exeFsOffset;
+		COMPONENT_STRUCT exeFs;
+		u64 romFsOffset;
+		COMPONENT_STRUCT romFs;
+	} sections;
 
 } ncch_settings;
 
@@ -221,16 +216,16 @@ int VerifyNCCH(u8 *ncch, keys_struct *keys, bool SuppressOutput);
 
 u8* RetargetNCCH(FILE *fp, u64 size, u8 *TitleId, u8 *ProgramId, keys_struct *keys);
 
-NCCH_Header* GetNCCH_CommonHDR(void *out, FILE *fp, u8 *buf);
+ncch_hdr* GetNCCH_CommonHDR(void *out, FILE *fp, u8 *buf);
 bool IsNCCH(FILE *fp, u8 *buf);
-bool IsCfa(NCCH_Header* hdr);
-u32 GetNCCH_MediaUnitSize(NCCH_Header* hdr);
-u32 GetNCCH_MediaSize(NCCH_Header* hdr);
-ncch_key_type GetNCCHKeyType(NCCH_Header* hdr);
+bool IsCfa(ncch_hdr* hdr);
+u32 GetNCCH_MediaUnitSize(ncch_hdr* hdr);
+u32 GetNCCH_MediaSize(ncch_hdr* hdr);
+ncch_key_type GetNCCHKeyType(ncch_hdr* hdr);
 
-int GetNCCHSection(u8 *dest, u64 dest_max_size, u64 src_pos, u8 *ncch, NCCH_STRUCT *ncch_ctx, keys_struct *keys, ncch_section section);
-u8* GetNCCHKey(NCCH_Header* hdr, keys_struct *keys);
+int GetNCCHSection(u8 *dest, u64 dest_max_size, u64 src_pos, u8 *ncch, ncch_struct *ncch_ctx, keys_struct *keys, ncch_section section);
+u8* GetNCCHKey(ncch_hdr* hdr, keys_struct *keys);
 
-int GetCXIStruct(NCCH_STRUCT *ctx, NCCH_Header *header);
-void ncch_get_counter(NCCH_STRUCT *ctx, u8 counter[16], u8 type);
-void CryptNCCHSection(u8 *buffer, u64 size, u64 src_pos, NCCH_STRUCT *ctx, u8 key[16], u8 type);
+int GetCXIStruct(ncch_struct *ctx, ncch_hdr *header);
+void ncch_get_counter(ncch_struct *ctx, u8 counter[16], u8 type);
+void CryptNCCHSection(u8 *buffer, u64 size, u64 src_pos, ncch_struct *ctx, u8 key[16], u8 type);

@@ -10,98 +10,115 @@ typedef enum
 // Structs
 typedef struct
 {
-	u8 HdrSize[4];
-	u8 Type[2];
-	u8 Version[2];
-	u8 CertChainSize[4];
-	u8 TicketSize[4];
-	u8 TitleMetaDataSize[4];
-	u8 CXI_MetaSize[4];
-	u8 ContentSize[8];
-	u8 ContentIndex[0x2000];
-} CIA_Header;
+	u8 hdrSize[4];
+	u8 type[2];
+	u8 version[2];
+	u8 certChainSize[4];
+	u8 tikSize[4];
+	u8 tmdSize[4];
+	u8 metaSize[4];
+	u8 contentSize[8];
+	u8 contentIndex[0x2000];
+} cia_hdr;
 
 typedef struct
 {
-	u8 DependancyList[0x30*0x8];
-	u8 Reserved0[0x180];
-	u8 CoreVersion[4];
-	u8 Reserved1[0xfc];
-} MetaData_Struct;
+	u8 dependencyList[0x30*0x8];
+	u8 padding0[0x180];
+	u8 coreVersion[4];
+	u8 padding1[0xfc];
+} cia_metadata;
 
 typedef struct
 {
+	u8 *inFile;
+	u64 inFileSize;
+
 	FILE *out;
-
-	u8 TitleID[8];
-	u8 Title_type[4];
-	u16 Version[3];
 
 	keys_struct *keys;
 
 	struct{
-		u8 ca_crl_version;
-		u8 signer_crl_version;
+		u8 titleId[8];
+		u16 titleVersion[4];
+		u8 titleKey[16];
+	} common;
+	
+
+	struct{
+		u8 caCrlVersion;
+		u8 signerCrlVersion;
 	} cert;
 
 	struct{
-		u8 TicketIssuer[0x40];
-		u8 ticket_format_ver;
-		u8 TicketID[8];
-		u8 DeviceID[8];
-		u8 TicketVersion[3];
-		u8 TitleKey[16];
+		u8 issuer[0x40];
+		u8 formatVersion;
+
+		u16 version;
+
+		u8 ticketId[8];
+		u8 deviceId[8];
+		u8 licenceType;
+		u8 audit;
+		u8 eshopAccId[4];
 	} tik;
 
 	struct{
-		u8 TMDIssuer[0x40];
-		u8 tmd_format_ver;
-		u8 TitleVersion[3];
-		u8 SaveDataSize[4];
-		u8 PrivSaveDataSize[4];
-		u8 twl_flag;
+		u8 issuer[0x40];
+		u8 formatVersion;
+
+		u16 version;
+
+		u8 titleType[4];
+		u8 savedataSize[4];
+		u8 privSavedataSize[4];
+		u8 twlFlag;
 	} tmd;
 
 	struct{
-		u8 *content0;
-		u64 content0_FileLen;
 		bool IsCfa;
-		bool KeyNotFound;
-		bool EncryptContents;
+		bool IsDlc;
+		bool encryptCia;
+		char *overrideSaveDataSize;
 
-		FILE **ContentFilePtrs;
-		u64 CCIContentOffsets[CCI_MAX_CONTENT];
-		u16 ContentCount;
-		u64 ContentSize[CIA_MAX_CONTENT];
-		u64 ContentOffset[CIA_MAX_CONTENT];
-		u16 ContentIndex[CIA_MAX_CONTENT];
-		u16 ContentType[CIA_MAX_CONTENT];
-		u32 ContentId[CIA_MAX_CONTENT];
-		u8 ContentHash[CIA_MAX_CONTENT][0x20];
+		bool keyNotFound;
 
-		u8 ContentTitleId[CIA_MAX_CONTENT][8];
-		u64 TotalContentSize;
+		FILE **contentFilePtrs;
+		u64 cciContentOffsets[CCI_MAX_CONTENT];
+
+		/* Misc Records */
+		u16 contentCount;
+		u64 contentOffset[CIA_MAX_CONTENT];
+		u64 totalContentSize;
+
+		/* Content Chunk Records */
+		u64 contentSize[CIA_MAX_CONTENT];
+		u16 contentIndex[CIA_MAX_CONTENT];
+		u16 contentFlags[CIA_MAX_CONTENT];
+		u32 contentId[CIA_MAX_CONTENT];
+		u8 contentHash[CIA_MAX_CONTENT][0x20];
+
+		u8 contentTitleId[CIA_MAX_CONTENT][8];
+		
 	} content;
 
 	struct{
-		COMPONENT_STRUCT Header;
+		COMPONENT_STRUCT ciaHdr;
 		
-		u32 CertChainOffset;
-		COMPONENT_STRUCT CertChain;
+		u32 certChainOffset;
+		COMPONENT_STRUCT certChain;
 
-		u32 TicketOffset;
-		COMPONENT_STRUCT Ticket;
+		u32 tikOffset;
+		COMPONENT_STRUCT tik;
 
-		u32 TitleMetaDataOffset;
-		COMPONENT_STRUCT TitleMetaData;
+		u32 tmdOffset;
+		COMPONENT_STRUCT tmd;
 
-		u32 CXI_MetaDataOffset;
-		COMPONENT_STRUCT CXI_MetaData;
+		u32 metaOffset;
+		COMPONENT_STRUCT meta;
 
-		u64 ContentOffset;
-	} CIA_Sections;
-
-	// Finish CIA data req.
+		u64 contentOffset;
+	} ciaSections;
 } cia_settings;
 
 // Public Prototypes

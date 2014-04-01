@@ -30,50 +30,51 @@ typedef enum
 
 typedef struct
 {
-	u8 Magic[4];
-	u8 BitFormat;
-	u8 Endianness;
-	u8 ELF_Version;
-	u8 OS;
-	u8 Padding_0[8];
-	u8 Type[2];
-	u8 TargetArchitecture[2];
-	u8 Version[4];
-	u8 EntryPoint[4];
-	u8 ProgramHeaderTableOffset[4];
-	u8 SectionHeaderTableOffset[4];
-	u8 Flags[4];
-	u8 HeaderSize[2];
-	u8 ProgramHeaderEntrySize[2];
-	u8 ProgramHeaderEntryCount[2];
-	u8 SectionTableEntrySize[2];
-	u8 SectionHeaderEntryCount[2];
-	u8 SectionHeaderNameEntryIndex[2];
+	u8 magic[4];
+	u8 bitFormat;
+	u8 endianness;
+	u8 elfVersion;
+	u8 os;
+	u8 padding0[8];
+	u8 type[2];
+	u8 targetArchitecture[2];
+	u8 version[4];
+	u8 entryPoint[4];
+	u8 programHeaderTableOffset[4];
+	u8 sectionHeaderTableOffset[4];
+	u8 flags[4];
+	u8 headerSize[2];
+	u8 programHeaderEntrySize[2];
+	u8 programHeaderEntryCount[2];
+	u8 sectionTableEntrySize[2];
+	u8 sectionHeaderEntryCount[2];
+	u8 sectionHeaderNameEntryIndex[2];
 } elf_32_hdr;
 
 typedef struct
 {
-	u8 Magic[4];
-	u8 BitFormat;
-	u8 Endianness;
-	u8 ELF_Version;
-	u8 OS;
-	u8 Padding_0[8];
-	u8 Type[2];
-	u8 TargetArchitecture[2];
-	u8 Version[4];
-	u8 EntryPoint[8];
-	u8 ProgramHeaderTableOffset[8];
-	u8 SectionHeaderTableOffset[8];
-	u8 Flags[4];
-	u8 HeaderSize[2];
-	u8 ProgramHeaderEntrySize[2];
-	u8 ProgramHeaderEntryCount[2];
-	u8 SectionTableEntrySize[2];
-	u8 SectionHeaderEntryCount[2];
-	u8 SectionHeaderNameEntryIndex[2];
+	u8 magic[4];
+	u8 bitFormat;
+	u8 endianness;
+	u8 elfVersion;
+	u8 os;
+	u8 padding0[8];
+	u8 type[2];
+	u8 targetArchitecture[2];
+	u8 version[4];
+	u8 entryPoint[8];
+	u8 programHeaderTableOffset[8];
+	u8 sectionHeaderTableOffset[8];
+	u8 flags[4];
+	u8 headerSize[2];
+	u8 programHeaderEntrySize[2];
+	u8 programHeaderEntryCount[2];
+	u8 sectionTableEntrySize[2];
+	u8 sectionHeaderEntryCount[2];
+	u8 sectionHeaderNameEntryIndex[2];
 } elf_64_hdr;
 
+/* taken from elf specs, will not follow global style */
 
 /* Section header.  */
 
@@ -96,9 +97,9 @@ typedef struct
 #define SHT_LOSUNW	 0x6ffffffb	/* Sun-specific low bound.  */
 #define SHT_SUNW_COMDAT  0x6ffffffb
 #define SHT_SUNW_syminfo 0x6ffffffc
-#define SHT_GNU_verdef	 0x6ffffffd	/* Version definition section.  */
-#define SHT_GNU_verneed	 0x6ffffffe	/* Version needs section.  */
-#define SHT_GNU_versym	 0x6fffffff	/* Version symbol table.  */
+#define SHT_GNU_verdef	 0x6ffffffd	/* titleVersion definition section.  */
+#define SHT_GNU_verneed	 0x6ffffffe	/* titleVersion needs section.  */
+#define SHT_GNU_versym	 0x6fffffff	/* titleVersion symbol table.  */
 #define SHT_HISUNW	 0x6fffffff	/* Sun-specific high bound.  */
 #define SHT_HIOS	 0x6fffffff	/* End OS-specific type */
 #define SHT_LOPROC	 0x70000000	/* Start of processor-specific */
