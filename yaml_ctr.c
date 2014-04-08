@@ -348,6 +348,7 @@ u32 SetYAMLSequence(char ***dest, char *key, ctr_yaml_context *ctx)
 		ActualCount++;
 		if(ActualCount >= SlotCount){ // if Exceeding Ptr capacity, expand buffer
 			SlotCount = SlotCount*2;
+			/*
 			char **tmp1 = malloc((SlotCount+1)*sizeof(char*)); // allocate new buffer
 			if(!tmp1){
 				ctx->error = YAML_MEM_ERROR;
@@ -357,6 +358,12 @@ u32 SetYAMLSequence(char ***dest, char *key, ctr_yaml_context *ctx)
 			for(u32 i = 0; i < ActualCount; i++) tmp1[i] = tmp[i]; // Transfer ptrs
 			free(tmp); // free original buffer
 			tmp = tmp1; // transfer main ptr
+			*/
+			tmp = realloc(tmp,(SlotCount+1)*sizeof(char*));
+			if(!tmp){
+				ctx->error = true;
+				return 0;
+			}
 		}
 		FinishEvent(ctx);
 		GetEvent(ctx);

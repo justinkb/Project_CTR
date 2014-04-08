@@ -1,5 +1,4 @@
-#ifndef _ELF_H_
-#define _ELF_H_
+#pragma once
 
 typedef enum
 {
@@ -81,7 +80,5 @@ typedef struct
 	ElfSegment *segments;
 
 } ElfContext;
-
-#endif
 
 int BuildExeFsCode(ncch_settings *ncchset);

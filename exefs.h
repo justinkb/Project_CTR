@@ -1,5 +1,4 @@
-#ifndef _EXEFS_H_
-#define _EXEFS_H_
+#pragma once
 
 #define MAX_EXEFS_SECTIONS 10 // DO NOT CHANGE
 
@@ -16,32 +15,30 @@ typedef struct
 	char name[8];
 	u8 offset[4];
 	u8 size[4];
-} ExeFs_FileHeader;
+} exefs_filehdr;
+
+typedef struct
+{
+	exefs_filehdr fileHdr[MAX_EXEFS_SECTIONS];
+	u8 reserved[0x20];
+	u8 fileHashes[MAX_EXEFS_SECTIONS][0x20];
+} exefs_hdr;
 
 typedef struct
 {
 	//Input
-	int section_count;
-	u8 *section[10];
-	u32 section_size[10];
-	u32 section_offset[10];
-	char lable[10][8];
-	u32 media_unit;
+	int fileCount;
+	u8 *file[MAX_EXEFS_SECTIONS];
+	u32 fileSize[MAX_EXEFS_SECTIONS];
+	u32 fileOffset[MAX_EXEFS_SECTIONS];
+	char fileName[MAX_EXEFS_SECTIONS][8];
+	u32 mediaUnit;
 	
 	//Working Data
-	ExeFs_FileHeader file_header[10];
-	u8 file_hashes[10][0x20];
+	exefs_filehdr fileHdr[MAX_EXEFS_SECTIONS];
+	u8 fileHashes[MAX_EXEFS_SECTIONS][0x20];
 	
-} ExeFs_BuildContext;
-
-typedef struct
-{
-	ExeFs_FileHeader SectionHdr[MAX_EXEFS_SECTIONS];
-	u8 Reserved[0x20];
-	u8 SectionHashes[MAX_EXEFS_SECTIONS][0x20];
-} ExeFs_Header;
-
-#endif
+} exefs_buildctx;
 
 /* ExeFs Build Functions */
 int BuildExeFs(ncch_settings *ncchset);

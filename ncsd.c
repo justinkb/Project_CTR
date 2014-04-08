@@ -175,6 +175,7 @@ int BuildCardInfoHeader(cci_settings *cciset, user_settings *usrset)
 	memcpy((u8*)ctx.cardinfo.initial_data,cciset->initialData,0x30);
 	memcpy((u8*)ctx.cardinfo.ncch_0_header,cciset->ncchHdr,0x100);
 	memcpy((u8*)ctx.devcardinfo.TitleKey,cciset->titleKey,0x10);
+
 	return 0;
 }
 
@@ -183,7 +184,15 @@ int WriteCCI_HDR_ToFile(cci_settings *cciset)
 	WriteBuffer(ctx.signature,0x100,0,cciset->out);
 	WriteBuffer((u8*)&ctx.cciHdr,sizeof(cci_hdr),0x100,cciset->out);
 	WriteBuffer((u8*)&ctx.cardinfo,sizeof(cardinfo_hdr),0x200,cciset->out);
-	WriteBuffer((u8*)&ctx.devcardinfo,sizeof(devcardinfo_hdr),0x1200,cciset->out);
+	if(memcmp(ctx.devcardinfo.TitleKey,ctx.keys->aes.normalKey,16) == 0){
+		// Creating Buffer of Dummy Bytes
+		u64 len = cciset->contentOffset[0] - 0x1200;
+		u8 *dummy_bytes = malloc(len);
+		memset(dummy_bytes,0xff,len);
+		WriteBuffer(dummy_bytes,len,0x1200,cciset->out);
+	}
+	else
+		WriteBuffer((u8*)&ctx.devcardinfo,sizeof(devcardinfo_hdr),0x1200,cciset->out);
 	return 0;
 }
 
@@ -213,7 +222,7 @@ int WriteCCI_Content_ToFile(cci_settings *cciset,user_settings *usrset)
 int WriteCCI_DummyBytes(cci_settings *cciset)
 {
 	// Seeking end of CCI Data
-	fseek_64(cciset->out,cciset->cciTotalSize,SEEK_SET);
+	fseek_64(cciset->out,cciset->cciTotalSize);
 
 	// Determining Size of Dummy Bytes
 	u64 len = cciset->mediaSize - cciset->cciTotalSize;
@@ -223,9 +232,8 @@ int WriteCCI_DummyBytes(cci_settings *cciset)
 	memset(dummy_bytes,0xff,cciset->mediaUnit);
 	
 	// Writing Dummy Bytes to file
-	for(u64 i = 0; i < len; i += cciset->mediaUnit){
-		fwrite(&dummy_bytes,cciset->mediaUnit,1,cciset->out);
-	}
+	for(u64 i = 0; i < len; i += cciset->mediaUnit)
+		fwrite(dummy_bytes,cciset->mediaUnit,1,cciset->out);
 	
 	return 0;
 }
@@ -324,7 +332,9 @@ int GetDataFromContent0(cci_settings *cciset, user_settings *usrset)
 		//memcpy(cciset->titleKey,(Hash+0x30),0x10); // Might Remove
 	}
 	
-	
+	/* FW6x SaveCrypto */
+	cciset->flags[FW6x_SaveCryptoFlag] = usrset->cci.use6xSavedataCrypto;
+
 	cciset->flags[MediaUnitSize] = hdr->flags[ContentUnitSize];
 	cciset->mediaUnit = GetNCCH_MediaUnitSize(hdr);
 	
@@ -400,9 +410,6 @@ int GetNCSDFlags(cci_settings *cciset, rsf_settings *yaml)
 		cciset->flags[FW6x_BackupWriteWaitTime] = (u8)WaitTime;
 	}
 
-	/* FW6x SaveCrypto */
-	cciset->flags[FW6x_SaveCryptoFlag] = 1;
-
 	/* MediaType */
 	if(!yaml->CardInfo.MediaType) cciset->flags[MediaTypeIndex] = CARD1;
 	else{
@@ -467,12 +474,12 @@ int GetWriteableAddress(cci_settings *cciset, user_settings *usrset)
 	if(cciset->writableAddress == -1){ // If not set manually or is max size
 		if ((cciset->mediaSize / 2) < cciset->savedataSize){ // If SaveData size is greater than half the MediaSize
 			u64 SavedataSize = cciset->savedataSize / KB;
-			fprintf(stderr,"[CCI ERROR] Too large SavedataSize %luK\n",SavedataSize);
+			fprintf(stderr,"[CCI ERROR] Too large SavedataSize %llK\n",SavedataSize);
 			return SAVE_DATA_TOO_LARGE;
 		}
 		if (cciset->savedataSize > (u64)(2047*MB)){ // Limit set by Nintendo
 			u64 SavedataSize = cciset->savedataSize / KB;
-			fprintf(stderr,"[CCI ERROR] Too large SavedataSize %luK\n",SavedataSize);
+			fprintf(stderr,"[CCI ERROR] Too large SavedataSize %llK\n",SavedataSize);
 			return SAVE_DATA_TOO_LARGE;
 		}
 		u64 UnusedSize = GetUnusedSize(cciset->mediaSize,cciset->flags[MediaTypeIndex]); // Need to look into this

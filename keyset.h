@@ -1,6 +1,4 @@
-#ifndef _KEYSET_H_
-#define _KEYSET_H_
-
+#pragma once
 typedef enum
 {
 	RSA_1024_KEY_SIZE = 0x80,
@@ -51,7 +49,6 @@ typedef struct
 		u8 *normalKey;
 		u8 *systemFixedKey;
 
-		bool supportUnFixedKeys;
 		u8 *ncchKeyX0;
 		u8 *ncchKeyX1;
 		u8 *unFixedKey0;
@@ -88,13 +85,13 @@ typedef struct
 	} certs;
 } keys_struct;
 
-#endif
-
 // Public Prototypes
 void InitKeys(keys_struct *keys);
 int SetKeys(keys_struct *keys);
 void FreeKeys(keys_struct *keys);
 
-int SetcommonKey(keys_struct *keys, u8 *commonKey, u8 Index);
-int SetcurrentCommonKey(keys_struct *keys, u8 Index);
-int SetsystemFixedKey(keys_struct *keys, u8 *systemFixedKey);
+int SetCommonKey(keys_struct *keys, u8 *commonKey, u8 Index);
+int SetCurrentCommonKey(keys_struct *keys, u8 Index);
+int SetSystemFixedKey(keys_struct *keys, u8 *systemFixedKey);
+
+int SetNcchUnfixedKeys(keys_struct *keys, u8 *ncchSig);

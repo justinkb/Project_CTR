@@ -1,5 +1,4 @@
-#ifndef _EXHEADER_H_
-#define _EXHEADER_H_
+#pragma once
 
 typedef enum
 {
@@ -96,13 +95,6 @@ typedef enum
 
 typedef struct
 {
-	u8 reserved[5];
-	u8 flag;
-	u8 remasterVersion[2]; // le u16
-} exhdr_SystemInfoFlags;
-
-typedef struct
-{
 	u8 address[4]; // le u32
 	u8 numMaxPages[4]; // le u32
 	u8 codeSize[4]; // le u32
@@ -111,11 +103,13 @@ typedef struct
 typedef struct
 {
 	u8 name[8];
-	exhdr_SystemInfoFlags flags;
+	u8 padding0[5];
+	u8 flag;
+	u8 remasterVersion[2]; // le u16
 	exhdr_CodeSegmentInfo textSectionInfo;
 	u8 stackSize[4]; // le u32
 	exhdr_CodeSegmentInfo readOnlySectionInfo;
-	u8 padding0[4];
+	u8 padding1[4];
 	exhdr_CodeSegmentInfo dataSectionInfo;
 	u8 bssSize[4]; // le u32
 } exhdr_CodeSetInfo;
@@ -139,11 +133,14 @@ typedef struct
 typedef struct
 {
 	u8 programId[8];
-	u8 flags[8];
+	u8 coreVersion[4];
+	u8 padding0[2];
+	u8 flag;
+	u8 priority;
 	u8 resourceLimitDescriptor[16][2];
 	exhdr_StorageInfo storageInfo;
-	u8 serviceAccessControl[32][8]; // Those char[8] svc handles
-	u8 padding0[0x1f];
+	u8 serviceAccessControl[32][8]; // Those char[8] server names
+	u8 padding1[0x1f];
 	u8 resourceLimitCategory;
 } exhdr_ARM11SystemLocalCapabilities;
 
@@ -208,7 +205,7 @@ typedef struct
 	extended_hdr *exHdr; // is the exheader output buffer ptr(in ncchset) cast as exheader struct ptr;
 } exheader_settings;
 
-#endif
+
 /* ExHeader Signature Functions */
 int SignAccessDesc(extended_hdr *ExHdr, keys_struct *keys);
 int CheckaccessDescSignature(extended_hdr *ExHdr, keys_struct *keys);
@@ -226,9 +223,11 @@ u8* GetAccessDesc_frm_exhdr(extended_hdr *hdr);
 u16 GetRemasterVersion_frm_exhdr(extended_hdr *hdr);
 u64 GetSaveDataSize_frm_exhdr(extended_hdr *hdr);
 int GetDependencyList_frm_exhdr(u8 *Dest,extended_hdr *hdr);
-int GetCoreVersion_frm_exhdr(u8 *Dest, extended_hdr *hdr);
+void GetCoreVersion_frm_exhdr(u8 *Dest, extended_hdr *hdr);
 
 /* ExHeader Settings Read from Yaml */
 int GetSaveDataSize_rsf(u64 *SaveDataSize, user_settings *usrset);
 int GetSaveDataSizeFromString(u64 *out, char *string);
 int GetRemasterVersion_rsf(u16 *RemasterVersion, user_settings *usrset);
+
+void ErrorParamNotFound(char *string);

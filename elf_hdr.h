@@ -1,5 +1,4 @@
-#ifndef _ELF_HDR_H_
-#define _ELF_HDR_H_
+#pragma once
 
 static const u32 ELF_MAGIC = 0x7f454c46;
 
@@ -175,4 +174,3 @@ typedef struct
   u8 p_memsz[8];		/* Segment size in memory */
   u8 p_align[8];		/* Segment alignment */
 } elf_64_phdr;
-#endif

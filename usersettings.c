@@ -174,19 +174,14 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		}
 		if(strcasecmp(argv[i+1],"test") == 0 || strcasecmp(argv[i+1],"t") == 0)
 			set->common.keys.keyset = pki_TEST;
-		else if(strcasecmp(argv[i+1],"custom") == 0 || strcasecmp(argv[i+1],"c") == 0)
-			set->common.keys.keyset = pki_CUSTOM;
-		
-#ifndef PUBLIC_BUILD
+		else if(strcasecmp(argv[i+1],"beta") == 0 || strcasecmp(argv[i+1],"b") == 0)
+			set->common.keys.keyset = pki_BETA;
 		else if(strcasecmp(argv[i+1],"debug") == 0 || strcasecmp(argv[i+1],"development") == 0 || strcasecmp(argv[i+1],"d") == 0)
 			set->common.keys.keyset = pki_DEVELOPMENT;
 		else if(strcasecmp(argv[i+1],"retail") == 0 || strcasecmp(argv[i+1],"production") == 0 || strcasecmp(argv[i+1],"p") == 0)
 			set->common.keys.keyset = pki_PRODUCTION;
-		/*
-		else if(strcasecmp(argv[i+1],"beta") == 0 || strcasecmp(argv[i+1],"b") == 0)
-			set->common.keys.keyset = pki_BETA;
-		*/
-#endif
+		else if(strcasecmp(argv[i+1],"custom") == 0 || strcasecmp(argv[i+1],"c") == 0)
+			set->common.keys.keyset = pki_CUSTOM;
 		else{
 			fprintf(stderr,"[SETTING ERROR] Unrecognised target '%s'\n",argv[i+1]);
 			return USR_BAD_ARG;
@@ -353,6 +348,15 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		return 1;
 	}
 #endif
+	// 
+	else if(strcmp(argv[i],"-6xcrypto") == 0){
+		if(HasParam){
+			PrintNoNeedParam("-6xcrypto");
+			return USR_BAD_ARG;
+		}
+		set->cci.use6xSavedataCrypto = true;
+		return 1;
+	}
 	// Cia Options
 #ifndef PUBLIC_BUILD
 	else if(strcmp(argv[i],"-cci") == 0){
@@ -527,15 +531,16 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		if(set->dname.m_items == 0){
 			set->dname.m_items = 10;
 			set->dname.u_items = 0;
-			set->dname.items = malloc(sizeof(dname_item)*set->dname.m_items);
+			set->dname.items = calloc(set->dname.m_items,sizeof(dname_item));
 			if(!set->dname.items){
 				fprintf(stderr,"[SETTING ERROR] Not enough memory\n");
 				return MEM_ERROR;
 			}
-			memset(set->dname.items,0,sizeof(dname_item)*set->dname.m_items);
+			//memset(set->dname.items,0,sizeof(dname_item)*set->dname.m_items);
 		}
 		else if(set->dname.m_items == set->dname.u_items){
 			set->dname.m_items *= 2;
+			/*
 			dname_item *tmp = malloc(sizeof(dname_item)*set->dname.m_items);
 			if(!tmp){
 				fprintf(stderr,"[SETTING ERROR] Not enough memory\n");
@@ -545,6 +550,12 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 			memcpy(tmp,set->dname.items,sizeof(dname_item)*set->dname.u_items);
 			free(set->dname.items);
 			set->dname.items = tmp;
+			*/
+			set->dname.items = realloc(set->dname.items,sizeof(dname_item)*set->dname.m_items);
+			if(!set->dname.items){
+				fprintf(stderr,"[SETTING ERROR] Not enough memory\n");
+				return MEM_ERROR;
+			}
 		}
 
 		char *name_pos = (char*)(argv[i]+2);
@@ -631,6 +642,10 @@ int CheckArgumentCombination(user_settings *set)
 	}
 	if(buildCXI && set->ncch.codePath && !set->ncch.exheaderPath){
 		PrintNeedsArgument("-exheader");
+		return USR_BAD_ARG;
+	}
+	if(set->common.keys.keyset == pki_CUSTOM && set->common.keys.keydir == NULL){
+		PrintNeedsArgument("-keydir");
 		return USR_BAD_ARG;
 	}
 
@@ -925,17 +940,13 @@ void DisplayHelp(char *app_name)
 	//printf(" -v                                 Verbose\n");
 	printf(" -DNAME=VALUE                       Substitute values in Spec files\n");
 	printf("KEY OPTIONS:\n");
-#ifdef PUBLIC_BUILD
-	printf(" -target        <t|c>               Target for crypto, defaults to 't'\n");
-	printf("                                    't' Test(false) Keys & prod Certs\n");
-	printf("                                    'c' User provides Keys & Certs\n");
-#else
 	printf(" -target        <t|d|p|c>           Target for crypto, defaults to 't'\n");
+	//printf(" -target        <t|b|d|p|c>           Target for crypto, defaults to 't'\n");
 	printf("                                    't' Test(false) Keys & prod Certs\n");
+	//printf("                                    'b' Beta Keys & prod Certs\n");
 	printf("                                    'd' Development Keys & Certs\n");
 	printf("                                    'p' Production Keys & Certs\n");
-	printf("                                    'c' User provides Keys & Certs\n");
-#endif
+	printf("                                    'c' Custom Keys & Certs\n");
 	printf(" -keydir        <dir>               Key Directory (for use with \"-target c\")\n");
 	printf(" -ckeyID        <u8 value>          Override the automatic commonKey selection\n");
 	printf(" -showkeys                          Display the loaded keychain\n");
@@ -956,6 +967,7 @@ void DisplayHelp(char *app_name)
 #ifndef PUBLIC_BUILD
 	printf(" -devcardcci                        Use SDK CardInfo Method\n");
 #endif
+	printf(" -6xcrypto                          Toggle FW6.X Save Crypto\n");
 	printf(" -content <filepath>:<index>        Specify content files\n");
 	printf("CIA OPTIONS:\n");
 #ifndef PUBLIC_BUILD

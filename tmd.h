@@ -1,5 +1,4 @@
-#ifndef _TMD_H_
-#define _TMD_H_
+#pragma once
 
 typedef enum
 {
@@ -60,8 +59,6 @@ typedef struct
 	u8 padding3[2];
 	u8 infoRecordHash[0x20]; // SHA-256
 } tmd_hdr;
-
-#endif
 
 // Prototypes
 u32 PredictTMDSize(u16 ContentCount);

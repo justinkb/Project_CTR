@@ -1,5 +1,4 @@
-#ifndef _NCCH_H_
-#define _NCCH_H_
+#pragma once
 
 typedef enum
 {
@@ -123,9 +122,10 @@ typedef struct
 
 typedef struct
 {
+	buffer_struct *out;
 	keys_struct *keys;
 	rsf_settings *rsfSet;
-	COMPONENT_STRUCT *out;
+	
 
 	struct
 	{
@@ -169,9 +169,9 @@ typedef struct
 
 	struct
 	{
-		COMPONENT_STRUCT code;
-		COMPONENT_STRUCT banner;
-		COMPONENT_STRUCT icon;
+		buffer_struct code;
+		buffer_struct banner;
+		buffer_struct icon;
 	} exefsSections;
 
 	struct
@@ -190,31 +190,27 @@ typedef struct
 
 	struct
 	{
-		u64 totalNcchSize;
-		COMPONENT_STRUCT ncchHdr;
-		COMPONENT_STRUCT exhdr;
-		u64 logoOffset;
-		COMPONENT_STRUCT logo;
-		u64 plainRegionOffset;
-		COMPONENT_STRUCT plainRegion;
-		u64 exeFsOffset;
-		COMPONENT_STRUCT exeFs;
-		u64 romFsOffset;
-		COMPONENT_STRUCT romFs;
+		buffer_struct exhdr;
+		buffer_struct logo;
+		buffer_struct plainRegion;
+		buffer_struct exeFs;
 	} sections;
+	
+	ncch_struct cryptoDetails;
+
 
 } ncch_settings;
-
-#endif
 
 // NCCH Build Functions
 int build_NCCH(user_settings *usrset);
 
 
 // NCCH Read Functions
-int VerifyNCCH(u8 *ncch, keys_struct *keys, bool SuppressOutput);
+int VerifyNCCH(u8 *ncch, keys_struct *keys, bool CheckHash, bool SuppressOutput);
 
 u8* RetargetNCCH(FILE *fp, u64 size, u8 *TitleId, u8 *ProgramId, keys_struct *keys);
+int ModifyNcchIds(u8 *ncch, u8 *titleId, u8 *programId, keys_struct *keys);
+
 
 ncch_hdr* GetNCCH_CommonHDR(void *out, FILE *fp, u8 *buf);
 bool IsNCCH(FILE *fp, u8 *buf);
@@ -224,8 +220,8 @@ u32 GetNCCH_MediaSize(ncch_hdr* hdr);
 ncch_key_type GetNCCHKeyType(ncch_hdr* hdr);
 
 int GetNCCHSection(u8 *dest, u64 dest_max_size, u64 src_pos, u8 *ncch, ncch_struct *ncch_ctx, keys_struct *keys, ncch_section section);
-u8* GetNCCHKey(ncch_hdr* hdr, keys_struct *keys);
+u8* GetNCCHKey(ncch_key_type keytype, keys_struct *keys);
 
-int GetCXIStruct(ncch_struct *ctx, ncch_hdr *header);
+int GetNCCHStruct(ncch_struct *ctx, ncch_hdr *header);
 void ncch_get_counter(ncch_struct *ctx, u8 counter[16], u8 type);
 void CryptNCCHSection(u8 *buffer, u64 size, u64 src_pos, ncch_struct *ctx, u8 key[16], u8 type);

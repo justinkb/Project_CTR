@@ -3,7 +3,7 @@
 #include "tik.h"
 
 // Private Prototypes
-int SetupTicketBuffer(COMPONENT_STRUCT *tik);
+int SetupTicketBuffer(buffer_struct *tik);
 int SetupTicketHeader(tik_hdr *hdr, cia_settings *ciaset);
 int SignTicketHeader(tik_hdr *hdr, tik_signature *sig, keys_struct *keys);
 void SetLimits(tik_hdr *hdr, cia_settings *ciaset);
@@ -26,7 +26,7 @@ int BuildTicket(cia_settings *ciaset)
 	return 0;
 }
 
-int SetupTicketBuffer(COMPONENT_STRUCT *tik)
+int SetupTicketBuffer(buffer_struct *tik)
 {
 	tik->size = sizeof(tik_signature) + sizeof(tik_hdr);
 	tik->buffer = malloc(tik->size);

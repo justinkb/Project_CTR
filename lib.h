@@ -11,15 +11,16 @@
 #include <time.h>
 #include <unistd.h>
 #include <math.h>
+#include <dirent.h>
+#include <wchar.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
+	
 #ifdef _WIN32
 	#include <io.h>
 	#include <direct.h>
 	#include <windows.h>
-	//#include <wchar.h>
-#else
-	#include <sys/stat.h>
-	#include <sys/types.h>
 #endif
 
 

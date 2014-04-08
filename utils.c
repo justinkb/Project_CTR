@@ -1,6 +1,7 @@
 #include "lib.h"
+#include "utf.h"
 
-//MISC
+// Memory
 void char_to_u8_array(unsigned char destination[], char source[], int size, int endianness, int base)
 {	
 	char tmp[size][2];
@@ -33,52 +34,38 @@ void endian_memcpy(u8 *destination, u8 *source, u32 size, int endianness)
     }
 }
 
-void u8_hex_print_be(u8 *array, int len)
+int CopyData(u8 **dest, u8 *source, u64 size)
 {
-	for(int i = 0; i < len; i++)
-		printf("%02x",array[i]);
-}
-
-void u8_hex_print_le(u8 *array, int len)
-{
-	for(int i = 0; i < len; i++)
-		printf("%02x",array[len - i - 1]);
-}
-
-u64 align_value(u64 value, u64 alignment)
-{
-	u64 tmp = value;
-	while(tmp > alignment)
-		tmp -= alignment;
-	return (value + (alignment - tmp));
-}
-
-void resolve_flag(unsigned char flag, unsigned char *flag_bool)
-{
-	unsigned char bit_mask[8] = {0x80,0x40,0x20,0x10,0x8,0x4,0x2,0x1};
-	for(int i = 0; i < 8; i++){
-		if (flag >= bit_mask[i]){
-			flag_bool[7-i] = true;
-			flag -= bit_mask[i];
-		}
-		else
-			flag_bool[7-i] = false;
+	if(!*dest){
+		*dest = malloc(size);
+		if(!*dest) return -1;
 	}
+	memcpy(*dest,source,size);
+	return 0;
 }
 
-void resolve_flag_u16(u16 flag, unsigned char *flag_bool)
+// Misc
+u64 align(u64 value, u64 alignment)
 {
-	u16 bit_mask[16] = {0x8000,0x4000,0x2000,0x1000,0x800,0x400,0x200,0x100,0x80,0x40,0x20,0x10,0x8,0x4,0x2,0x1};
-	for(int i = 0; i < 16; i++){
-		if (flag >= bit_mask[i]){
-			flag_bool[15-i] = true;
-			flag -= bit_mask[i];
-		}
+	if(value % alignment != 0)
+		return value + alignment - value % alignment;
 	else
-		flag_bool[15-i] = false;
-	}
+		return value;
 }
 
+u64 min_u64(u64 a, u64 b)
+{
+	if(a < b) return a;
+	return b;
+}
+
+u64 max_u64(u64 a, u64 b)
+{
+	if(a > b) return a;
+	return b;
+}
+
+// Strings
 int append_filextention(char *output, u16 max_outlen, char *input, char extention[])
 {
 	if(output == NULL || input == NULL){
@@ -102,111 +89,118 @@ int append_filextention(char *output, u16 max_outlen, char *input, char extentio
 	return 0;
 }
 
-int CopyData(u8 **dest, u8 *source, u64 size)
+void memdump(FILE* fout, const char* prefix, const u8* data, u32 size)
 {
-	if(!*dest){
-		*dest = malloc(size);
-		if(!*dest) return -1;
+	u32 i;
+	u32 prefixlen = strlen(prefix);
+	u32 offs = 0;
+	u32 line = 0;
+	while(size)
+	{
+		u32 max = 32;
+
+		if (max > size)
+			max = size;
+
+		if (line==0)
+			fprintf(fout, "%s", prefix);
+		else
+			fprintf(fout, "%*s", prefixlen, "");
+
+
+		for(i=0; i<max; i++)
+			fprintf(fout, "%02X", data[offs+i]);
+		fprintf(fout, "\n");
+		line++;
+		size -= max;
+		offs += max;
 	}
-	memcpy(*dest,source,size);
+}
+
+int str_u8_to_u16(u16 **dst, u32 *dst_len, u8 *src, u32 src_len)
+{
+	*dst_len = src_len*sizeof(u16);
+	*dst = malloc((*dst_len)+sizeof(u16));
+	if(*dst == NULL)
+		return -1;
+	memset(*dst,0,(*dst_len)+sizeof(u16));
+	u16 *tmp = *dst;
+	for(int i=0; i<src_len; i++)
+		tmp[i] = (u16)src[i];
 	return 0;
 }
 
-u64 min_u64(u64 a, u64 b)
+int str_u16_to_u16(u16 **dst, u32 *dst_len, u16 *src, u32 src_len)
 {
-	if(a < b) return a;
-	return b;
+	*dst_len = src_len*sizeof(u16);
+	*dst = malloc((*dst_len)+sizeof(u16));
+	if(*dst == NULL)
+		return -1;
+	memset(*dst,0,(*dst_len)+sizeof(u16));
+	u16 *tmp = *dst;
+	for(int i=0; i<src_len; i++)
+		tmp[i] = src[i];
+	return 0;
 }
 
-u64 max_u64(u64 a, u64 b)
+int str_u32_to_u16(u16 **dst, u32 *dst_len, u32 *src, u32 src_len)
 {
-	if(a > b) return a;
-	return b;
+	*dst_len = src_len*sizeof(u16);
+	*dst = malloc((*dst_len)+sizeof(u16));
+	if(*dst == NULL)
+		return -1;
+	memset(*dst,0,(*dst_len)+sizeof(u16));
+	u16 *tmp = *dst;
+	for(int i=0; i<src_len; i++)
+		tmp[i] = (u16)src[i];
+	return 0;
 }
 
-//IO Related
-void WriteBuffer(void *buffer, u64 size, u64 offset, FILE *output)
+#ifndef _WIN32
+int str_utf8_to_u16(u16 **dst, u32 *dst_len, u8 *src, u32 src_len)
 {
-	fseek_64(output,offset,SEEK_SET);
-	fwrite(buffer,size,1,output);
-} 
+	*dst_len = src_len*sizeof(u16);
+	*dst = malloc((*dst_len)+sizeof(u16));
+	if(*dst == NULL)
+		return -1;
+	memset(*dst,0,(*dst_len)+sizeof(u16));
+	
+	UTF16 *target_start = *dst;
+	UTF16 *target_end = (target_start + *dst_len);
+	
+	UTF8 *src_start = (UTF8*)src;
+	UTF8 *src_end = (UTF8*)(src+src_len*sizeof(u8));
+	
+	return ConvertUTF8toUTF16 (&src_start, src_end, &target_start, target_end, strictConversion);
+}
+#endif
 
-void ReadFile_64(void *outbuff, u64 size, u64 offset, FILE *file)
+//Char IO
+bool DoesFileExist(char *filename)
 {
-	fseek_64(file,offset,SEEK_SET);
-	fread(outbuff,size,1,file);
+#ifdef _WIN32
+	struct _stat64 st;
+	return _stat64(filename, &st) == 0;
+#else
+	struct stat st;
+	return stat(filename, &st) == 0;
+#endif
 }
 
 u64 GetFileSize_u64(char *filename)
 {
-	u64 size;
 #ifdef _WIN32
-	/* Making sure file exists */
-	FILE *tmp = fopen(filename,"rb");
-	if(!tmp) return 0;
-	fclose(tmp);
-
-	int fh;
- 	u64 n;
-  	fh = _open( filename, 0 );
-  	n = _lseeki64(fh, 0, SEEK_END);
-	_close(fh);
-	size = (n / sizeof(short))*2;
+	struct _stat64 st;
+	if( _stat64(filename, &st) != 0)
+		return 0;
+	else
+		return st.st_size;
 #else
-	FILE *file = fopen(filename,"rb");
-	fseeko(file, 0L, SEEK_END);
-	size = ftello(file);
-	fclose(file);
-#endif
-	return size;
-}
-
-u32 GetFileSize_u32(FILE *file)
-{
-	u32 size = 0;
-	fseek(file, 0L, SEEK_END);
-	size = ftell(file);
-	fseek(file, 0L, SEEK_SET);
-	return size;
-}
-
-int TruncateFile_u64(char *filename, u64 filelen)
-{
-#ifdef _WIN32
-	HANDLE fh;
- 
-	LARGE_INTEGER fp;
-	fp.QuadPart = filelen;
- 
-	fh = CreateFile(filename, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
-	if (fh == INVALID_HANDLE_VALUE) {
-		printf("[!] Invalid File handle\n");
-		return 1;
-	}
- 
-	if (SetFilePointerEx(fh, fp, NULL, FILE_BEGIN) == 0 ||
-	    SetEndOfFile(fh) == 0) {
-		printf("[!] truncate failed\n");
-		CloseHandle(fh);
-		return 1;
-	}
- 
-	CloseHandle(fh);
-	return 0;
-#else
-	return truncate(filename,filelen);
-#endif	
-}
-
-int fseek_64(FILE *fp, u64 file_pos, int whence)
-{
-#ifdef _WIN32
-	if(whence != SEEK_SET)
-		printf("[!] fseek_64, whence has been overided to SEEK_SET\n");
-	fpos_t pos = file_pos;
-	return fsetpos(fp,&pos); //I can't believe the 2gb problem with Windows & MINGW, maybe I have a bad installation :/
-#else
-	return fseeko(fp,file_pos,whence);
+	struct stat st;
+	if( stat(filename, &st) != 0)
+		return 0;
+	else
+		return st.st_size;
 #endif
 }
 
@@ -228,7 +222,89 @@ char *getcwdir(char *buffer,int maxlen)
 #endif
 }
 
-//Data Size contitleVersion
+int TruncateFile_u64(char *filename, u64 filelen)
+{
+#ifdef _WIN32
+	HANDLE fh;
+ 
+	LARGE_INTEGER fp;
+	fp.QuadPart = filelen;
+ 
+	fh = CreateFile(filename, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+	if (fh == INVALID_HANDLE_VALUE) {
+		printf("[!] Invalid File handle\n");
+		return 1;
+	}
+ 
+	if (SetFilePointerEx(fh, fp, NULL, FILE_BEGIN) == 0 || SetEndOfFile(fh) == 0) {
+		printf("[!] Truncate failed\n");
+		CloseHandle(fh);
+		return 1;
+	}
+ 
+	CloseHandle(fh);
+	return 0;
+#else
+	return truncate(filename,filelen);
+#endif	
+}
+
+// Wide Char IO
+#ifdef _WIN32
+u64 wGetFileSize_u64(u16 *filename)
+{
+	struct _stat64 st;
+	_wstat64((wchar_t*)filename, &st);
+	return st.st_size;
+}
+#endif
+
+//IO Misc
+u8* ImportFile(char *file, u64 size)
+{
+	u64 fsize = GetFileSize_u64(file);
+	if(size > 0){
+		if(size != fsize){
+			fprintf(stderr,"[!] %s has an invalid size (0x%llx)\n",fsize);
+			return NULL;
+		}
+	}
+
+	u8 *data = (u8*)calloc(1,fsize);
+	if(!data){
+		fprintf(stderr,"[!] Not enough memory\n");
+			return NULL;
+	}
+	FILE *fp = fopen(file,"rb");
+	fread(data,fsize,1,fp);
+	fclose(fp);
+
+	return data;
+}
+
+void WriteBuffer(void *buffer, u64 size, u64 offset, FILE *output)
+{
+	fseek_64(output,offset);
+	fwrite(buffer,size,1,output);
+} 
+
+void ReadFile_64(void *outbuff, u64 size, u64 offset, FILE *file)
+{
+	fseek_64(file,offset);
+	fread(outbuff,size,1,file);
+}
+
+int fseek_64(FILE *fp, u64 file_pos)
+{
+#ifdef _WIN32
+	fpos_t pos = file_pos;
+	return fsetpos(fp,&pos);
+#else
+	return fseeko(fp,file_pos,SEEK_SET);
+#endif
+}
+
+//Data Size conversion
 u16 u8_to_u16(u8 *value, u8 endianness)
 {
 	u16 new_value;
@@ -339,35 +415,6 @@ int u64_to_u8(u8 *out_value, u64 in_value, u8 endianness)
 			break;
 	}
 	return 0;
-}
-
-//Copied from ctrtool
-void memdump(FILE* fout, const char* prefix, const u8* data, u32 size)
-{
-	u32 i;
-	u32 prefixlen = strlen(prefix);
-	u32 offs = 0;
-	u32 line = 0;
-	while(size)
-	{
-		u32 max = 32;
-
-		if (max > size)
-			max = size;
-
-		if (line==0)
-			fprintf(fout, "%s", prefix);
-		else
-			fprintf(fout, "%*s", prefixlen, "");
-
-
-		for(i=0; i<max; i++)
-			fprintf(fout, "%02X", data[offs+i]);
-		fprintf(fout, "\n");
-		line++;
-		size -= max;
-		offs += max;
-	}
 }
 
 

@@ -147,7 +147,7 @@ finish:
 
 int ImportPlainRegionFromFile(ncch_settings *ncchset)
 {
-	ncchset->sections.plainRegion.size = align_value(ncchset->componentFilePtrs.plainregionSize,ncchset->options.mediaSize);
+	ncchset->sections.plainRegion.size = align(ncchset->componentFilePtrs.plainregionSize,ncchset->options.mediaSize);
 	ncchset->sections.plainRegion.buffer = malloc(ncchset->sections.plainRegion.size);
 	if(!ncchset->sections.plainRegion.buffer) {fprintf(stderr,"[ELF ERROR] MEM ERROR\n"); return MEM_ERROR;}
 	ReadFile_64(ncchset->sections.plainRegion.buffer,ncchset->componentFilePtrs.plainregionSize,0,ncchset->componentFilePtrs.plainregion);
@@ -187,7 +187,7 @@ u32 GetPageSize(ncch_settings *ncchset)
 
 u32 SizeToPage(u32 memorySize, ElfContext *elf)
 {
-	return align_value(memorySize,elf->pageSize)/elf->pageSize;
+	return align(memorySize,elf->pageSize)/elf->pageSize;
 }
 
 
@@ -226,7 +226,7 @@ int ImportPlainRegionFromElf(ElfContext *elf, u8 *ElfFile, ncch_settings *ncchse
 	}
 	
 	/* Creating Output Buffer */
-	ncchset->sections.plainRegion.size = align_value(TotalSize,ncchset->options.mediaSize);
+	ncchset->sections.plainRegion.size = align(TotalSize,ncchset->options.mediaSize);
 	ncchset->sections.plainRegion.buffer = malloc(ncchset->sections.plainRegion.size);
 	if(!ncchset->sections.plainRegion.buffer) {fprintf(stderr,"[ELF ERROR] MEM ERROR\n"); return MEM_ERROR;}
 	memset(ncchset->sections.plainRegion.buffer,0,ncchset->sections.plainRegion.size);
@@ -395,7 +395,7 @@ ElfSegment** GetContinuousSegments(u16 *ContinuousSegmentNum, ElfContext *elf, c
 
 	u32 vAddr = Segments[0]->vAddr + Segments[0]->header->sizeInMemory;
 	for (int i = 1; i < SegmentNum; i++){
-		if (Segments[i]->vAddr != (u32)align_value(vAddr,Segments[i]->header->alignment)){ //Each Segment must start after each other
+		if (Segments[i]->vAddr != (u32)align(vAddr,Segments[i]->header->alignment)){ //Each Segment must start after each other
 			fprintf(stderr,"[ELF ERROR] %s segment and %s segment are not continuous\n", Segments[i]->name, Segments[i - 1]->name);
 			free(Segments);
 			*ContinuousSegmentNum = 0xffff; // Signify to function that an error occured
@@ -938,7 +938,7 @@ int CreateElfSegments(ElfContext *elf, u8 *ElfFile)
 				if(size == 0)
 					size =  elf->sections[j].size;
 				else
-					size = align_value(size,elf->sections[j].alignment) + elf->sections[j].size;
+					size = align(size,elf->sections[j].alignment) + elf->sections[j].size;
 
 				//printf("Section Name: %s",elf->sections[j].name);
 				//printf(" 0x%lx",elf->sections[j].size);

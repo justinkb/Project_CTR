@@ -1,6 +1,4 @@
-#ifndef _NCSD_H_
-#define _NCSD_H_
-
+#pragma once
 
 // Enums
 typedef enum
@@ -162,11 +160,7 @@ static const u8 stock_title_key[0x10] =
 	0x97, 0x11, 0x92, 0xBA
 };
 
-#endif
-
 // Public Prototypes
-
-
 // Build Functions
 int build_CCI(user_settings *usrset);
 

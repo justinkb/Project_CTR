@@ -1,5 +1,4 @@
-#ifndef _PPKI_LEGACY_H_
-#define _PPKI_LEGACY_H_
+#pragma once
 
 // AES Keys
 static const unsigned char rvl_common_etd_key_ppki[2][16] =
@@ -16,5 +15,3 @@ static const unsigned char twl_common_etd_key_ppki[1][16] =
 // RSA Keys
 
 // Certificates
-
-#endif

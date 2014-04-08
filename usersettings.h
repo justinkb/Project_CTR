@@ -1,5 +1,4 @@
-#ifndef _USERSETTINGS_H_
-#define _USERSETTINGS_H_
+#pragma once
 
 #define CCI_MAX_CONTENT 8
 #define CIA_MAX_CONTENT 65536
@@ -246,7 +245,7 @@ typedef struct
 
 		char *workingFilePath;
 		infile_type workingFileType; // Could Be ncch/ncsd/srl. This is mainly used for CIA gen
-		COMPONENT_STRUCT workingFile;
+		buffer_struct workingFile;
 	} common;
 	
 	dname_struct dname; // For RSF value subsitution
@@ -270,6 +269,7 @@ typedef struct
 	
 	struct{ 
 		bool useSDKStockData;  // incase we want to use the SDK stock data, for whatever reason.
+		bool use6xSavedataCrypto; // 6.X Gamecard Save Crypto, because spec support.
 	} cci; // CCI Settings
 	
 	struct{
@@ -287,7 +287,6 @@ typedef struct
 	
 	
 } user_settings;
-#endif
 
 // Prototypes
 

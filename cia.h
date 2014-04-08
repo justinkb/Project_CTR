@@ -1,3 +1,5 @@
+#pragma once
+
 // Enums
 typedef enum
 {
@@ -84,7 +86,6 @@ typedef struct
 		bool keyNotFound;
 
 		FILE **contentFilePtrs;
-		u64 cciContentOffsets[CCI_MAX_CONTENT];
 
 		/* Misc Records */
 		u16 contentCount;
@@ -96,28 +97,26 @@ typedef struct
 		u16 contentIndex[CIA_MAX_CONTENT];
 		u16 contentFlags[CIA_MAX_CONTENT];
 		u32 contentId[CIA_MAX_CONTENT];
-		u8 contentHash[CIA_MAX_CONTENT][0x20];
-
-		u8 contentTitleId[CIA_MAX_CONTENT][8];
-		
+		u8 contentHash[CIA_MAX_CONTENT][0x20];		
 	} content;
 
 	struct{
-		COMPONENT_STRUCT ciaHdr;
+		buffer_struct ciaHdr;
 		
 		u32 certChainOffset;
-		COMPONENT_STRUCT certChain;
+		buffer_struct certChain;
 
 		u32 tikOffset;
-		COMPONENT_STRUCT tik;
+		buffer_struct tik;
 
 		u32 tmdOffset;
-		COMPONENT_STRUCT tmd;
+		buffer_struct tmd;
 
 		u32 metaOffset;
-		COMPONENT_STRUCT meta;
+		buffer_struct meta;
 
 		u64 contentOffset;
+		buffer_struct content;
 	} ciaSections;
 } cia_settings;
 

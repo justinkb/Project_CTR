@@ -13,6 +13,7 @@ int SetunFixedKey(keys_struct *keys, u8 *unFixedKey);
 void InitcommonKeySlots(keys_struct *keys);
 
 FILE* keyset_OpenFile(char *dir, char *name, bool FileRequired);
+void keysetOpenError(char *file);
 
 int SetTIK_RsaKey(keys_struct *keys, u8 *PrivateExp, u8 *PublicMod);
 int SetTMD_RsaKey(keys_struct *keys, u8 *PrivateExp, u8 *PublicMod);
@@ -32,14 +33,13 @@ void InitKeys(keys_struct *keys)
 	InitcommonKeySlots(keys);
 	keys->rsa.cxiHdrPub = malloc(RSA_2048_KEY_SIZE);
 	keys->rsa.cxiHdrPvt = malloc(RSA_2048_KEY_SIZE);
-	keys->aes.supportUnFixedKeys = false;
 	keys->aes.unFixedKey0 = malloc(16);
 	keys->aes.unFixedKey1 = malloc(16);
 }
 
 void PrintBadKeySize(char *path, u32 size)
 {
-	fprintf(stderr,"[KEYSET ERROR] %s is has invalid size (0x%x)\n",path,size);
+	fprintf(stderr,"[KEYSET ERROR] %s has invalid size (0x%x)\n",path,size);
 }
 
 int SetKeys(keys_struct *keys)
@@ -47,12 +47,14 @@ int SetKeys(keys_struct *keys)
 	if(keys->keyset == pki_TEST){ // Ergo False Sign
 		/* AES Keys */
 		// CIA
-		//SetcommonKey(keys,(u8*)zeros_aesKey,1);
+		//SetCommonKey(keys,(u8*)zeros_aesKey,1);
 		if(keys->aes.currentCommonKey > 0xff)
-			SetcurrentCommonKey(keys,0);
+			SetCurrentCommonKey(keys,0);
 	
 		// NCCH
 		keys->aes.normalKey = (u8*)zeros_aesKey;
+		keys->aes.systemFixedKey = NULL;
+		//SetSystemFixedKey(keys,(u8*)zeros_aesKey);
 
 		/* RSA Keys */
 		keys->rsa.isFalseSign = true;
@@ -70,33 +72,17 @@ int SetKeys(keys_struct *keys)
 		SetTmdCert(keys,(u8*)cpB_tpki_cert);
 	}
 	else if(keys->keyset == pki_CUSTOM){
-		int keydir_pathlen = strlen(keys->keydir);
-		char *path = NULL;
-#ifdef _WIN32
-		char slash = '\\';
-#else
-		char slash = '/';
-#endif
-		if(keys->keydir[keydir_pathlen-1] != slash){
-			path = malloc(sizeof(char)*(keydir_pathlen+1));
-			memset(path,0,sizeof(char)*(keydir_pathlen+1));
-			sprintf(path,"%s%c",keys->keydir,slash);
-		}
-		else{
-			path = malloc(sizeof(char)*(keydir_pathlen));
-			memset(path,0,sizeof(char)*(keydir_pathlen));
-			sprintf(path,"%s",keys->keydir);
-		}
+		char *cwd = calloc(100,sizeof(char));
+		getcwdir(cwd,100);
 
-		FILE *fp = NULL;
+		chdir(keys->keydir);
 
 		// NCCH
 		keys->aes.normalKey = (u8*)zeros_aesKey;
-		fp = keyset_OpenFile(path,"systemfixed.aesKey",false);
-		if(fp){
-			keys->aes.systemFixedKey = malloc(16);
-			fread(keys->aes.systemFixedKey,16,1,fp);
-			fclose(fp);
+		if(DoesFileExist("systemfixed.aesKey")){
+			keys->aes.systemFixedKey = ImportFile("systemfixed.aesKey",16);
+			if(!keys->aes.systemFixedKey)
+				return FAILED_TO_IMPORT_FILE;
 		}
 
 		// commonKeys
@@ -104,165 +90,129 @@ int SetKeys(keys_struct *keys)
 		for(int i = 0; i < 256; i++){
 			memset(common_key_name,0,sizeof(char)*30);
 			sprintf(common_key_name,"common_etd_%d.aesKey",i);
-			fp = keyset_OpenFile(path,common_key_name,false);
-			if(fp){
-				keys->aes.commonKey[i] = malloc(16);
-				fread(keys->aes.commonKey[i],16,1,fp);
+			if(DoesFileExist(common_key_name)){
+				keys->aes.commonKey[i] = ImportFile(common_key_name,16);
+				if(!keys->aes.commonKey[i])
+					return FAILED_TO_IMPORT_FILE;
 				if(keys->aes.currentCommonKey > 0xff)
-					SetcurrentCommonKey(keys,i);
-				fclose(fp);
+					SetCurrentCommonKey(keys,i);
 			}
 		}
 	
 		// Certs
-		fp = keyset_OpenFile(path,"ca_cpki.cert",true);
-		if(fp){
-			u32 size = GetFileSize_u32(fp);
-			keys->certs.caCert = malloc(size);
-			fread(keys->certs.caCert,size,1,fp);
-			fclose(fp);
+		if(DoesFileExist("ca_cpki.cert")){
+			keys->certs.caCert = ImportFile("ca_cpki.cert",0);
+			if(!keys->certs.caCert)
+				return FAILED_TO_IMPORT_FILE;
 		}
-		else
+		else{
+			keysetOpenError("ca_cpki.cert");
 			return FAILED_TO_IMPORT_FILE;
+		}
 		
-		fp = keyset_OpenFile(path,"xs_cpki.cert",true);
-		if(fp){
-			u32 size = GetFileSize_u32(fp);
-			keys->certs.xsCert = malloc(size);
-			fread(keys->certs.xsCert,size,1,fp);
-			fclose(fp);
+		if(DoesFileExist("xs_cpki.cert")){
+			keys->certs.xsCert = ImportFile("xs_cpki.cert",0);
+			if(!keys->certs.xsCert)
+				return FAILED_TO_IMPORT_FILE;
 		}
-		else
+		else{
+			keysetOpenError("xs_cpki.cert");
 			return FAILED_TO_IMPORT_FILE;
+		}
 
-		fp = keyset_OpenFile(path,"cp_cpki.cert",true);
-		if(fp){
-			u32 size = GetFileSize_u32(fp);
-			keys->certs.cpCert = malloc(size);
-			fread(keys->certs.cpCert,size,1,fp);
-			fclose(fp);
+		if(DoesFileExist("cp_cpki.cert")){
+			keys->certs.cpCert = ImportFile("cp_cpki.cert",0);
+			if(!keys->certs.cpCert)
+				return FAILED_TO_IMPORT_FILE;
 		}
-		else
+		else{
+			keysetOpenError("cp_cpki.cert");
 			return FAILED_TO_IMPORT_FILE;
+		}
 
 		// RSA Keys
-		fp = keyset_OpenFile(path,"cp_cpki.rsaPubKey",true);
-		if(fp){
-			u32 size = GetFileSize_u32(fp);
-			if(size != RSA_2048_KEY_SIZE){
-				PrintBadKeySize("cp_cpki.rsaPubKey",size);
+		if(DoesFileExist("cp_cpki.rsaPubKey")){
+			keys->rsa.cpPub = ImportFile("cp_cpki.rsaPubKey",RSA_2048_KEY_SIZE);
+			if(!keys->rsa.cpPub)
 				return FAILED_TO_IMPORT_FILE;
-			}
-			keys->rsa.cpPub = malloc(size);
-			fread(keys->rsa.cpPub,size,1,fp);
-			fclose(fp);
 		}
-		else
+		else{
+			keysetOpenError("cp_cpki.rsaPubKey");
 			return FAILED_TO_IMPORT_FILE;
+		}
 
-		fp = keyset_OpenFile(path,"cp_cpki.rsaPvtKey",true);
-		if(fp){
-			u32 size = GetFileSize_u32(fp);
-			if(size != RSA_2048_KEY_SIZE){
-				PrintBadKeySize("cp_cpki.rsaPvtKey",size);
+		if(DoesFileExist("cp_cpki.rsaPvtKey")){
+			keys->rsa.cpPvt = ImportFile("cp_cpki.rsaPvtKey",RSA_2048_KEY_SIZE);
+			if(!keys->rsa.cpPvt)
 				return FAILED_TO_IMPORT_FILE;
-			}
-			keys->rsa.cpPvt = malloc(size);
-			fread(keys->rsa.cpPvt,size,1,fp);
-			fclose(fp);
 		}
-		else
+		else{
+			keysetOpenError("cp_cpki.rsaPvtKey");
 			return FAILED_TO_IMPORT_FILE;
+		}
 
-		fp = keyset_OpenFile(path,"xs_cpki.rsaPubKey",true);
-		if(fp){
-			u32 size = GetFileSize_u32(fp);
-			if(size != RSA_2048_KEY_SIZE){
-				PrintBadKeySize("xs_cpki.rsaPubKey",size);
+		if(DoesFileExist("xs_cpki.rsaPubKey")){
+			keys->rsa.xsPub = ImportFile("xs_cpki.rsaPubKey",RSA_2048_KEY_SIZE);
+			if(!keys->rsa.xsPub)
 				return FAILED_TO_IMPORT_FILE;
-			}
-			keys->rsa.xsPub = malloc(size);
-			fread(keys->rsa.xsPub,size,1,fp);
-			fclose(fp);
 		}
-		else
+		else{
+			keysetOpenError("xs_cpki.rsaPubKey");
 			return FAILED_TO_IMPORT_FILE;
+		}
 
-		fp = keyset_OpenFile(path,"xs_cpki.rsaPvtKey",true);
-		if(fp){
-			u32 size = GetFileSize_u32(fp);
-			if(size != RSA_2048_KEY_SIZE){
-				PrintBadKeySize("xs_cpki.rsaPvtKey",size);
+		if(DoesFileExist("xs_cpki.rsaPvtKey")){
+			keys->rsa.xsPvt = ImportFile("xs_cpki.rsaPvtKey",RSA_2048_KEY_SIZE);
+			if(!keys->rsa.xsPvt)
 				return FAILED_TO_IMPORT_FILE;
-			}
-			keys->rsa.xsPvt = malloc(size);
-			fread(keys->rsa.xsPvt,size,1,fp);
-			fclose(fp);
 		}
-		else
+		else{
+			keysetOpenError("xs_cpki.rsaPvtKey");
 			return FAILED_TO_IMPORT_FILE;
+		}
 
-		fp = keyset_OpenFile(path,"ncsd_cfa.rsaPubKey",true);
-		if(fp){
-			u32 size = GetFileSize_u32(fp);
-			if(size != RSA_2048_KEY_SIZE){
-				PrintBadKeySize("ncsd_cfa.rsaPubKey",size);
+		if(DoesFileExist("ncsd_cfa.rsaPubKey")){
+			keys->rsa.cciCfaPub = ImportFile("ncsd_cfa.rsaPubKey",RSA_2048_KEY_SIZE);
+			if(!keys->rsa.cciCfaPub)
 				return FAILED_TO_IMPORT_FILE;
-			}
-			keys->rsa.cciCfaPub = malloc(size);
-			fread(keys->rsa.cciCfaPub,size,1,fp);
-			fclose(fp);
 		}
-		else
+		else{
+			keysetOpenError("ncsd_cfa.rsaPubKey");
 			return FAILED_TO_IMPORT_FILE;
+		}
 
-		fp = keyset_OpenFile(path,"ncsd_cfa.rsaPvtKey",true);
-		if(fp){
-			u32 size = GetFileSize_u32(fp);
-			if(size != RSA_2048_KEY_SIZE){
-				PrintBadKeySize("ncsd_cfa.rsaPvtKey",size);
+		if(DoesFileExist("ncsd_cfa.rsaPvtKey")){
+			keys->rsa.cciCfaPvt = ImportFile("ncsd_cfa.rsaPvtKey",RSA_2048_KEY_SIZE);
+			if(!keys->rsa.cciCfaPvt)
 				return FAILED_TO_IMPORT_FILE;
-			}
-			keys->rsa.cciCfaPvt = malloc(size);
-			fread(keys->rsa.cciCfaPvt,size,1,fp);
-			fclose(fp);
 		}
-		else
+		else{
+			keysetOpenError("ncsd_cfa.rsaPvtKey");
 			return FAILED_TO_IMPORT_FILE;
-
-		fp = keyset_OpenFile(path,"acex.rsaPubKey",true);
-		if(fp){
-			u32 size = GetFileSize_u32(fp);
-			if(size != RSA_2048_KEY_SIZE){
-				PrintBadKeySize("acex.rsaPubKey",size);
+		}
+		
+		if(DoesFileExist("acex.rsaPubKey")){
+			keys->rsa.acexPub = ImportFile("acex.rsaPubKey",RSA_2048_KEY_SIZE);
+			if(!keys->rsa.acexPub)
 				return FAILED_TO_IMPORT_FILE;
-			}
-			keys->rsa.acexPub = malloc(size);
-			fread(keys->rsa.acexPub,size,1,fp);
-			fclose(fp);
 		}
-		else
+		else{
+			keysetOpenError("acex.rsaPubKey");
 			return FAILED_TO_IMPORT_FILE;
+		}
 
-		fp = keyset_OpenFile(path,"acex.rsaPvtKey",true);
-		if(fp){
-			u32 size = GetFileSize_u32(fp);
-			if(size != RSA_2048_KEY_SIZE){
-				PrintBadKeySize("acex.rsaPvtKey",size);
+		if(DoesFileExist("acex.rsaPvtKey")){
+			keys->rsa.acexPvt = ImportFile("acex.rsaPvtKey",RSA_2048_KEY_SIZE);
+			if(!keys->rsa.acexPvt)
 				return FAILED_TO_IMPORT_FILE;
-			}
-			keys->rsa.acexPvt = malloc(size);
-			fread(keys->rsa.acexPvt,size,1,fp);
-			fclose(fp);
 		}
-		else
+		else{
+			keysetOpenError("acex.rsaPvtKey");
 			return FAILED_TO_IMPORT_FILE;
+		}
 
-#ifdef DEBUG
-	fprintf(stdout,"[DEBUG] Set Keys, free path now\n");
-#endif
-
-		free(path);
+		chdir(cwd);
+		free(cwd);
 #ifdef DEBUG
 	fprintf(stdout,"[DEBUG] freed path\n");
 #endif
@@ -272,17 +222,18 @@ int SetKeys(keys_struct *keys)
 		/* AES Keys */
 		// CIA
 		for(int i = 0; i < 2; i++){
-			SetcommonKey(keys,(u8*)ctr_common_etd_key_dpki[i],i);
+			SetCommonKey(keys,(u8*)ctr_common_etd_key_dpki[i],i);
 		}
 		if(keys->aes.currentCommonKey > 0xff)
-			SetcurrentCommonKey(keys,0);
+			SetCurrentCommonKey(keys,0);
 	
 		// NCCH
 		keys->aes.normalKey = (u8*)ctr_fixed_ncch_key_dpki[0];
-		SetsystemFixedKey(keys,(u8*)ctr_fixed_ncch_key_dpki[1]);
-		keys->aes.supportUnFixedKeys = true;
+		SetSystemFixedKey(keys,(u8*)ctr_fixed_ncch_key_dpki[1]);
+		/*
 		keys->aes.ncchKeyX0 = (u8*)ctr_unfixed_ncch_keyX_dpki[0];
 		keys->aes.ncchKeyX1 = (u8*)ctr_unfixed_ncch_keyX_dpki[1];
+		*/
 
 		/* RSA Keys */
 		// CIA
@@ -302,14 +253,14 @@ int SetKeys(keys_struct *keys)
 		/* AES Keys */
 		// CIA
 		for(int i = 0; i < 6; i++){
-			keys->aes.commonKey[i] = AesKeyScrambler((u8*)ctr_common_etd_keyX_ppki,(u8*)ctr_common_etd_keyY_ppki[i]);
+			keys->aes.commonKey[i] = malloc(16);
+			AesKeyScrambler(keys->aes.commonKey[i],(u8*)ctr_common_etd_keyX_ppki,(u8*)ctr_common_etd_keyY_ppki[i]);
 		}
-		SetcurrentCommonKey(keys,1);
+		SetCurrentCommonKey(keys,1);
 	
 		// NCCH
 		keys->aes.normalKey = (u8*)zeros_aesKey;
 		/*
-		keys->aes.supportUnFixedKeys = true;
 		keys->aes.ncchKeyX0 = (u8*)ctr_unfixed_ncch_keyX_ppki[0];
 		keys->aes.ncchKeyX1 = (u8*)ctr_unfixed_ncch_keyX_ppki[1];
 		*/
@@ -399,6 +350,11 @@ FILE* keyset_OpenFile(char *dir, char *name, bool FileRequired)
 	return fp;
 }
 
+void keysetOpenError(char *file)
+{
+	fprintf(stderr,"[KEYSET ERROR] Failed to open: %s\n",file);
+}
+
 void FreeKeys(keys_struct *keys)
 {
 	// AES
@@ -447,7 +403,7 @@ int SetRsaKeySet(u8 **PrivDest, u8 *PrivSource, u8 **PubDest, u8 *PubSource)
 	return 0;
 }
 
-int SetcommonKey(keys_struct *keys, u8 *commonKey, u8 Index)
+int SetCommonKey(keys_struct *keys, u8 *commonKey, u8 Index)
 {
 	if(!keys) return -1;
 	return CopyData(&keys->aes.commonKey[Index],commonKey,16);
@@ -461,17 +417,33 @@ void InitcommonKeySlots(keys_struct *keys)
 	}
 }
 
-int SetcurrentCommonKey(keys_struct *keys, u8 Index)
+int SetCurrentCommonKey(keys_struct *keys, u8 Index)
 {
 	if(!keys) return -1;
 	keys->aes.currentCommonKey = Index;
 	return 0;
 }
 
-int SetsystemFixedKey(keys_struct *keys, u8 *systemFixedKey)
+int SetSystemFixedKey(keys_struct *keys, u8 *systemFixedKey)
 {
 	if(!keys) return -1;
 	return CopyData(&keys->aes.systemFixedKey,systemFixedKey,16);
+}
+
+int SetNcchUnfixedKeys(keys_struct *keys, u8 *ncchSig)
+{
+	if(!keys) return -1;
+
+	//memdump(stdout,"keyY:  ",ncchSig,16);
+	//memdump(stdout,"keyX0: ",keys->aes.ncchKeyX0,16);
+	//memdump(stdout,"keyX1: ",keys->aes.ncchKeyX1,16);
+
+	if(keys->aes.ncchKeyX0)
+		AesKeyScrambler(keys->aes.unFixedKey0,keys->aes.ncchKeyX0,ncchSig);
+	if(keys->aes.ncchKeyX1)
+		AesKeyScrambler(keys->aes.unFixedKey1,keys->aes.ncchKeyX1,ncchSig);
+
+	return 0;
 }
 
 int SetTIK_RsaKey(keys_struct *keys, u8 *PrivateExp, u8 *PublicMod)

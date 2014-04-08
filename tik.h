@@ -1,5 +1,4 @@
-#ifndef _TIK_H_
-#define _TIK_H_
+#pragma once
 
 static const unsigned char default_contentIndex[0x30] =
 {
@@ -63,8 +62,6 @@ typedef struct
 	u8 limits[0x40];
 	u8 contentIndex[0xAC];
 } tik_hdr;
-
-#endif
 
 // Prototypes
 int BuildTicket(cia_settings *ciaset);

@@ -1,39 +1,50 @@
 #include "lib.h"
 #include "ncch.h"
 #include "romfs.h"
+#include "romfs_binary.h"
+#include "romfs_import.h"
 
 // RomFs Build Functions
-
-int ImportRomFsBinaryFromFile(ncch_settings *ncchset);
-
-int BuildRomFs(ncch_settings *ncchset)
+int SetupRomFs(ncch_settings *ncchset, romfs_buildctx *ctx)
 {
-	int result = 0;
+	ctx->output = NULL;
+	ctx->romfsSize = 0;
 
 	// If Not Using RomFS Return
-	if(!ncchset->options.UseRomFS) return result;
+	if(!ncchset->options.UseRomFS)
+		return 0;
 
-	if(ncchset->componentFilePtrs.romfs){ // The user has specified a pre-built RomFs Binary
-		result = ImportRomFsBinaryFromFile(ncchset);
-		return result;
-	}
+	int result = 0;
+
+	if(ncchset->componentFilePtrs.romfs)// The user has specified a pre-built RomFs Binary
+		result = PrepareImportRomFsBinaryFromFile(ncchset,ctx);
 	
-	// Need to implement RomFs generation
+	else // Otherwise build ROMFS
+		result = PrepareBuildRomFsBinary(ncchset,ctx);
 
 	return result;
 }
 
-int ImportRomFsBinaryFromFile(ncch_settings *ncchset)
+int BuildRomFs(romfs_buildctx *ctx)
 {
-	ncchset->sections.romFs.size = ncchset->componentFilePtrs.romfsSize;
-	ncchset->sections.romFs.buffer = malloc(ncchset->sections.romFs.size);
-	if(!ncchset->sections.romFs.buffer) {fprintf(stderr,"[ROMFS ERROR] MEM ERROR\n"); return MEM_ERROR;}
-	ReadFile_64(ncchset->sections.romFs.buffer,ncchset->sections.romFs.size,0,ncchset->componentFilePtrs.romfs);
-	if(memcmp(ncchset->sections.romFs.buffer,"IVFC",4) != 0){
-		fprintf(stderr,"[ROMFS ERROR] Invalid RomFS Binary.\n");
-		return INVALID_ROMFS_FILE;
-	}
-	return 0;
+	// If Not Using RomFS Return
+	if(!ctx->romfsSize)
+		return 0;
+
+	int result = 0;
+	
+	if(ctx->ImportRomfsBinary) // The user has specified a pre-built RomFs Binary
+		result = ImportRomFsBinaryFromFile(ctx);
+	else // Otherwise build ROMFS
+		result = BuildRomFsBinary(ctx);	
+
+	FreeRomFsCtx(ctx);
+
+	return result;
 }
 
-// RomFs Read Functions
+void FreeRomFsCtx(romfs_buildctx *ctx)
+{
+	if(ctx->romfsBinary)
+		fclose(ctx->romfsBinary);
+}

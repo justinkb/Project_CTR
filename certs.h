@@ -1,5 +1,4 @@
-#ifndef _CERTS_H_
-#define _CERTS_H_
+#pragma once
 
 typedef struct
 {
@@ -29,7 +28,6 @@ typedef struct
 	u8 Padding[0x3C];
 } ecc_pubk_struct;
 
-#endif
 // Cert Sizes
 u32 GetCertSize(u8 *cert);
 void GetCertSigSectionSizes(u32 *SigSize, u32 *SigPadding, u8 *cert);

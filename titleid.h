@@ -1,5 +1,4 @@
-#ifndef _TITLEID_H_
-#define _TITLEID_H_
+#pragma once
 
 typedef enum
 {
@@ -83,8 +82,6 @@ typedef enum
 												| PROGRAM_ID_CATEGORY_FLAG_NOT_REQUIRE_RIGHT_FOR_MOUNT ),
 
 } ProgramIdCategory;
-
-#endif
 
 u64 ConvertTwlIdToCtrId(u64 pgid);
 

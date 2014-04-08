@@ -1,5 +1,4 @@
-#ifndef _YAML_H_
-#define _YAML_H_
+#pragma once
 
 typedef enum
 {
@@ -26,8 +25,6 @@ typedef struct
 	u32 Level;
 	
 } ctr_yaml_context;
-
-#endif
 
 // Public Prototypes
 int GetYamlSettings(user_settings *set);

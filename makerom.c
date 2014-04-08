@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
 			}
 			fclose(fp);
 			u64 size = GetFileSize_u64(usrset->common.workingFilePath);
-			usrset->common.workingFile.size = align_value(size,0x10);
+			usrset->common.workingFile.size = align(size,0x10);
 			usrset->common.workingFile.buffer = malloc(usrset->common.workingFile.size);
 			fp = fopen(usrset->common.workingFilePath,"rb");
 			ReadFile_64(usrset->common.workingFile.buffer,size,0,fp);

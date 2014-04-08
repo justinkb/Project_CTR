@@ -3,21 +3,21 @@
 #include "exefs.h"
 
 // Private Prototypes
-u32 PredictExeFS_Size(ExeFs_BuildContext *ctx);
-int GenerateExeFS_Header(ExeFs_BuildContext *ctx, u8 *outbuff);
-void InitialiseExeFSContext(ExeFs_BuildContext *ctx);
-void FreeExeFSContext(ExeFs_BuildContext *ctx);
-int ImportDatatoExeFS(ExeFs_BuildContext *ctx, u8 *outbuff);
-int ImportToExeFSContext(ExeFs_BuildContext *ctx, char *lable, u8 *buffer, u32 size);
+u32 PredictExeFS_Size(exefs_buildctx *ctx);
+int GenerateExeFS_Header(exefs_buildctx *ctx, u8 *outbuff);
+void InitialiseExeFSContext(exefs_buildctx *ctx);
+void FreeExeFSContext(exefs_buildctx *ctx);
+int ImportDatatoExeFS(exefs_buildctx *ctx, u8 *outbuff);
+int ImportToExeFSContext(exefs_buildctx *ctx, char *name, u8 *buffer, u32 size);
 
 // ExeFs Build Functions
 int BuildExeFs(ncch_settings *ncchset)
 {
 	/* Intialising ExeFs Build Context */
-	ExeFs_BuildContext *ctx = malloc(sizeof(ExeFs_BuildContext));
+	exefs_buildctx *ctx = malloc(sizeof(exefs_buildctx));
 	if(!ctx) {fprintf(stderr,"[EXEFS ERROR] MEM ERROR\n"); return MEM_ERROR;}
 	InitialiseExeFSContext(ctx);
-	ctx->media_unit = ncchset->options.mediaSize;
+	ctx->mediaUnit = ncchset->options.mediaSize;
 
 	/* Importing ExeFs */
 	if(ncchset->exefsSections.code.size) 
@@ -47,98 +47,98 @@ int BuildExeFs(ncch_settings *ncchset)
 	return 0;
 }
 
-u32 PredictExeFS_Size(ExeFs_BuildContext *ctx)
+u32 PredictExeFS_Size(exefs_buildctx *ctx)
 {
 	u32 exefs_size = 0x200; // Size of header
-	for(int i = 0; i < ctx->section_count; i++){
-		exefs_size += align_value(ctx->section_size[i],ctx->media_unit);
+	for(int i = 0; i < ctx->fileCount; i++){
+		exefs_size += align(ctx->fileSize[i],ctx->mediaUnit);
 	}
-	//exefs_size = align_value(ctx->exefs_size,ctx->media_unit);
+	//exefs_size = align(ctx->exefs_size,ctx->mediaUnit);
 	return exefs_size;
 }
 
-int GenerateExeFS_Header(ExeFs_BuildContext *ctx, u8 *outbuff)
+int GenerateExeFS_Header(exefs_buildctx *ctx, u8 *outbuff)
 {
-	for(int i = 0; i < ctx->section_count; i++){
+	for(int i = 0; i < ctx->fileCount; i++){
 		if(i == 0)
-			ctx->section_offset[i] = 0;
+			ctx->fileOffset[i] = 0;
 		else
-			ctx->section_offset[i] = align_value((ctx->section_offset[i-1]+ctx->section_size[i-1]),ctx->media_unit);
+			ctx->fileOffset[i] = align((ctx->fileOffset[i-1]+ctx->fileSize[i-1]),ctx->mediaUnit);
 		
-		memcpy(ctx->file_header[i].name,ctx->lable[i],8);
-		u32_to_u8(ctx->file_header[i].offset,ctx->section_offset[i],LE);
-		u32_to_u8(ctx->file_header[i].size,ctx->section_size[i],LE);
-		ctr_sha(ctx->section[i],ctx->section_size[i],ctx->file_hashes[9-i],CTR_SHA_256);
+		memcpy(ctx->fileHdr[i].name,ctx->fileName[i],8);
+		u32_to_u8(ctx->fileHdr[i].offset,ctx->fileOffset[i],LE);
+		u32_to_u8(ctx->fileHdr[i].size,ctx->fileSize[i],LE);
+		ctr_sha(ctx->file[i],ctx->fileSize[i],ctx->fileHashes[9-i],CTR_SHA_256);
 	}
-	memcpy(outbuff,ctx->file_header,sizeof(ExeFs_FileHeader)*10);
-	memcpy(outbuff+0xc0,ctx->file_hashes,0x20*10);
+	memcpy(outbuff,ctx->fileHdr,sizeof(exefs_filehdr)*10);
+	memcpy(outbuff+0xc0,ctx->fileHashes,0x20*10);
 	return 0;
 }
 
-void InitialiseExeFSContext(ExeFs_BuildContext *ctx)
+void InitialiseExeFSContext(exefs_buildctx *ctx)
 {
-	memset(ctx,0,sizeof(ExeFs_BuildContext));
+	memset(ctx,0,sizeof(exefs_buildctx));
 }
 
-void FreeExeFSContext(ExeFs_BuildContext *ctx)
+void FreeExeFSContext(exefs_buildctx *ctx)
 {
 	/*
 	if(ctx->outbuff != NULL)
 		free(ctx->outbuff);
 	for(int i = 0; i < 10; i++){
-		if(ctx->section[i] != NULL)
-			free(ctx->section[i]);
+		if(ctx->file[i] != NULL)
+			free(ctx->file[i]);
 	}
 	*/
-	memset(ctx,0,sizeof(ExeFs_BuildContext));
+	memset(ctx,0,sizeof(exefs_buildctx));
 	free(ctx);
 }
 
-int ImportDatatoExeFS(ExeFs_BuildContext *ctx, u8 *outbuff)
+int ImportDatatoExeFS(exefs_buildctx *ctx, u8 *outbuff)
 {
-	for(int i = 0; i < ctx->section_count; i++){
-		memcpy(outbuff+ctx->section_offset[i]+0x200,ctx->section[i],ctx->section_size[i]);
+	for(int i = 0; i < ctx->fileCount; i++){
+		memcpy(outbuff+ctx->fileOffset[i]+0x200,ctx->file[i],ctx->fileSize[i]);
 	}
 	return 0;
 }
 
-int ImportToExeFSContext(ExeFs_BuildContext *ctx, char *lable, u8 *buffer, u32 size)
+int ImportToExeFSContext(exefs_buildctx *ctx, char *name, u8 *buffer, u32 size)
 {
-	if(ctx == NULL || lable == NULL || buffer == NULL){
+	if(ctx == NULL || name == NULL || buffer == NULL){
 		printf("[!] PTR ERROR\n");
 		return PTR_ERROR;
 	}
-	if(ctx->section_count >= 10){
+	if(ctx->fileCount >= MAX_EXEFS_SECTIONS){
 		printf("[!] Maximum ExeFS Capacity Reached\n");
 		return EXEFS_MAX_REACHED;
 	}
-	if(strlen(lable) > 8){
-		printf("[!] ExeFS Section Name: '%s' is too large\n",lable);
+	if(strlen(name) > 8){
+		printf("[!] ExeFS File Name: '%s' is too large\n",name);
 		return EXEFS_SECTION_NAME_ERROR;
 	}	
 	
-	ctx->section_count++;
-	ctx->section[ctx->section_count - 1] = buffer;
-	ctx->section_size[ctx->section_count - 1] = size;
-	strcpy(ctx->lable[ctx->section_count - 1],lable);
+	ctx->fileCount++;
+	ctx->file[ctx->fileCount - 1] = buffer;
+	ctx->fileSize[ctx->fileCount - 1] = size;
+	strcpy(ctx->fileName[ctx->fileCount - 1],name);
 	return 0;
 }
 
 // ExeFs Read Functions
 bool DoesExeFsSectionExist(char *section, u8 *ExeFs)
 {
-	ExeFs_Header *hdr = (ExeFs_Header*) ExeFs;
+	exefs_hdr *hdr = (exefs_hdr*) ExeFs;
 	for(int i = 0; i < MAX_EXEFS_SECTIONS; i++){
-		if(strncmp(hdr->SectionHdr[i].name,section,8) == 0) return true;
+		if(strncmp(hdr->fileHdr[i].name,section,8) == 0) return true;
 	}
 	return false;
 }
 u8* GetExeFsSection(char *section, u8 *ExeFs)
 {
-	ExeFs_Header *hdr = (ExeFs_Header*) ExeFs;
+	exefs_hdr *hdr = (exefs_hdr*) ExeFs;
 	for(int i = 0; i < MAX_EXEFS_SECTIONS; i++){
-		if(strncmp(hdr->SectionHdr[i].name,section,8) == 0){ 
-			u32 offset = u8_to_u32(hdr->SectionHdr[i].offset,LE) + sizeof(ExeFs_Header);
+		if(strncmp(hdr->fileHdr[i].name,section,8) == 0){ 
+			u32 offset = u8_to_u32(hdr->fileHdr[i].offset,LE) + sizeof(exefs_hdr);
 			return (u8*)(ExeFs+offset);
 		}
 	}
@@ -147,10 +147,10 @@ u8* GetExeFsSection(char *section, u8 *ExeFs)
 
 u8* GetExeFsSectionHash(char *section, u8 *ExeFs)
 {
-	ExeFs_Header *hdr = (ExeFs_Header*) ExeFs;
+	exefs_hdr *hdr = (exefs_hdr*) ExeFs;
 	for(int i = 0; i < MAX_EXEFS_SECTIONS; i++){
-		if(strncmp(hdr->SectionHdr[i].name,section,8) == 0){ 
-			return (u8*)(hdr->SectionHashes[MAX_EXEFS_SECTIONS-1-i]);
+		if(strncmp(hdr->fileHdr[i].name,section,8) == 0){ 
+			return (u8*)(hdr->fileHashes[MAX_EXEFS_SECTIONS-1-i]);
 		}
 	}
 	return NULL;
@@ -158,10 +158,10 @@ u8* GetExeFsSectionHash(char *section, u8 *ExeFs)
 
 u32 GetExeFsSectionSize(char *section, u8 *ExeFs)
 {
-	ExeFs_Header *hdr = (ExeFs_Header*) ExeFs;
+	exefs_hdr *hdr = (exefs_hdr*) ExeFs;
 	for(int i = 0; i < MAX_EXEFS_SECTIONS; i++){
-		if(strncmp(hdr->SectionHdr[i].name,section,8) == 0){ 
-			return u8_to_u32(hdr->SectionHdr[i].size,LE);
+		if(strncmp(hdr->fileHdr[i].name,section,8) == 0){ 
+			return u8_to_u32(hdr->fileHdr[i].size,LE);
 		}
 	}
 	return 0;
@@ -169,10 +169,10 @@ u32 GetExeFsSectionSize(char *section, u8 *ExeFs)
 
 u32 GetExeFsSectionOffset(char *section, u8 *ExeFs)
 {
-	ExeFs_Header *hdr = (ExeFs_Header*) ExeFs;
+	exefs_hdr *hdr = (exefs_hdr*) ExeFs;
 	for(int i = 0; i < MAX_EXEFS_SECTIONS; i++){
-		if(strncmp(hdr->SectionHdr[i].name,section,8) == 0){ 
-			return u8_to_u32(hdr->SectionHdr[i].offset,LE) + sizeof(ExeFs_Header);
+		if(strncmp(hdr->fileHdr[i].name,section,8) == 0){ 
+			return u8_to_u32(hdr->fileHdr[i].offset,LE) + sizeof(exefs_hdr);
 		}
 	}
 	return 0;

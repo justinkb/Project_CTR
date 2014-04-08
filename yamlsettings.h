@@ -1,3 +1,4 @@
+#pragma once
 
 int MergeSpecData(rsf_settings *out, rsf_settings *desc, rsf_settings *rsf);
 void EvaluateRSF(rsf_settings *rsf, ctr_yaml_context *ctx);

@@ -3,7 +3,7 @@
 #include "tmd.h"
 
 // Private Prototypes
-int SetupTMDBuffer(COMPONENT_STRUCT *tik);
+int SetupTMDBuffer(buffer_struct *tik);
 int SetupTMDHeader(tmd_hdr *hdr, tmd_content_info_record *info_record, cia_settings *ciaset);
 int SignTMDHeader(tmd_hdr *hdr, tmd_signature *sig, keys_struct *keys);
 int SetupTMDInfoRecord(tmd_content_info_record *info_record, u8 *content_record, u16 ContentCount);
@@ -17,6 +17,7 @@ u32 PredictTMDSize(u16 ContentCount)
 int BuildTMD(cia_settings *ciaset)
 {
 	int result = 0;
+	ciaset->ciaSections.tmd.size = PredictTMDSize(ciaset->content.contentCount);
 	result = SetupTMDBuffer(&ciaset->ciaSections.tmd);
 	if(result) return result;
 
@@ -35,8 +36,9 @@ int BuildTMD(cia_settings *ciaset)
 	return 0;
 }
 
-int SetupTMDBuffer(COMPONENT_STRUCT *tmd)
+int SetupTMDBuffer(buffer_struct *tmd)
 {
+	// Predict TMD Size
 	tmd->buffer = malloc(tmd->size); // tmd->size is already set before
 	if(!tmd->buffer) { fprintf(stderr,"[ERROR] MEM ERROR\n"); return MEM_ERROR; }
 	memset(tmd->buffer,0,tmd->size);
