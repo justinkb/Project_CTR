@@ -18,9 +18,9 @@ const int RSF_DESC_DATA_LEN = 684;
 int accessdesc_SignWithKey(exheader_settings *exhdrset, ncch_settings *ncchset);
 int accessdesc_GetSignFromRsf(exheader_settings *exhdrset, ncch_settings *ncchset);
 int accessdesc_GetSignFromPreset(exheader_settings *exhdrset, ncch_settings *ncchset);
-void accessdesc_GetPresetData(u8 **AccessDescData, u8 **DepList, ncch_settings *ncchset);
+void accessdesc_GetPresetData(u8 **desc, u8 **accessDesc, u8 **depList, ncch_settings *ncchset);
 #ifndef PUBLIC_BUILD
-void accessdesc_GetPresetSigData(u8 **AccessDescSig, u8 **CXI_Pubk, u8 **CXI_Privk, ncch_settings *ncchset);
+void accessdesc_GetPresetSigData(u8 **accessDescSig, u8 **cxiPubk, u8 **cxiPvtk, ncch_settings *ncchset);
 #endif
 
 bool IsValidB64Char(char chr);
@@ -55,6 +55,7 @@ int accessdesc_SignWithKey(exheader_settings *exhdrset, ncch_settings *ncchset)
 	u8 AffinityMask = (*flag>>2)&0x3;
 	u8 IdealProcessor = 1<<((*flag>>0)&0x3);
 	*flag = (u8)(SystemMode << 4 | AffinityMask << 2 | IdealProcessor);
+	exhdrset->exHdr->accessDescriptor.arm11SystemLocalCapabilities.priority /= 2;
 	
 	memcpy(&exhdrset->exHdr->accessDescriptor.arm11KernelCapabilities,&exhdrset->exHdr->arm11KernelCapabilities,sizeof(exhdr_ARM11KernelCapabilities));
 	memcpy(&exhdrset->exHdr->accessDescriptor.arm9AccessControlInfo,&exhdrset->exHdr->arm9AccessControlInfo,sizeof(exhdr_ARM9AccessControlInfo));
@@ -141,39 +142,40 @@ finish:
 
 int accessdesc_GetSignFromPreset(exheader_settings *exhdrset, ncch_settings *ncchset)
 {
-	u8 *AccessDescData = NULL;
-	u8 *DepList = NULL;
+	u8 *desc = NULL;
+	u8 *accessDesc = NULL;
+	u8 *depList = NULL;
 
-	u8 *AccessDescSig = NULL;
-	u8 *CXI_Pubk = NULL;
-	u8 *CXI_Privk = NULL;
+	u8 *accessDescSig = NULL;
+	u8 *cxiPubk = NULL;
+	u8 *cxiPvtk = NULL;
 
-	accessdesc_GetPresetData(&AccessDescData,&DepList,ncchset);
+	accessdesc_GetPresetData(&desc,&accessDesc,&depList,ncchset);
 #ifndef PUBLIC_BUILD
-	accessdesc_GetPresetSigData(&AccessDescSig,&CXI_Pubk,&CXI_Privk,ncchset);
+	accessdesc_GetPresetSigData(&accessDescSig,&cxiPubk,&cxiPvtk,ncchset);
 #endif
 
 	// Error Checking
-	if(!AccessDescData || !DepList){
+	if(!accessDesc || !depList){
 		fprintf(stderr,"[EXHEADER ERROR] AccessDesc preset is unavailable, please configure RSF file\n");
 		return CANNOT_SIGN_ACCESSDESC;
 	}
 
-	if((!CXI_Pubk || !CXI_Privk || !AccessDescSig) && ncchset->keys->rsa.requiresPresignedDesc){
+	if((!cxiPubk || !cxiPvtk || !accessDescSig) && ncchset->keys->rsa.requiresPresignedDesc){
 		fprintf(stderr,"[EXHEADER ERROR] This AccessDesc preset needs to be signed, the current keyset is incapable of doing so. Please configure RSF file with the appropriate signature data.\n");
 		return CANNOT_SIGN_ACCESSDESC;
 	}
 	
 	// Setting data in Exheader
 	// Dependency List
-	memcpy(exhdrset->exHdr->dependencyList,DepList,0x180);
+	memcpy(exhdrset->exHdr->dependencyList,depList,0x180);
 
 	// ARM11 Local Capabilities
-	exhdr_ARM11SystemLocalCapabilities *arm11local = (exhdr_ARM11SystemLocalCapabilities*)(AccessDescData);
+	exhdr_ARM11SystemLocalCapabilities *arm11local = (exhdr_ARM11SystemLocalCapabilities*)(accessDesc);
 	// Backing Up Non Preset Details
 	u8 ProgramID[8];
-	memcpy(ProgramID,exhdrset->exHdr->arm11SystemLocalCapabilities.programId,8);
 	exhdr_StorageInfo StorageInfoBackup;
+	memcpy(ProgramID,exhdrset->exHdr->arm11SystemLocalCapabilities.programId,8);
 	memcpy(&StorageInfoBackup,&exhdrset->exHdr->arm11SystemLocalCapabilities.storageInfo,sizeof(exhdr_StorageInfo));
 	
 	// Setting Preset Data
@@ -189,14 +191,14 @@ int accessdesc_GetSignFromPreset(exheader_settings *exhdrset, ncch_settings *ncc
 	u8 AffinityMask = (*flag>>2)&0x3;
 	u8 IdealProcessor = ((*flag>>0)&0x3)>>1;
 	*flag = (u8)(SystemMode << 4 | AffinityMask << 2 | IdealProcessor);
-	exhdrset->exHdr->arm11SystemLocalCapabilities.priority = 0x30;
+	exhdrset->exHdr->arm11SystemLocalCapabilities.priority *= 2;
 
 	// ARM11 Kernel Capabilities
-	exhdr_ARM11KernelCapabilities *arm11kernel = (exhdr_ARM11KernelCapabilities*)(AccessDescData+sizeof(exhdr_ARM11SystemLocalCapabilities));
+	exhdr_ARM11KernelCapabilities *arm11kernel = (exhdr_ARM11KernelCapabilities*)(accessDesc+sizeof(exhdr_ARM11SystemLocalCapabilities));
 	memcpy(&exhdrset->exHdr->arm11KernelCapabilities,arm11kernel,(sizeof(exhdr_ARM11KernelCapabilities)));
 
 	// ARM9 Access Control
-	exhdr_ARM9AccessControlInfo *arm9 = (exhdr_ARM9AccessControlInfo*)(AccessDescData+sizeof(exhdr_ARM11SystemLocalCapabilities)+sizeof(exhdr_ARM11KernelCapabilities));
+	exhdr_ARM9AccessControlInfo *arm9 = (exhdr_ARM9AccessControlInfo*)(accessDesc+sizeof(exhdr_ARM11SystemLocalCapabilities)+sizeof(exhdr_ARM11KernelCapabilities));
 	memcpy(&exhdrset->exHdr->arm9AccessControlInfo,arm9,(sizeof(exhdr_ARM9AccessControlInfo)));
 
 	// Setting AccessDesc Area
@@ -205,35 +207,48 @@ int accessdesc_GetSignFromPreset(exheader_settings *exhdrset, ncch_settings *ncc
 		return accessdesc_SignWithKey(exhdrset,ncchset);
 
 	// Otherwise set static data & ncch hdr sig info
-	memcpy(exhdrset->keys->rsa.cxiHdrPub,CXI_Pubk,0x100);
-	memcpy(exhdrset->keys->rsa.cxiHdrPvt,CXI_Privk,0x100);
-	memcpy(&exhdrset->exHdr->accessDescriptor.signature,AccessDescSig,0x100);
-	memcpy(&exhdrset->exHdr->accessDescriptor.ncchRsaPubKey,CXI_Pubk,0x100);
-	memcpy(&exhdrset->exHdr->accessDescriptor.arm11SystemLocalCapabilities,AccessDescData,0x200);
+	memcpy(exhdrset->keys->rsa.cxiHdrPub,cxiPubk,0x100);
+	memcpy(exhdrset->keys->rsa.cxiHdrPvt,cxiPvtk,0x100);
+	memcpy(&exhdrset->exHdr->accessDescriptor.signature,accessDescSig,0x100);
+	memcpy(&exhdrset->exHdr->accessDescriptor.ncchRsaPubKey,cxiPubk,0x100);
+	memcpy(&exhdrset->exHdr->accessDescriptor.arm11SystemLocalCapabilities,accessDesc,0x200);
 
 	return 0;
 }
 
-void accessdesc_GetPresetData(u8 **AccessDescData, u8 **DepList, ncch_settings *ncchset)
+void accessdesc_GetPresetData(u8 **desc, u8 **accessDesc, u8 **depList, ncch_settings *ncchset)
 {
 	if(ncchset->keys->accessDescSign.presetType == app){
 		switch(ncchset->keys->accessDescSign.targetFirmware){
 			case 1:
-				*AccessDescData = (u8*)app_1_acex_data;
-				*DepList = (u8*)sdk1_dep_list;
+				*desc = (u8*)app_1_desc_data;
+				*accessDesc = (u8*)app_1_acex_data;
+				*depList = (u8*)sdk1_dep_list;
 				break;
 			case 2:
-				*AccessDescData = (u8*)app_2_acex_data;
-				*DepList = (u8*)sdk2_dep_list;
+				*desc = (u8*)app_2_desc_data;
+				*accessDesc = (u8*)app_2_acex_data;
+				*depList = (u8*)sdk2_dep_list;
+				break;
+			case 3:
+				*desc = (u8*)app_3_desc_data;
+				*accessDesc = (u8*)app_3_acex_data;
+				*depList = (u8*)sdk3_dep_list;
 				break;
 			case 4:
+				*desc = (u8*)app_4_desc_data;
+				*accessDesc = (u8*)app_4_acex_data;
+				*depList = (u8*)sdk4_dep_list;
+				break;
 			case 5:
-				*AccessDescData = (u8*)app_4_acex_data;
-				*DepList = (u8*)sdk4_dep_list;
+				*desc = (u8*)app_5_desc_data;
+				*accessDesc = (u8*)app_5_acex_data;
+				*depList = (u8*)sdk5_dep_list;
 				break;
 			case 7:
-				*AccessDescData = (u8*)app_7_acex_data;
-				*DepList = (u8*)sdk7_dep_list;
+				*desc = (u8*)app_7_desc_data;
+				*accessDesc = (u8*)app_7_acex_data;
+				*depList = (u8*)sdk7_dep_list;
 				break;
 			
 		}
@@ -241,77 +256,117 @@ void accessdesc_GetPresetData(u8 **AccessDescData, u8 **DepList, ncch_settings *
 	else if(ncchset->keys->accessDescSign.presetType == ec_app){
 		switch(ncchset->keys->accessDescSign.targetFirmware){
 			case 4:
+				*desc = (u8*)ecapp_4_desc_data;
+				*accessDesc = (u8*)ecapp_4_acex_data;
+				*depList = (u8*)sdk4_dep_list;
+				break;
 			case 5:
-				*AccessDescData = (u8*)ecapp_4_acex_data;
-				*DepList = (u8*)sdk4_dep_list;
+				*desc = (u8*)ecapp_5_desc_data;
+				*accessDesc = (u8*)ecapp_5_acex_data;
+				*depList = (u8*)sdk5_dep_list;
 				break;
 		}
 	}
 	else if(ncchset->keys->accessDescSign.presetType == dlp){
 		switch(ncchset->keys->accessDescSign.targetFirmware){
 			case 1:
-				*AccessDescData = (u8*)dlp_1_acex_data;
-				*DepList = (u8*)sdk1_dep_list;
+				*desc = (u8*)dlp_1_desc_data;
+				*accessDesc = (u8*)dlp_1_acex_data;
+				*depList = (u8*)sdk1_dep_list;
 				break;
 			case 2:
-				*AccessDescData = (u8*)dlp_2_acex_data;
-				*DepList = (u8*)sdk2_dep_list;
+				*desc = (u8*)dlp_2_desc_data;
+				*accessDesc = (u8*)dlp_2_acex_data;
+				*depList = (u8*)sdk2_dep_list;
 				break;
 			case 4:
-			case 5:
-				*AccessDescData = (u8*)dlp_4_acex_data;
-				*DepList = (u8*)sdk4_dep_list;
+				*desc = (u8*)dlp_4_desc_data;
+				*accessDesc = (u8*)dlp_4_acex_data;
+				*depList = (u8*)sdk4_dep_list;
 				break;
 		}
 	}
 	else if(ncchset->keys->accessDescSign.presetType == demo){
 		switch(ncchset->keys->accessDescSign.targetFirmware){
+			case 2:
+				*desc = (u8*)demo_2_desc_data;
+				*accessDesc = (u8*)demo_2_acex_data;
+				*depList = (u8*)sdk2_dep_list;
+				break;
 			case 4:
-			case 5:
-				*AccessDescData = (u8*)demo_4_acex_data;
-				*DepList = (u8*)sdk4_dep_list;
+				*desc = (u8*)demo_4_desc_data;
+				*accessDesc = (u8*)demo_4_acex_data;
+				*depList = (u8*)sdk4_dep_list;
 				break;
 		}
 	}
 }
 
 #ifndef PUBLIC_BUILD
-void accessdesc_GetPresetSigData(u8 **AccessDescSig, u8 **CXI_Pubk, u8 **CXI_Privk, ncch_settings *ncchset)
+void accessdesc_GetPresetSigData(u8 **accessDescSig, u8 **cxiPubk, u8 **cxiPvtk, ncch_settings *ncchset)
 {
 	if(ncchset->keys->accessDescSign.presetType == app){
 		switch(ncchset->keys->accessDescSign.targetFirmware){
 			case 1:
 				if(ncchset->keys->keyset == pki_DEVELOPMENT){
-					*AccessDescSig = (u8*)app_1_dev_acexsig;
-					*CXI_Pubk = (u8*)app_1_dev_hdrpub;
-					*CXI_Privk = (u8*)app_1_dev_hdrpvt;
+					*accessDescSig = (u8*)app_1_dev_acexsig;
+					*cxiPubk = (u8*)app_1_dev_hdrpub;
+					*cxiPvtk = (u8*)app_1_dev_hdrpvt;
 				}
 				break;
 			case 2:
 				if(ncchset->keys->keyset == pki_DEVELOPMENT){
-					*AccessDescSig = (u8*)app_2_dev_acexsig;
-					*CXI_Pubk = (u8*)app_2_dev_hdrpub;
-					*CXI_Privk = (u8*)app_2_dev_hdrpvt;
+					*accessDescSig = (u8*)app_2_dev_acexsig;
+					*cxiPubk = (u8*)app_2_dev_hdrpub;
+					*cxiPvtk = (u8*)app_2_dev_hdrpvt;
+				}
+				if(ncchset->keys->keyset == pki_PRODUCTION){
+					*accessDescSig = (u8*)app_2_prod_acexsig;
+					*cxiPubk = (u8*)app_2_prod_hdrpub;
+					*cxiPvtk = NULL;
+				}
+				break;
+			case 3:
+				if(ncchset->keys->keyset == pki_DEVELOPMENT){
+					*accessDescSig = (u8*)app_3_dev_acexsig;
+					*cxiPubk = (u8*)app_3_dev_hdrpub;
+					*cxiPvtk = NULL;
+				}
+				else if(ncchset->keys->keyset == pki_PRODUCTION){
+					*accessDescSig = (u8*)app_3_prod_acexsig;
+					*cxiPubk = (u8*)app_3_prod_hdrpub;
+					*cxiPvtk = NULL;
 				}
 				break;
 			case 4:
-			case 5:
 				if(ncchset->keys->keyset == pki_DEVELOPMENT){
-					*AccessDescSig = (u8*)app_4_dev_acexsig;
-					*CXI_Pubk = (u8*)app_4_dev_hdrpub;
-					*CXI_Privk = (u8*)app_4_dev_hdrpvt;
+					*accessDescSig = (u8*)app_4_dev_acexsig;
+					*cxiPubk = (u8*)app_4_dev_hdrpub;
+					*cxiPvtk = (u8*)app_4_dev_hdrpvt;
 				}
 				else if(ncchset->keys->keyset == pki_PRODUCTION){
-					*AccessDescSig = (u8*)app_4_prod_acexsig;
-					*CXI_Pubk = (u8*)app_4_prod_hdrpub;
-					*CXI_Privk = NULL;
+					*accessDescSig = (u8*)app_4_prod_acexsig;
+					*cxiPubk = (u8*)app_4_prod_hdrpub;
+					*cxiPvtk = NULL;
+				}
+				break;
+			case 5:
+				if(ncchset->keys->keyset == pki_DEVELOPMENT){
+					*accessDescSig = (u8*)app_5_dev_acexsig;
+					*cxiPubk = (u8*)app_5_dev_hdrpub;
+					*cxiPvtk = NULL;
+				}
+				else if(ncchset->keys->keyset == pki_PRODUCTION){
+					*accessDescSig = (u8*)app_5_prod_acexsig;
+					*cxiPubk = (u8*)app_5_prod_hdrpub;
+					*cxiPvtk = NULL;
 				}
 				break;
 			case 7:
 				if(ncchset->keys->keyset == pki_PRODUCTION){
-					*AccessDescSig = (u8*)app_7_prod_acexsig;
-					*CXI_Pubk = (u8*)app_7_prod_hdrpub;
-					*CXI_Privk = NULL;
+					*accessDescSig = (u8*)app_7_prod_acexsig;
+					*cxiPubk = (u8*)app_7_prod_hdrpub;
+					*cxiPvtk = NULL;
 				}
 				break;
 			
@@ -320,11 +375,17 @@ void accessdesc_GetPresetSigData(u8 **AccessDescSig, u8 **CXI_Pubk, u8 **CXI_Pri
 	else if(ncchset->keys->accessDescSign.presetType == ec_app){
 		switch(ncchset->keys->accessDescSign.targetFirmware){
 			case 4:
+				if(ncchset->keys->keyset == pki_PRODUCTION){
+					*accessDescSig = (u8*)ecapp_4_prod_acexsig;
+					*cxiPubk = (u8*)ecapp_4_prod_hdrpub;
+					*cxiPvtk = NULL;
+				}
+				break;
 			case 5:
 				if(ncchset->keys->keyset == pki_PRODUCTION){
-					*AccessDescSig = (u8*)ecapp_4_prod_acexsig;
-					*CXI_Pubk = (u8*)ecapp_4_prod_hdrpub;
-					*CXI_Privk = NULL;
+					*accessDescSig = (u8*)ecapp_5_prod_acexsig;
+					*cxiPubk = (u8*)ecapp_5_prod_hdrpub;
+					*cxiPvtk = NULL;
 				}
 				break;
 		}
@@ -333,36 +394,41 @@ void accessdesc_GetPresetSigData(u8 **AccessDescSig, u8 **CXI_Pubk, u8 **CXI_Pri
 		switch(ncchset->keys->accessDescSign.targetFirmware){
 			case 1:
 				if(ncchset->keys->keyset == pki_DEVELOPMENT){
-					*AccessDescSig = (u8*)dlp_1_dev_acexsig;
-					*CXI_Pubk = (u8*)dlp_1_dev_hdrpub;
-					*CXI_Privk = (u8*)dlp_1_dev_hdrpvt;
+					*accessDescSig = (u8*)dlp_1_dev_acexsig;
+					*cxiPubk = (u8*)dlp_1_dev_hdrpub;
+					*cxiPvtk = (u8*)dlp_1_dev_hdrpvt;
 				}
 				break;
 			case 2:
 				if(ncchset->keys->keyset == pki_DEVELOPMENT){
-					*AccessDescSig = (u8*)dlp_2_dev_acexsig;
-					*CXI_Pubk = (u8*)dlp_2_dev_hdrpub;
-					*CXI_Privk = (u8*)dlp_2_dev_hdrpvt;
+					*accessDescSig = (u8*)dlp_2_dev_acexsig;
+					*cxiPubk = (u8*)dlp_2_dev_hdrpub;
+					*cxiPvtk = (u8*)dlp_2_dev_hdrpvt;
 				}
 				break;
 			case 4:
-			case 5:
 				if(ncchset->keys->keyset == pki_DEVELOPMENT){
-					*AccessDescSig = (u8*)dlp_4_dev_acexsig;
-					*CXI_Pubk = (u8*)dlp_4_dev_hdrpub;
-					*CXI_Privk = (u8*)dlp_4_dev_hdrpvt;
+					*accessDescSig = (u8*)dlp_4_dev_acexsig;
+					*cxiPubk = (u8*)dlp_4_dev_hdrpub;
+					*cxiPvtk = (u8*)dlp_4_dev_hdrpvt;
 				}
 				break;
 		}
 	}
 	else if(ncchset->keys->accessDescSign.presetType == demo){
 		switch(ncchset->keys->accessDescSign.targetFirmware){
-			case 4:
-			case 5:
+			case 2:
 				if(ncchset->keys->keyset == pki_DEVELOPMENT){
-					*AccessDescSig = (u8*)demo_4_dev_acexsig;
-					*CXI_Pubk = (u8*)demo_4_dev_hdrpub;
-					*CXI_Privk = (u8*)demo_4_dev_hdrpvt;
+					*accessDescSig = (u8*)demo_2_dev_acexsig;
+					*cxiPubk = (u8*)demo_2_dev_hdrpub;
+					*cxiPvtk = NULL;
+				}
+ 				break;
+			case 4:
+				if(ncchset->keys->keyset == pki_DEVELOPMENT){
+					*accessDescSig = (u8*)demo_4_dev_acexsig;
+					*cxiPubk = (u8*)demo_4_dev_hdrpub;
+					*cxiPvtk = (u8*)demo_4_dev_hdrpvt;
 				}
  				break;
 		}

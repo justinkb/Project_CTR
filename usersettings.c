@@ -347,50 +347,33 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		set->cci.useSDKStockData = true;
 		return 1;
 	}
-#endif
-	// 
-	else if(strcmp(argv[i],"-6xcrypto") == 0){
+	else if(strcmp(argv[i],"-nomodtid") == 0){
 		if(HasParam){
-			PrintNoNeedParam("-6xcrypto");
+			PrintNoNeedParam("-nomodtid");
 			return USR_BAD_ARG;
 		}
-		set->cci.use6xSavedataCrypto = true;
+		set->cci.dontModifyNcchTitleID = true;
 		return 1;
 	}
-	// Cia Options
-#ifndef PUBLIC_BUILD
-	else if(strcmp(argv[i],"-cci") == 0){
-		if(!HasParam){
-			PrintNeedsParam("-cci");
-			return USR_ARG_REQ_PARAM;
+	else if(strcmp(argv[i],"-alignwr") == 0){
+		if(HasParam){
+			PrintNoNeedParam("-alignwr");
+			return USR_BAD_ARG;
 		}
-		set->ncch.buildNcch0 = false;
-		set->common.workingFileType = infile_ncsd;
-		set->common.workingFilePath = argv[i+1];
-		set->common.outFormat = CIA;
+		set->cci.closeAlignWritableRegion = true;
+		return 1;
+	}
+	else if(strcmp(argv[i],"-genupdatenote") == 0){
+		if(!HasParam){
+			PrintNeedsParam("-genupdatenote");
+			return USR_BAD_ARG;
+		}
+		set->cci.cverCiaPath = argv[i+1];
 		return 2;
 	}
-	else if(strcmp(argv[i],"-srl") == 0){
-		if(!HasParam){
-			PrintNeedsParam("-srl");
-			return USR_ARG_REQ_PARAM;
-		}
-		set->ncch.buildNcch0 = false;
-		set->common.workingFileType = infile_srl;
-		set->common.workingFilePath = argv[i+1];
-		set->common.outFormat = CIA;
-		return 2;
 
-	}
-	else if(strcmp(argv[i],"-dlc") == 0){
-		if(HasParam){
-			PrintNoNeedParam("-dlc");
-			return USR_BAD_ARG;
-		}
-		set->cia.DlcContent = true;
-		return 1;
-	}
 #endif
+	// Cia Options
 	else if(strcmp(argv[i],"-major") == 0){
 		if(!HasParam){
 			PrintNeedsParam("-major");
@@ -471,7 +454,40 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		set->cia.encryptCia = false;
 		return 1;
 	}
-	
+#ifndef PUBLIC_BUILD
+	else if(strcmp(argv[i],"-cci") == 0){
+		if(!HasParam){
+			PrintNeedsParam("-cci");
+			return USR_ARG_REQ_PARAM;
+		}
+		set->ncch.buildNcch0 = false;
+		set->common.workingFileType = infile_ncsd;
+		set->common.workingFilePath = argv[i+1];
+		set->common.outFormat = CIA;
+		return 2;
+	}
+	else if(strcmp(argv[i],"-srl") == 0){
+		if(!HasParam){
+			PrintNeedsParam("-srl");
+			return USR_ARG_REQ_PARAM;
+		}
+		set->ncch.buildNcch0 = false;
+		set->common.workingFileType = infile_srl;
+		set->common.workingFilePath = argv[i+1];
+		set->common.outFormat = CIA;
+		return 2;
+
+	}
+	else if(strcmp(argv[i],"-dlc") == 0){
+		if(HasParam){
+			PrintNoNeedParam("-dlc");
+			return USR_BAD_ARG;
+		}
+		set->cia.DlcContent = true;
+		return 1;
+	}
+#endif
+
 	// Other Setting
 	else if(strcmp(argv[i],"-content") == 0){
 		if(!HasParam){
@@ -505,12 +521,11 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 			fprintf(stderr,"[SETTING ERROR] Content %d is already specified\n",content_index);
 			return USR_BAD_ARG;
 		}
-		set->common.contentPath[content_index] = malloc(path_len);
+		set->common.contentPath[content_index] = calloc(path_len,sizeof(char));
 		if(set->common.contentPath[content_index] == NULL){
 			fprintf(stderr,"[SETTING ERROR] Not enough memory\n");
 			return USR_MEM_ERROR;
 		}
-		memset(set->common.contentPath[content_index],0,path_len);
 		strncpy(set->common.contentPath[content_index],argv[i+1],path_len-1);	
 
 		/* Get ContentID for CIA gen */
@@ -522,7 +537,7 @@ int SetArgument(int argc, int i, char *argv[], user_settings *set)
 		/* Return Next Arg Pos*/
 		return 2;
 	}
-	
+	// RSF Value Substitution
 	else if(strncmp(argv[i],"-D",2) == 0){
 		if(HasParam){
 			PrintNoNeedParam("-DNAME=VALUE");
@@ -610,6 +625,11 @@ int CheckArgumentCombination(user_settings *set)
 	}
 	if(set->ncch.ncchType != format_not_set && !set->ncch.buildNcch0){
 		fprintf(stderr,"[SETTING ERROR] Arguments \"-content %s:0\" and \"-data\" cannot be used together\n",set->common.contentPath[0]);
+		return USR_BAD_ARG;
+	}
+
+	if(set->common.outFormat == CIA && set->cci.cverCiaPath){
+		fprintf(stderr,"[SETTING ERROR] You cannot use argument \"-genupdatenote\" when generating a CIA\n");
 		return USR_BAD_ARG;
 	}
 
@@ -853,6 +873,7 @@ void free_RsfSettings(rsf_settings *set)
 	free(set->CardInfo.CardDevice);
 	free(set->CardInfo.MediaType);
 	free(set->CardInfo.BackupWriteWaitTime);
+	free(set->CardInfo.SaveCrypto);
 
 	//CommonHeaderKey
 	free(set->CommonHeaderKey.D);
@@ -875,7 +896,7 @@ void free_UserSettings(user_settings *usr_settings)
 			free(usr_settings->common.contentPath[i]);
 		free(usr_settings->common.contentPath);
 	}
-	
+
 	// free -DNAME=VALUE
 	for(u32 i = 0; i < usr_settings->dname.u_items; i++){
 		free(usr_settings->dname.items[i].name);
@@ -940,10 +961,10 @@ void DisplayHelp(char *app_name)
 	//printf(" -v                                 Verbose\n");
 	printf(" -DNAME=VALUE                       Substitute values in Spec files\n");
 	printf("KEY OPTIONS:\n");
-	printf(" -target        <t|d|p|c>           Target for crypto, defaults to 't'\n");
-	//printf(" -target        <t|b|d|p|c>           Target for crypto, defaults to 't'\n");
+	//printf(" -target        <t|d|p|c>           Target for crypto, defaults to 't'\n");
+	printf(" -target        <t|b|d|p|c>           Target for crypto, defaults to 't'\n");
 	printf("                                    't' Test(false) Keys & prod Certs\n");
-	//printf("                                    'b' Beta Keys & prod Certs\n");
+	printf("                                    'b' Beta Keys & prod Certs\n");
 	printf("                                    'd' Development Keys & Certs\n");
 	printf("                                    'p' Production Keys & Certs\n");
 	printf("                                    'c' Custom Keys & Certs\n");
@@ -964,17 +985,14 @@ void DisplayHelp(char *app_name)
 	printf(" -plain-region  <pln region path>   PlainRegion File\n");
 	printf(" -romfs         <romfs path>        RomFS File\n");	
 	printf("CCI OPTIONS:\n");
+	printf(" -content <filepath>:<index>        Specify content files\n");
 #ifndef PUBLIC_BUILD
 	printf(" -devcardcci                        Use SDK CardInfo Method\n");
+	printf(" -nomodtid                          Don't Modify Content TitleIDs\n");
+	printf(" -alignwr                           Align Writeable Region to the end of last NCCH\n");
+	printf(" -genupdatenote <cver cia path>     Create Update Partition Notes\n");
 #endif
-	printf(" -6xcrypto                          Toggle FW6.X Save Crypto\n");
-	printf(" -content <filepath>:<index>        Specify content files\n");
 	printf("CIA OPTIONS:\n");
-#ifndef PUBLIC_BUILD
-	printf(" -cci           <cci path>          Convert CCI to CIA\n");
-	printf(" -srl           <srl path>          Use TWL SRL as Content0\n");
-	printf(" -dlc                               Create DLC CIA\n");
-#endif
 	printf(" -content <filepath>:<index>:<id>   Specify content files\n");
 	printf(" -major         <major version>     Specify Major Version\n");
 	printf(" -minor         <minor version>     Specify Minor Version\n");
@@ -983,4 +1001,9 @@ void DisplayHelp(char *app_name)
 	printf(" -savesize      <size>              Savedata size\n");
 	printf(" -rand                              Use a random title key\n");
 	printf(" -nocryptcia                        Don't encrypt CIA contents\n");
+#ifndef PUBLIC_BUILD
+	printf(" -cci           <cci path>          Convert CCI to CIA\n");
+	printf(" -srl           <srl path>          Use TWL SRL as Content0\n");
+	printf(" -dlc                               Create DLC CIA\n");
+#endif
 }

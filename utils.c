@@ -178,6 +178,8 @@ int str_utf8_to_u16(u16 **dst, u32 *dst_len, u8 *src, u32 src_len)
 //Char IO
 bool DoesFileExist(char *filename)
 {
+	if(filename == NULL)
+		return false;
 #ifdef _WIN32
 	struct _stat64 st;
 	return _stat64(filename, &st) == 0;

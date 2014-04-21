@@ -1,6 +1,6 @@
 # Makerom Sources
 UTILS_OBJS = utils.o dir.o utf.o keyset.o titleid.o
-CIA_OBJS = cia.o certs.o tik.o tmd.o
+CIA_OBJS = cia.o cia_read.o certs.o tik.o tmd.o tmd_read.o
 NCCH_OBJS = ncch.o exheader.o accessdesc.o exefs.o elf.o romfs.o romfs_import.o romfs_binary.o  
 NCSD_OBJS = ncsd.o  
 SETTINGS_OBJS = usersettings.o yamlsettings.o
@@ -21,7 +21,7 @@ CC = gcc
 # MAKEROM Build Settings
 MAKEROM_BUILD_FLAGS = #-DDEBUG #-DPUBLIC_BUILD 
 VER_MAJOR = 0
-VER_MINOR = 6
+VER_MINOR = 7
 OUTPUT = makerom
 
 main: build

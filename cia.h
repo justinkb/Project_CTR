@@ -1,5 +1,7 @@
 #pragma once
 
+static const int CIA_ALIGN_SIZE = 0x40;
+
 // Enums
 typedef enum
 {
@@ -122,3 +124,15 @@ typedef struct
 
 // Public Prototypes
 int build_CIA(user_settings *usrset);
+
+// Cia Read Functions
+u64 GetCiaCertOffset(cia_hdr *hdr);
+u64 GetCiaCertSize(cia_hdr *hdr);
+u64 GetTikOffset(cia_hdr *hdr);
+u64 GetTikSize(cia_hdr *hdr);
+u64 GetTmdOffset(cia_hdr *hdr);
+u64 GetTmdSize(cia_hdr *hdr);
+u64 GetContentOffset(cia_hdr *hdr);
+u64 GetContentSize(cia_hdr *hdr);
+u64 GetMetaOffset(cia_hdr *hdr);
+u64 GetMetaSize(cia_hdr *hdr);

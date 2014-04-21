@@ -2,6 +2,8 @@
 #include "ncch.h"
 #include "exheader.h"
 #include "ncsd.h"
+#include "cia.h"
+#include "tmd.h"
 
 // Private Prototypes
 
@@ -43,8 +45,11 @@ int build_CCI(user_settings *usrset)
 	int result = 0;
 
 	// Init Settings
-	cci_settings *cciset = malloc(sizeof(cci_settings));
-	if(!cciset) {fprintf(stderr,"[CCI ERROR] MEM ERROR\n"); return MEM_ERROR;}
+	cci_settings *cciset = calloc(1,sizeof(cci_settings));
+	if(!cciset) {
+		fprintf(stderr,"[CCI ERROR] Not enough memory\n"); 
+		return MEM_ERROR;
+	}
 	init_CCISettings(cciset);
 	
 	// Get Settings
@@ -58,7 +63,7 @@ int build_CCI(user_settings *usrset)
 		result = FAILED_TO_CREATE_OUTFILE;
 		goto finish;
 	}
-	
+
 	// Generate NCSD Header and Additional Header
 	result = BuildNCSDHeader(cciset,usrset);
 	if(result) 
@@ -133,6 +138,9 @@ int get_CCISettings(cci_settings *cciset, user_settings *usrset)
 	result = GetCardInfoBitmask(cciset,usrset);
 	if(result) return result;
 	
+	result = ImportCverDetails(cciset,usrset);
+	if(result) return result;
+
 	/* All Done */
 	return 0;
 }
@@ -168,13 +176,15 @@ int BuildNCSDHeader(cci_settings *cciset, user_settings *usrset)
 
 int BuildCardInfoHeader(cci_settings *cciset, user_settings *usrset)
 {
-	u32_to_u8((u8*)ctx.cardinfo.writable_address,(cciset->writableAddress/cciset->mediaUnit),LE); 
-	u32_to_u8((u8*)ctx.cardinfo.card_info_bitmask,cciset->cardInfoBitmask,BE);
-	u32_to_u8((u8*)ctx.cardinfo.media_size_used,cciset->cciTotalSize,LE); 
-	memcpy((u8*)ctx.cardinfo.ncch_0_title_id,cciset->contentTitleId[0],8);
-	memcpy((u8*)ctx.cardinfo.initial_data,cciset->initialData,0x30);
-	memcpy((u8*)ctx.cardinfo.ncch_0_header,cciset->ncchHdr,0x100);
-	memcpy((u8*)ctx.devcardinfo.TitleKey,cciset->titleKey,0x10);
+	u32_to_u8((u8*)ctx.cardinfo.writableAddress,(cciset->writableAddress/cciset->mediaUnit),LE); 
+	u32_to_u8((u8*)ctx.cardinfo.cardInfoBitmask,cciset->cardInfoBitmask,BE);
+	u32_to_u8((u8*)ctx.cardinfo.mediaSizeUsed,cciset->cciTotalSize,LE);
+	memcpy(ctx.cardinfo.cverTitleId,cciset->cverTitleId,8);
+	memcpy(ctx.cardinfo.cverTitleVersion,cciset->cverTitleVersion,2);
+	memcpy((u8*)ctx.cardinfo.ncch0TitleId,cciset->contentTitleId[0],8);
+	memcpy((u8*)ctx.cardinfo.initialData,cciset->initialData,0x30);
+	memcpy((u8*)ctx.cardinfo.ncch0Hdr,cciset->ncchHdr,0x100);
+	memcpy((u8*)ctx.devcardinfo.titleKey,cciset->titleKey,0x10);
 
 	return 0;
 }
@@ -184,7 +194,7 @@ int WriteCCI_HDR_ToFile(cci_settings *cciset)
 	WriteBuffer(ctx.signature,0x100,0,cciset->out);
 	WriteBuffer((u8*)&ctx.cciHdr,sizeof(cci_hdr),0x100,cciset->out);
 	WriteBuffer((u8*)&ctx.cardinfo,sizeof(cardinfo_hdr),0x200,cciset->out);
-	if(memcmp(ctx.devcardinfo.TitleKey,ctx.keys->aes.normalKey,16) == 0){
+	if(memcmp(ctx.devcardinfo.titleKey,ctx.keys->aes.normalKey,16) == 0){
 		// Creating Buffer of Dummy Bytes
 		u64 len = cciset->contentOffset[0] - 0x1200;
 		u8 *dummy_bytes = malloc(len);
@@ -242,7 +252,7 @@ int GetContentFP(cci_settings *cciset, user_settings *usrset)
 {
 	cciset->content = malloc(sizeof(FILE*)*8);
 	if(!cciset->content){
-		fprintf(stderr,"[CCI ERROR] MEM ERROR\n");
+		fprintf(stderr,"[CCI ERROR] Not enough memory\n");
 		return MEM_ERROR;
 	}
 	memset(cciset->content,0,sizeof(FILE*)*8);
@@ -268,13 +278,17 @@ int GetContentFP(cci_settings *cciset, user_settings *usrset)
 				return NCSD_INVALID_NCCH0;
 			}
 			
-			memcpy(&cciset->contentTitleId[i],cciset->mediaId,8); // Set TitleID
-			 
-			// Modify TitleID Accordingly
-			u16 tmp = u8_to_u16(&hdr->titleId[6],LE);
-			tmp |= (i+4);
-			u16_to_u8(&cciset->contentTitleId[i][6],tmp,LE);
+			if(usrset->cci.dontModifyNcchTitleID)
+				memcpy(&cciset->contentTitleId[i],hdr->titleId,8);
+			else{
+				memcpy(&cciset->contentTitleId[i],cciset->mediaId,8); // Set TitleID
 			
+				// Modify TitleID Accordingly
+				u16 tmp = u8_to_u16(&hdr->titleId[6],LE);
+				tmp |= (i+4);
+				u16_to_u8(&cciset->contentTitleId[i][6],tmp,LE);
+			}
+
 			cciset->contentSize[i] =  GetNCCH_MediaSize(hdr)*cciset->mediaUnit;
 			cciset->contentOffset[i] = cciset->cciTotalSize;
 			
@@ -332,9 +346,6 @@ int GetDataFromContent0(cci_settings *cciset, user_settings *usrset)
 		//memcpy(cciset->titleKey,(Hash+0x30),0x10); // Might Remove
 	}
 	
-	/* FW6x SaveCrypto */
-	cciset->flags[FW6x_SaveCryptoFlag] = usrset->cci.use6xSavedataCrypto;
-
 	cciset->flags[MediaUnitSize] = hdr->flags[ContentUnitSize];
 	cciset->mediaUnit = GetNCCH_MediaUnitSize(hdr);
 	
@@ -423,32 +434,44 @@ int GetNCSDFlags(cci_settings *cciset, rsf_settings *yaml)
 
 	/* Platform */
 	cciset->flags[MediaPlatformIndex] = CTR;
-	/*
-	if(!yaml->TitleInfo.Platform) cciset->flags[MediaPlatformIndex] = CTR;
+
+	u8 saveCrypto;
+
+	if(!yaml->CardInfo.SaveCrypto) saveCrypto = 3;
 	else{
-		if(strcasecmp(yaml->TitleInfo.Platform,"ctr") == 0) cciset->flags[MediaPlatformIndex] = CTR;
+		if(strcasecmp(yaml->CardInfo.SaveCrypto,"fw1") == 0 || strcasecmp(yaml->CardInfo.SaveCrypto,"ctr fail") == 0 ) saveCrypto = 1;
+		else if(strcasecmp(yaml->CardInfo.SaveCrypto,"fw2") == 0) saveCrypto = 2;
+		else if(strcasecmp(yaml->CardInfo.SaveCrypto,"fw3") == 0) saveCrypto = 3;
+		else if(strcasecmp(yaml->CardInfo.SaveCrypto,"fw6") == 0) saveCrypto = 6;
 		else {
-			fprintf(stderr,"[CCI ERROR] Invalid Platform: %s\n",yaml->TitleInfo.Platform);
+			fprintf(stderr,"[CCI ERROR] Invalid SaveCrypto: %s\n",yaml->CardInfo.SaveCrypto);
 			return INVALID_YAML_OPT;
 		}
 	}
-	*/
+	
+
+	/* FW6x SaveCrypto */
+	cciset->flags[FW6x_SaveCryptoFlag] = saveCrypto == 6;
 
 	/* CardDevice */
-	if(!yaml->CardInfo.CardDevice) cciset->flags[CardDeviceFlag] = CARD_DEVICE_NONE;
-	else{
-		if(strcmp(yaml->CardInfo.CardDevice,"NorFlash") == 0) {
-			cciset->flags[CardDeviceFlag] = CARD_DEVICE_NOR_FLASH;
-			if(cciset->flags[MediaTypeIndex] == CARD2){
-				fprintf(stderr,"[CCI WARNING] 'CardDevice: NorFlash' is invalid on Card2\n");
-				cciset->flags[CardDeviceFlag] = CARD_DEVICE_NONE;
+	if(saveCrypto > 1){
+		u8 flag = CardDeviceFlag;
+		if(saveCrypto == 2) flag = OldCardDeviceFlag;
+		if(!yaml->CardInfo.CardDevice) cciset->flags[flag] = CARD_DEVICE_NONE;
+		else{
+			if(strcmp(yaml->CardInfo.CardDevice,"NorFlash") == 0) {
+				cciset->flags[flag] = CARD_DEVICE_NOR_FLASH;
+				if(cciset->flags[MediaTypeIndex] == CARD2){
+					fprintf(stderr,"[CCI WARNING] 'CardDevice: NorFlash' is invalid on Card2\n");
+					cciset->flags[flag] = CARD_DEVICE_NONE;
+				}
 			}
-		}
-		else if(strcmp(yaml->CardInfo.CardDevice,"None") == 0) cciset->flags[CardDeviceFlag] = CARD_DEVICE_NONE;
-		else if(strcmp(yaml->CardInfo.CardDevice,"BT") == 0) cciset->flags[CardDeviceFlag] = CARD_DEVICE_BT;
-		else {
-			fprintf(stderr,"[CCI ERROR] Invalid CardDevice: %s\n",yaml->CardInfo.CardDevice);
-			return INVALID_YAML_OPT;
+			else if(strcmp(yaml->CardInfo.CardDevice,"None") == 0) cciset->flags[flag] = CARD_DEVICE_NONE;
+			else if(strcmp(yaml->CardInfo.CardDevice,"BT") == 0) cciset->flags[flag] = CARD_DEVICE_BT;
+			else {
+				fprintf(stderr,"[CCI ERROR] Invalid CardDevice: %s\n",yaml->CardInfo.CardDevice);
+				return INVALID_YAML_OPT;
+			}
 		}
 	}
 	return 0;
@@ -482,8 +505,12 @@ int GetWriteableAddress(cci_settings *cciset, user_settings *usrset)
 			fprintf(stderr,"[CCI ERROR] Too large SavedataSize %llK\n",SavedataSize);
 			return SAVE_DATA_TOO_LARGE;
 		}
-		u64 UnusedSize = GetUnusedSize(cciset->mediaSize,cciset->flags[MediaTypeIndex]); // Need to look into this
-		cciset->writableAddress = cciset->mediaSize - UnusedSize - cciset->savedataSize;
+		if(usrset->cci.closeAlignWritableRegion)
+			cciset->writableAddress = align(cciset->cciTotalSize, cciset->mediaUnit);
+		else{
+			u64 UnusedSize = GetUnusedSize(cciset->mediaSize,cciset->flags[MediaTypeIndex]); // Need to look into this
+			cciset->writableAddress = cciset->mediaSize - UnusedSize - cciset->savedataSize;
+		}
 	}
 	return 0;
 }
@@ -515,6 +542,39 @@ int GetCardInfoBitmask(cci_settings *cciset, user_settings *usrset)
 		cciset->cardInfoBitmask |= (Value*0x40);
 	}
 	
+	return 0;
+}
+
+int ImportCverDetails(cci_settings *cciset, user_settings *usrset)
+{
+	if(!usrset->cci.cverCiaPath){
+		memset(cciset->cverTitleId,0,8);
+		memset(cciset->cverTitleVersion,0,2);
+		return 0;
+	}
+	if(!DoesFileExist(usrset->cci.cverCiaPath)){
+		fprintf(stderr,"[NCSD ERROR] Failed to open \"%s\"\n",usrset->cci.cverCiaPath);
+		return FAILED_TO_IMPORT_FILE;
+	}
+	FILE *cia = fopen(usrset->cci.cverCiaPath,"rb");
+	cia_hdr *ciaHdr = calloc(1,sizeof(cia_hdr));
+	ReadFile_64(ciaHdr,sizeof(cia_hdr),0,cia);
+	
+	u64 tmdSize = GetTmdSize(ciaHdr);
+	u64 tmdOffset = GetTmdOffset(ciaHdr);
+	u8 *tmd = calloc(1,tmdSize);
+	ReadFile_64(tmd,tmdSize,tmdOffset,cia);
+	tmd_hdr *tmdHdr = GetTmdHdr(tmd);
+	memdump(stdout,"tmd: ",(u8*)tmdHdr,sizeof(tmd_hdr));
+
+
+	endian_memcpy(cciset->cverTitleId,tmdHdr->titleID,8,LE);
+	endian_memcpy(cciset->cverTitleVersion,tmdHdr->titleVersion,2,LE);
+
+	fclose(cia);
+	free(ciaHdr);
+	free(tmd);
+
 	return 0;
 }
 

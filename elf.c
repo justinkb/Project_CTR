@@ -79,16 +79,22 @@ int BuildExeFsCode(ncch_settings *ncchset)
 #endif
 	/* Import ELF */
 	u8 *ElfFile = malloc(ncchset->componentFilePtrs.elfSize);
-	if(!ElfFile) {fprintf(stderr,"[ELF ERROR] MEM ERROR\n"); return MEM_ERROR;}
+	if(!ElfFile) {
+		fprintf(stderr,"[ELF ERROR] Not enough memory\n"); 
+		return MEM_ERROR;
+	}
 	ReadFile_64(ElfFile,ncchset->componentFilePtrs.elfSize,0,ncchset->componentFilePtrs.elf);
 
 #ifdef DEBUG
 	printf("[DEBUG] Create ELF Context\n");
 #endif
 	/* Create ELF Context */
-	ElfContext *elf = malloc(sizeof(ElfContext));
-	if(!elf) {fprintf(stderr,"[ELF ERROR] MEM ERROR\n"); free(ElfFile); return MEM_ERROR;}
-	memset(elf,0,sizeof(ElfContext));
+	ElfContext *elf = calloc(1,sizeof(ElfContext));
+	if(!elf) {
+		fprintf(stderr,"[ELF ERROR] Not enough memory\n"); 
+		free(ElfFile); 
+		return MEM_ERROR;
+	}
 	
 	result = GetElfContext(elf,ElfFile);
 	if(result) goto finish;
@@ -149,7 +155,7 @@ int ImportPlainRegionFromFile(ncch_settings *ncchset)
 {
 	ncchset->sections.plainRegion.size = align(ncchset->componentFilePtrs.plainregionSize,ncchset->options.mediaSize);
 	ncchset->sections.plainRegion.buffer = malloc(ncchset->sections.plainRegion.size);
-	if(!ncchset->sections.plainRegion.buffer) {fprintf(stderr,"[ELF ERROR] MEM ERROR\n"); return MEM_ERROR;}
+	if(!ncchset->sections.plainRegion.buffer) {fprintf(stderr,"[ELF ERROR] Not enough memory\n"); return MEM_ERROR;}
 	ReadFile_64(ncchset->sections.plainRegion.buffer,ncchset->componentFilePtrs.plainregionSize,0,ncchset->componentFilePtrs.plainregion);
 	return 0;
 }
@@ -158,12 +164,12 @@ int ImportExeFsCodeBinaryFromFile(ncch_settings *ncchset)
 {
 	u32 size = ncchset->componentFilePtrs.codeSize;
 	u8 *buffer = malloc(size);
-	if(!buffer) {fprintf(stderr,"[ELF ERROR] MEM ERROR\n"); return MEM_ERROR;}
+	if(!buffer) {fprintf(stderr,"[ELF ERROR] Not enough memory\n"); return MEM_ERROR;}
 	ReadFile_64(buffer,size,0,ncchset->componentFilePtrs.code);
 
 	ncchset->exefsSections.code.size = ncchset->componentFilePtrs.codeSize;
 	ncchset->exefsSections.code.buffer = malloc(ncchset->exefsSections.code.size);
-	if(!ncchset->exefsSections.code.buffer) {fprintf(stderr,"[ELF ERROR] MEM ERROR\n"); return MEM_ERROR;}
+	if(!ncchset->exefsSections.code.buffer) {fprintf(stderr,"[ELF ERROR] Not enough memory\n"); return MEM_ERROR;}
 	ReadFile_64(ncchset->exefsSections.code.buffer,ncchset->exefsSections.code.size,0,ncchset->componentFilePtrs.code);
 	if(ncchset->options.CompressCode){
 		u32 new_len;
@@ -205,7 +211,7 @@ int GetBSS_SizeFromElf(ElfContext *elf, u8 *ElfFile, ncch_settings *ncchset)
 int ImportPlainRegionFromElf(ElfContext *elf, u8 *ElfFile, ncch_settings *ncchset) // Doesn't work same as N makerom
 {
 	if(!ncchset->rsfSet->PlainRegionNum) return 0;
-	u16 *Index = malloc(sizeof(u16)*ncchset->rsfSet->PlainRegionNum);
+	u16 *Index = calloc(ncchset->rsfSet->PlainRegionNum,sizeof(u16));
 
 	/* Getting Index Values for each section */
 	for(int i = 0; i < ncchset->rsfSet->PlainRegionNum; i++){
@@ -228,7 +234,7 @@ int ImportPlainRegionFromElf(ElfContext *elf, u8 *ElfFile, ncch_settings *ncchse
 	/* Creating Output Buffer */
 	ncchset->sections.plainRegion.size = align(TotalSize,ncchset->options.mediaSize);
 	ncchset->sections.plainRegion.buffer = malloc(ncchset->sections.plainRegion.size);
-	if(!ncchset->sections.plainRegion.buffer) {fprintf(stderr,"[ELF ERROR] MEM ERROR\n"); return MEM_ERROR;}
+	if(!ncchset->sections.plainRegion.buffer) {fprintf(stderr,"[ELF ERROR] Not enough memory\n"); return MEM_ERROR;}
 	memset(ncchset->sections.plainRegion.buffer,0,ncchset->sections.plainRegion.size);
 
 	/* Storing Sections */
@@ -324,16 +330,14 @@ int CreateCodeSegmentFromElf(CodeSegment *out, ElfContext *elf, u8 *ElfFile, cha
 			vAddr = ContinuousSegments[i]->vAddr;
 		}
 		else{ // Add rounded size from previous segment
-			u32 num = ContinuousSegments[i]->vAddr - (vAddr + memorySize);
-			memorySize += num;
+			u32 padding = ContinuousSegments[i]->vAddr - (vAddr + memorySize);
+			memorySize += padding;
 		}
 
 		memorySize += ContinuousSegments[i]->header->sizeInMemory;
-		for (int j = 0; j < ContinuousSegments[i]->sectionNum; j++){
-			ElfSectionEntry *Section = &ContinuousSegments[i]->sections[j];
-			if (IsBss(Section) && j == (ContinuousSegments[i]->sectionNum-1))
-				memorySize -= Section->size;
-		}
+
+		if(IsBss(&ContinuousSegments[i]->sections[ContinuousSegments[i]->sectionNum-1]))
+			memorySize -= ContinuousSegments[i]->sections[ContinuousSegments[i]->sectionNum-1].size;
 	}
 	
 	// For Check
@@ -348,29 +352,31 @@ int CreateCodeSegmentFromElf(CodeSegment *out, ElfContext *elf, u8 *ElfFile, cha
 	out->data = malloc(memorySize);
 	
 	/* Writing Segment to Buffer */
-	vAddr = 0;
-	memorySize = 0;
+	//vAddr = 0;
+	//memorySize = 0;
 	for(int i = 0; i < ContinuousSegmentNum; i++){
-		if (i==0){
+		/*
+		if (i==0)
 			vAddr = ContinuousSegments[i]->vAddr;
-		}
+		
 		else{
 			u32 num = ContinuousSegments[i]->vAddr - (vAddr + memorySize);
 			memorySize += num;
 		}
-		u32 size = 0;
+		*/
+		//u32 size = 0;
 		for (int j = 0; j < ContinuousSegments[i]->sectionNum; j++){
 			ElfSectionEntry *Section = &ContinuousSegments[i]->sections[j];
 			if (!IsBss(Section)){				
 				u8 *pos = (out->data + (Section->address - ContinuousSegments[i]->vAddr));
 				memcpy(pos,Section->ptr,Section->size);
-				size += Section->size;
+				//size += Section->size;
 			}
 
-			else if (j == (ContinuousSegments[i]->sectionNum-1))
-				memorySize -= Section->size;
-			else
-				size += Section->size;
+			//else if (j == (ContinuousSegments[i]->sectionNum-1))
+				//memorySize -= Section->size;
+			//'else
+				//size += Section->size;
 		}
 	}
 
@@ -414,7 +420,7 @@ ElfSegment** GetSegments(u16 *SegmentNum, ElfContext *elf, char **Names, u32 Nam
 		return NULL;
 	}
 
-	ElfSegment **Segments = malloc(sizeof(ElfSegment*)*NameNum); 
+	ElfSegment **Segments = calloc(NameNum,sizeof(ElfSegment*)); 
 	*SegmentNum = 0; // There can be a max of NameNum Segments, however, they might not all exist
 	for (int i = 0; i < NameNum; i++){
 		for(int j = 0; j < elf->activeSegments; j++){
@@ -453,8 +459,11 @@ int GetElfContext(ElfContext *elf, u8 *ElfFile)
 
 int GetElfSectionEntries(ElfContext *elf, u8 *ElfFile)
 {
-	elf->sections = malloc(sizeof(ElfSectionEntry)*elf->sectionTableEntryCount);
-	if(!elf->sections) {fprintf(stderr,"[ELF ERROR] MEM ERROR\n"); return MEM_ERROR;}
+	elf->sections = calloc(elf->sectionTableEntryCount,sizeof(ElfSectionEntry));
+	if(!elf->sections) {
+		fprintf(stderr,"[ELF ERROR] Not enough memory\n"); 
+		return MEM_ERROR;
+	}
 
 	for(int i = 0; i < elf->sectionTableEntryCount; i++){
 		elf->sections[i].name = GetELFSectionEntryName(i,elf,ElfFile);
@@ -471,8 +480,11 @@ int GetElfSectionEntries(ElfContext *elf, u8 *ElfFile)
 
 int GetElfProgramEntries(ElfContext *elf, u8 *ElfFile)
 {
-	elf->programHeaders = malloc(sizeof(ElfProgramEntry)*elf->programTableEntryCount);
-	if(!elf->programHeaders) {fprintf(stderr,"[ELF ERROR] MEM ERROR\n"); return MEM_ERROR;}
+	elf->programHeaders = calloc(elf->programTableEntryCount,sizeof(ElfProgramEntry));
+	if(!elf->programHeaders) {
+		fprintf(stderr,"[ELF ERROR] Not enough memory\n"); 
+		return MEM_ERROR;
+	}
 
 	for(int i = 0; i < elf->programTableEntryCount; i++){
 		elf->programHeaders[i].type = GetELFProgramEntryType(i,elf,ElfFile);
@@ -890,34 +902,35 @@ int CreateElfSegments(ElfContext *elf, u8 *ElfFile)
 	int num = 0;
 	// Interate through Each Program Header
 	elf->activeSegments = 0;
-	elf->segments = malloc(sizeof(ElfSegment)*elf->programTableEntryCount);
+	elf->segments = calloc(elf->programTableEntryCount,sizeof(ElfSegment));
 	ElfSegment *segment = malloc(sizeof(ElfSegment)); // Temporary Buffer
 	for (int i = 0; i < elf->programTableEntryCount; i++){
 		if (elf->programHeaders[i].sizeInMemory != 0 && elf->programHeaders[i].type == 1){
 			memset(segment,0,sizeof(ElfSegment));
 
-			bool flag = false;
+			bool foundFirstSection = false;
 			u32 size = 0;
 			u32 vAddr = elf->programHeaders[i].virtualAddress;
  			u32 memorySize = elf->programHeaders[i].sizeInMemory;
 			//printf("Segment Size in memory: 0x%x\n",memorySize);
+			//printf("Segment Alignment:      0x%x\n",elf->programHeaders[i].alignment);
 			
 			u16 SectionInfoCapacity = 10;
 			segment->sectionNum = 0;
-			segment->sections = malloc(sizeof(ElfSectionEntry)*SectionInfoCapacity);
+			segment->sections = calloc(SectionInfoCapacity,sizeof(ElfSectionEntry));
 
 			// Itterate Through Section Headers
 			for (int j = num; j < elf->sectionTableEntryCount; j++){
-				if (!flag){
+				if (!foundFirstSection){
 					if (elf->sections[j].address != vAddr)
-                        goto Skip;
+                        continue;
                     
 					while (j < (int)elf->sections[j].size && elf->sections[j].address == vAddr && !IsIgnoreSection(elf->sections[j]))
                         j++;
 
 					j--;
 
-					flag = true;
+					foundFirstSection = true;
 					segment->vAddr = elf->sections[j].address;
 					segment->name = elf->sections[j].name;
                 }
@@ -926,7 +939,7 @@ int CreateElfSegments(ElfContext *elf, u8 *ElfFile)
 					memcpy(&segment->sections[segment->sectionNum],&elf->sections[j],sizeof(ElfSectionEntry));
 				else{
 					SectionInfoCapacity = SectionInfoCapacity*2;
-					ElfSectionEntry *tmp = malloc(sizeof(ElfSectionEntry)*SectionInfoCapacity);
+					ElfSectionEntry *tmp = calloc(SectionInfoCapacity,sizeof(ElfSectionEntry));
 					for(int k = 0; k < segment->sectionNum; k++)
 						memcpy(&tmp[k],&segment->sections[k],sizeof(ElfSectionEntry));
 					free(segment->sections);
@@ -936,10 +949,12 @@ int CreateElfSegments(ElfContext *elf, u8 *ElfFile)
 				segment->sectionNum++;
 
 				if(size == 0)
-					size =  elf->sections[j].size;
-				else
-					size = align(size,elf->sections[j].alignment) + elf->sections[j].size;
-
+					size += elf->sections[j].size;
+				else{
+					u32 padding = elf->sections[j].address - (elf->sections[j-1].address + elf->sections[j-1].size);
+					size += padding + elf->sections[j].size;
+				}
+					
 				//printf("Section Name: %s",elf->sections[j].name);
 				//printf(" 0x%lx",elf->sections[j].size);
 				//printf(" (Total Size: 0x%x)\n",size);
@@ -951,7 +966,6 @@ int CreateElfSegments(ElfContext *elf, u8 *ElfFile)
 					fprintf(stderr,"[ELF ERROR] Too large section size.\n Segment size = 0x%x\n Section Size = 0x%x\n", memorySize, size);
 					return ELF_SEGMENT_SECTION_SIZE_MISMATCH;
 				}
-			Skip: ;
             }
 			if(segment->sectionNum){
 				segment->header = &elf->programHeaders[i];

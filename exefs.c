@@ -5,7 +5,6 @@
 // Private Prototypes
 u32 PredictExeFS_Size(exefs_buildctx *ctx);
 int GenerateExeFS_Header(exefs_buildctx *ctx, u8 *outbuff);
-void InitialiseExeFSContext(exefs_buildctx *ctx);
 void FreeExeFSContext(exefs_buildctx *ctx);
 int ImportDatatoExeFS(exefs_buildctx *ctx, u8 *outbuff);
 int ImportToExeFSContext(exefs_buildctx *ctx, char *name, u8 *buffer, u32 size);
@@ -14,9 +13,11 @@ int ImportToExeFSContext(exefs_buildctx *ctx, char *name, u8 *buffer, u32 size);
 int BuildExeFs(ncch_settings *ncchset)
 {
 	/* Intialising ExeFs Build Context */
-	exefs_buildctx *ctx = malloc(sizeof(exefs_buildctx));
-	if(!ctx) {fprintf(stderr,"[EXEFS ERROR] MEM ERROR\n"); return MEM_ERROR;}
-	InitialiseExeFSContext(ctx);
+	exefs_buildctx *ctx = calloc(1,sizeof(exefs_buildctx));
+	if(!ctx) {
+		fprintf(stderr,"[EXEFS ERROR] Not enough memory\n"); 
+		return MEM_ERROR;
+	}
 	ctx->mediaUnit = ncchset->options.mediaSize;
 
 	/* Importing ExeFs */
@@ -28,6 +29,12 @@ int BuildExeFs(ncch_settings *ncchset)
 		ImportToExeFSContext(ctx,"icon",ncchset->exefsSections.icon.buffer,ncchset->exefsSections.icon.size);
 	if(ncchset->sections.logo.size && ncchset->options.IncludeExeFsLogo) 
 		ImportToExeFSContext(ctx,"logo",ncchset->sections.logo.buffer,ncchset->sections.logo.size);
+
+	if(ctx->fileCount == 0){ // no exefs needed
+		ncchset->sections.exeFs.size = 0;
+		ncchset->sections.exeFs.buffer = NULL;
+		return 0;
+	}
 
 	/* Allocating Memory for ExeFs */
 	ncchset->sections.exeFs.size = PredictExeFS_Size(ctx);
@@ -73,11 +80,6 @@ int GenerateExeFS_Header(exefs_buildctx *ctx, u8 *outbuff)
 	memcpy(outbuff,ctx->fileHdr,sizeof(exefs_filehdr)*10);
 	memcpy(outbuff+0xc0,ctx->fileHashes,0x20*10);
 	return 0;
-}
-
-void InitialiseExeFSContext(exefs_buildctx *ctx)
-{
-	memset(ctx,0,sizeof(exefs_buildctx));
 }
 
 void FreeExeFSContext(exefs_buildctx *ctx)

@@ -75,3 +75,5 @@ typedef struct
 	FILE *romfsBinary;
 } romfs_buildctx;
 
+int SetupRomFs(ncch_settings *ncchset, romfs_buildctx *ctx);
+int BuildRomFs(romfs_buildctx *ctx);

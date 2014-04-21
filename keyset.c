@@ -49,7 +49,7 @@ int SetKeys(keys_struct *keys)
 		// CIA
 		//SetCommonKey(keys,(u8*)zeros_aesKey,1);
 		if(keys->aes.currentCommonKey > 0xff)
-			SetCurrentCommonKey(keys,0);
+			SetCurrentCommonKey(keys,1);
 	
 		// NCCH
 		keys->aes.normalKey = (u8*)zeros_aesKey;
@@ -71,7 +71,7 @@ int SetKeys(keys_struct *keys)
 		SetTikCert(keys,(u8*)xsC_tpki_cert);
 		SetTmdCert(keys,(u8*)cpB_tpki_cert);
 	}
-	else if(keys->keyset == pki_CUSTOM){
+	else if(keys->keyset == pki_CUSTOM || keys->keyset == pki_BETA){
 		char *cwd = calloc(100,sizeof(char));
 		getcwdir(cwd,100);
 
@@ -230,6 +230,7 @@ int SetKeys(keys_struct *keys)
 		// NCCH
 		keys->aes.normalKey = (u8*)ctr_fixed_ncch_key_dpki[0];
 		SetSystemFixedKey(keys,(u8*)ctr_fixed_ncch_key_dpki[1]);
+		
 		/*
 		keys->aes.ncchKeyX0 = (u8*)ctr_unfixed_ncch_keyX_dpki[0];
 		keys->aes.ncchKeyX1 = (u8*)ctr_unfixed_ncch_keyX_dpki[1];

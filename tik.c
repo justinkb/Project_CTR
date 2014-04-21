@@ -29,9 +29,11 @@ int BuildTicket(cia_settings *ciaset)
 int SetupTicketBuffer(buffer_struct *tik)
 {
 	tik->size = sizeof(tik_signature) + sizeof(tik_hdr);
-	tik->buffer = malloc(tik->size);
-	if(!tik->buffer) { fprintf(stderr,"[ERROR] MEM ERROR\n"); return MEM_ERROR; }
-	memset(tik->buffer,0,tik->size);
+	tik->buffer = calloc(1,tik->size);
+	if(!tik->buffer) { 
+		fprintf(stderr,"[TIK ERROR] Not enough memory\n"); 
+		return MEM_ERROR; 
+	}
 	return 0;
 }
 

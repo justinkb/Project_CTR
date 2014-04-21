@@ -45,7 +45,7 @@ int build_CIA(user_settings *usrset)
 	// Init Settings
 	cia_settings *ciaset = calloc(1,sizeof(cia_settings));
 	if(!ciaset) {
-		fprintf(stderr,"[CIA ERROR] MEM ERROR\n"); 
+		fprintf(stderr,"[CIA ERROR] Not enough memory\n"); 
 		return MEM_ERROR;
 	}
 
@@ -63,7 +63,7 @@ int build_CIA(user_settings *usrset)
 	}
 
 	// Create CIA Sections
-	
+
 	/* Certificate Chain */
 	result = BuildCIA_CertChain(ciaset);
 	if(result) goto finish;
@@ -85,8 +85,11 @@ int build_CIA(user_settings *usrset)
 	if(result) goto finish;
 
 finish:
-	if(result != FAILED_TO_CREATE_OUTFILE && ciaset->out) fclose(ciaset->out);
+	if(result != FAILED_TO_CREATE_OUTFILE && ciaset->out) 
+		fclose(ciaset->out);
+
 	free_CIASettings(ciaset);
+
 	return result;
 }
 
@@ -107,6 +110,7 @@ void free_CIASettings(cia_settings *set)
 	free(set->ciaSections.tik.buffer);
 	free(set->ciaSections.tmd.buffer);
 	free(set->ciaSections.meta.buffer);
+	free(set->ciaSections.content.buffer);
 
 	memset(set,0,sizeof(cia_settings));
 
@@ -158,6 +162,9 @@ int GetSettingsFromUsrset(cia_settings *ciaset, user_settings *usrset)
 	ciaset->keys = &usrset->common.keys;
 	ciaset->ciaSections.content.buffer = usrset->common.workingFile.buffer;
 	ciaset->ciaSections.content.size = usrset->common.workingFile.size;
+	usrset->common.workingFile.buffer = NULL;
+	ciaset->ciaSections.content.size = 0;
+
 	u32_to_u8(ciaset->tmd.titleType,TYPE_CTR,BE);
 	ciaset->content.encryptCia = usrset->cia.encryptCia;
 	ciaset->content.IsDlc = usrset->cia.DlcContent;
@@ -232,7 +239,7 @@ int GetSettingsFromNcch0(cia_settings *ciaset, u32 ncch0_offset)
 	/* Get Ncch0 Import Context */
 	ncch_struct *ncch_ctx = malloc(sizeof(ncch_struct));
 	if(!ncch_ctx){ 
-		fprintf(stderr,"[CIA ERROR] MEM ERROR\n"); 
+		fprintf(stderr,"[CIA ERROR] Not enough memory\n"); 
 		return MEM_ERROR; 
 	}
 	memset(ncch_ctx,0x0,sizeof(ncch_struct));
@@ -430,11 +437,14 @@ int ImportNcchContent(cia_settings *ciaset)
 		fprintf(stderr,"[CIA ERROR] Not enough memory\n");
 		return MEM_ERROR;
 	}
+
 	ncch_hdr *ncch0hdr = (ncch_hdr*)(ciaset->ciaSections.content.buffer+0x100);
 	for(int i = 1; i < ciaset->content.contentCount; i++){
 		// Import
-		fread(ciaset->ciaSections.content.buffer+ciaset->content.contentOffset[i],ciaset->content.contentSize[i],1,ciaset->content.contentFilePtrs[i]);
-		if(ModifyNcchIds(ciaset->ciaSections.content.buffer+ciaset->content.contentOffset[i], NULL, ncch0hdr->programId, ciaset->keys) != 0)
+		u8 *ncchpos = (u8*)(ciaset->ciaSections.content.buffer+ciaset->content.contentOffset[i]);
+
+		ReadFile_64(ncchpos, ciaset->content.contentSize[i], 0, ciaset->content.contentFilePtrs[i]);
+		if(ModifyNcchIds(ncchpos, NULL, ncch0hdr->programId, ciaset->keys) != 0)
 			return -1;
 		
 		// Set Additional Flags
@@ -444,6 +454,7 @@ int ImportNcchContent(cia_settings *ciaset)
 		//if(unknown condition)
 		//	ciaset->content.contentFlags[i] |= content_Shared;
 	}
+
 	ciaset->ciaSections.content.size = ciaset->content.totalContentSize;
 	return 0;
 }

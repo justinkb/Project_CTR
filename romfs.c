@@ -4,6 +4,8 @@
 #include "romfs_binary.h"
 #include "romfs_import.h"
 
+void FreeRomFsCtx(romfs_buildctx *ctx);
+
 // RomFs Build Functions
 int SetupRomFs(ncch_settings *ncchset, romfs_buildctx *ctx)
 {

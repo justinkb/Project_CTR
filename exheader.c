@@ -75,7 +75,10 @@ int BuildExHeader(ncch_settings *ncchset)
 		return 0;
 
 	exheader_settings *exhdrset = malloc(sizeof(exheader_settings));
-	if(!exhdrset) {fprintf(stderr,"[EXHEADER ERROR] MEM ERROR\n"); return MEM_ERROR;}
+	if(!exhdrset) {
+		fprintf(stderr,"[EXHEADER ERROR] Not enough memory\n"); 
+		return MEM_ERROR;
+	}
 	init_ExHeaderSettings(exhdrset);
 
 	// Get Settings
@@ -115,7 +118,10 @@ int get_ExHeaderSettingsFromNcchset(exheader_settings *exhdrset, ncch_settings *
 	/* Creating Output Buffer */
 	ncchset->sections.exhdr.size = 0x800;
 	ncchset->sections.exhdr.buffer = malloc(ncchset->sections.exhdr.size);
-	if(!ncchset->sections.exhdr.buffer) {fprintf(stderr,"[EXHEADER ERROR] MEM ERROR\n"); return MEM_ERROR;}
+	if(!ncchset->sections.exhdr.buffer) {
+		fprintf(stderr,"[EXHEADER ERROR] Not enough memory\n"); 
+		return MEM_ERROR;
+	}
 	memset(ncchset->sections.exhdr.buffer,0,ncchset->sections.exhdr.size);
 	
 	/* Import ExHeader Code Section template */
@@ -124,6 +130,7 @@ int get_ExHeaderSettingsFromNcchset(exheader_settings *exhdrset, ncch_settings *
 		u32 import_offset = 0x10;
 		if((import_size+import_offset) > ncchset->componentFilePtrs.exhdrSize){
 			fprintf(stderr,"[EXHEADER ERROR] Exheader Template is too small\n");
+			return FAILED_TO_IMPORT_FILE;
 		}
 		ReadFile_64((ncchset->sections.exhdr.buffer+import_offset),import_size,import_offset,ncchset->componentFilePtrs.exhdr);
 	}

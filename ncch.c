@@ -279,7 +279,7 @@ int ImportNonCodeExeFsSections(ncch_settings *ncchset)
 		ncchset->exefsSections.banner.size = ncchset->componentFilePtrs.bannerSize;
 		ncchset->exefsSections.banner.buffer = malloc(ncchset->exefsSections.banner.size);
 		if(!ncchset->exefsSections.banner.buffer) {
-			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
+			fprintf(stderr,"[NCCH ERROR] Not enough memory\n"); 
 			return MEM_ERROR;
 		}
 		ReadFile_64(ncchset->exefsSections.banner.buffer,ncchset->exefsSections.banner.size,0,ncchset->componentFilePtrs.banner);
@@ -288,7 +288,7 @@ int ImportNonCodeExeFsSections(ncch_settings *ncchset)
 		ncchset->exefsSections.icon.size = ncchset->componentFilePtrs.iconSize;
 		ncchset->exefsSections.icon.buffer = malloc(ncchset->exefsSections.icon.size);
 		if(!ncchset->exefsSections.icon.buffer) {
-			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n");
+			fprintf(stderr,"[NCCH ERROR] Not enough memory\n");
 			return MEM_ERROR;
 		}
 		ReadFile_64(ncchset->exefsSections.icon.buffer,ncchset->exefsSections.icon.size,0,ncchset->componentFilePtrs.icon);
@@ -302,7 +302,7 @@ int ImportLogo(ncch_settings *ncchset)
 		ncchset->sections.logo.size = align(ncchset->componentFilePtrs.logoSize,ncchset->options.mediaSize);
 		ncchset->sections.logo.buffer = malloc(ncchset->sections.logo.size);
 		if(!ncchset->sections.logo.buffer) {
-			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n");
+			fprintf(stderr,"[NCCH ERROR] Not enough memory\n");
 			return MEM_ERROR;
 		}
 		memset(ncchset->sections.logo.buffer,0,ncchset->sections.logo.size);
@@ -313,7 +313,7 @@ int ImportLogo(ncch_settings *ncchset)
 			ncchset->sections.logo.size = 0x2000;
 			ncchset->sections.logo.buffer = malloc(ncchset->sections.logo.size);
 			if(!ncchset->sections.logo.buffer) {
-				fprintf(stderr,"[NCCH ERROR] MEM ERROR\n");
+				fprintf(stderr,"[NCCH ERROR] Not enough memory\n");
 				return MEM_ERROR;
 			}
 			memcpy(ncchset->sections.logo.buffer,Nintendo_LZ,0x2000);
@@ -322,7 +322,7 @@ int ImportLogo(ncch_settings *ncchset)
 			ncchset->sections.logo.size = 0x2000;
 			ncchset->sections.logo.buffer = malloc(ncchset->sections.logo.size);
 			if(!ncchset->sections.logo.buffer) {
-				fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
+				fprintf(stderr,"[NCCH ERROR] Not enough memory\n"); 
 				return MEM_ERROR;
 			}
 			memcpy(ncchset->sections.logo.buffer,Nintendo_LicensedBy_LZ,0x2000);
@@ -331,7 +331,7 @@ int ImportLogo(ncch_settings *ncchset)
 			ncchset->sections.logo.size = 0x2000;
 			ncchset->sections.logo.buffer = malloc(ncchset->sections.logo.size);
 			if(!ncchset->sections.logo.buffer) {
-				fprintf(stderr,"[NCCH ERROR] MEM ERROR\n");
+				fprintf(stderr,"[NCCH ERROR] Not enough memory\n");
 				return MEM_ERROR;
 			}
 			memcpy(ncchset->sections.logo.buffer,Nintendo_DistributedBy_LZ,0x2000);
@@ -340,7 +340,7 @@ int ImportLogo(ncch_settings *ncchset)
 			ncchset->sections.logo.size = 0x2000;
 			ncchset->sections.logo.buffer = malloc(ncchset->sections.logo.size);
 			if(!ncchset->sections.logo.buffer) {
-				fprintf(stderr,"[NCCH ERROR] MEM ERROR\n");
+				fprintf(stderr,"[NCCH ERROR] Not enough memory\n");
 				return MEM_ERROR;
 			}
 			memcpy(ncchset->sections.logo.buffer,iQue_with_ISBN_LZ,0x2000);
@@ -349,7 +349,7 @@ int ImportLogo(ncch_settings *ncchset)
 			ncchset->sections.logo.size = 0x2000;
 			ncchset->sections.logo.buffer = malloc(ncchset->sections.logo.size);
 			if(!ncchset->sections.logo.buffer) {
-				fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
+				fprintf(stderr,"[NCCH ERROR] Not enough memory\n"); 
 				return MEM_ERROR;
 			}
 			memcpy(ncchset->sections.logo.buffer,iQue_without_ISBN_LZ,0x2000);
@@ -408,10 +408,8 @@ int SetupNcch(ncch_settings *ncchset, romfs_buildctx *romfs)
 	if(romfs->romfsSize){
 		romfsHashSize = ncchset->options.mediaSize;
 		romfsSize = align(romfs->romfsSize,ncchset->options.mediaSize);
-		if(ncchSize == 0x200)
-			romfsOffset = ncchSize;
-		else
-			romfsOffset = align(ncchSize,ncchset->options.mediaSize*8);
+		//romfsOffset = align(ncchSize,0x200); // Old makerom method, SDK 3.x and prior
+		romfsOffset = align(ncchSize,0x1000);
 		ncchSize = romfsOffset + romfsSize;
 	}
 	else
@@ -539,8 +537,10 @@ int FinaliseNcch(ncch_settings *ncchset)
 			return -1;
 		}
 
-		//memdump(stdout,"key0: ",key0,16);
-		//memdump(stdout,"key1: ",key1,16);
+		/*
+		memdump(stdout,"key0: ",key0,16);
+		memdump(stdout,"key1: ",key1,16);
+		*/
 
 		// Crypting Exheader
 		if(ncchset->cryptoDetails.exhdrSize)
@@ -548,16 +548,16 @@ int FinaliseNcch(ncch_settings *ncchset)
 
 		// Crypting ExeFs Files
 		if(ncchset->cryptoDetails.exefsSize){
+			exefs_hdr *exefsHdr = (exefs_hdr*)exefs;
 			for(int i = 0; i < MAX_EXEFS_SECTIONS; i++){
 				u8 *key = NULL;
-				exefs_filehdr *exefsFile = (exefs_filehdr*)(exefs+sizeof(exefs_filehdr)*i);
-				if(strncmp(exefsFile->name,"icon",8) == 0 ||strncmp(exefsFile->name,"banner",8) == 0)
+				if(strncmp(exefsHdr->fileHdr[i].name,"icon",8) == 0 || strncmp(exefsHdr->fileHdr[i].name,"banner",8) == 0)
 					key = key0;
 				else
 					key = key1;
 
-				u32 offset = u8_to_u32(exefsFile->offset,LE) + 0x200;
-				u32 size = u8_to_u32(exefsFile->size,LE);
+				u32 offset = u8_to_u32(exefsHdr->fileHdr[i].offset,LE) + 0x200;
+				u32 size = u8_to_u32(exefsHdr->fileHdr[i].size,LE);
 
 				if(size)
 					CryptNCCHSection((exefs+offset),align(size,ncchset->options.mediaSize),offset,&ncchset->cryptoDetails,key,ncch_exefs);
@@ -603,7 +603,7 @@ int SetCommonHeaderBasicData(ncch_settings *ncchset, ncch_hdr *hdr)
 
 	if(ncchset->rsfSet->BasicInfo.CompanyCode){
 		if(strlen((char*)ncchset->rsfSet->BasicInfo.CompanyCode) != 2){
-			fprintf(stderr,"[NCCH ERROR] Company code length must be 2\n");
+			fprintf(stderr,"[NCCH ERROR] CompanyCode length must be 2\n");
 			return NCCH_BAD_YAML_SET;
 		}
 		memcpy(hdr->makerCode,ncchset->rsfSet->BasicInfo.CompanyCode,2);
@@ -678,9 +678,11 @@ int VerifyNCCH(u8 *ncch, keys_struct *keys, bool CheckHash, bool SuppressOutput)
 	u8 *hdr_sig = ncch;
 	ncch_hdr* hdr = GetNCCH_CommonHDR(NULL,NULL,ncch);
 
-	ncch_struct *ncch_ctx = malloc(sizeof(ncch_struct));
-	if(!ncch_ctx){ fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); return MEM_ERROR; }
-	memset(ncch_ctx,0x0,sizeof(ncch_struct));
+	ncch_struct *ncch_ctx = calloc(1,sizeof(ncch_struct));
+	if(!ncch_ctx){ 
+		fprintf(stderr,"[NCCH ERROR] Not enough memory\n"); 
+		return MEM_ERROR; 
+	}
 	GetNCCHStruct(ncch_ctx,hdr);
 
 	ncch_key_type keyType = GetNCCHKeyType(hdr);
@@ -734,7 +736,7 @@ int VerifyNCCH(u8 *ncch, keys_struct *keys, bool CheckHash, bool SuppressOutput)
 		// Get ExHeader
 		extended_hdr *ExHeader = malloc(ncch_ctx->exhdrSize);
 		if(!ExHeader){ 
-			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
+			fprintf(stderr,"[NCCH ERROR] Not enough memory\n"); 
 			free(ncch_ctx);
 			return MEM_ERROR; 
 		}
@@ -783,7 +785,7 @@ int VerifyNCCH(u8 *ncch, keys_struct *keys, bool CheckHash, bool SuppressOutput)
 	{
 		u8 *ExeFs = malloc(ncch_ctx->exefsHashDataSize);
 		if(!ExeFs){ 
-			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
+			fprintf(stderr,"[NCCH ERROR] Not enough memory\n"); 
 			free(ncch_ctx);
 			return MEM_ERROR; 
 		}
@@ -803,7 +805,7 @@ int VerifyNCCH(u8 *ncch, keys_struct *keys, bool CheckHash, bool SuppressOutput)
 	if(ncch_ctx->romfsSize){
 		u8 *RomFs = malloc(ncch_ctx->romfsHashDataSize);
 		if(!RomFs){ 
-			fprintf(stderr,"[NCCH ERROR] MEM ERROR\n"); 
+			fprintf(stderr,"[NCCH ERROR] Not enough memory\n"); 
 			free(ncch_ctx);
 			return MEM_ERROR; 
 		}
@@ -838,9 +840,9 @@ int VerifyNCCH(u8 *ncch, keys_struct *keys, bool CheckHash, bool SuppressOutput)
 
 u8* RetargetNCCH(FILE *fp, u64 size, u8 *TitleId, u8 *ProgramId, keys_struct *keys)
 {
-	u8 *ncch = malloc(size);
+	u8 *ncch = calloc(1,size);
 	if(!ncch){
-		fprintf(stderr,"[NCCH ERROR] MEM ERROR\n");
+		fprintf(stderr,"[NCCH ERROR] Not enough memory\n");
 		return NULL;
 	}
 	ReadFile_64(ncch,size,0,fp); // Importing
@@ -856,7 +858,7 @@ u8* RetargetNCCH(FILE *fp, u64 size, u8 *TitleId, u8 *ProgramId, keys_struct *ke
 int ModifyNcchIds(u8 *ncch, u8 *titleId, u8 *programId, keys_struct *keys)
 {
 	if(!IsNCCH(NULL,ncch)){
-		free(ncch);
+		//free(ncch);
 		return -1;
 	}
 		
@@ -865,7 +867,7 @@ int ModifyNcchIds(u8 *ncch, u8 *titleId, u8 *programId, keys_struct *keys)
 	
 	if(/*keys->rsa.requiresPresignedDesc && */!IsCfa(hdr)){
 		fprintf(stderr,"[NCCH ERROR] CXI's ID cannot be modified without the ability to resign the AccessDesc\n"); // Not yet yet, requires AccessDesc Privk, may implement anyway later
-		free(ncch);
+		//free(ncch);
 		return -1;
 	}
 	
@@ -894,7 +896,7 @@ int ModifyNcchIds(u8 *ncch, u8 *titleId, u8 *programId, keys_struct *keys)
 		key = GetNCCHKey(keytype,keys);
 		if(key == NULL){
 			fprintf(stderr,"[NCCH ERROR] Failed to load ncch aes key\n");
-			free(ncch);
+			//free(ncch);
 			return -1;
 		}
 		CryptNCCHSection(romfs,ncch_struct.romfsSize,0,&ncch_struct,key,ncch_romfs);
@@ -918,7 +920,7 @@ int ModifyNcchIds(u8 *ncch, u8 *titleId, u8 *programId, keys_struct *keys)
 		key = GetNCCHKey(keytype,keys);
 		if(key == NULL){
 			fprintf(stderr,"[NCCH ERROR] Failed to load ncch aes key\n");
-			free(ncch);
+			//free(ncch);
 			return -1;
 		}
 		CryptNCCHSection(romfs,ncch_struct.romfsSize,0,&ncch_struct,key,ncch_romfs);
@@ -1122,6 +1124,8 @@ void CryptNCCHSection(u8 *buffer, u64 size, u64 src_pos, ncch_struct *ctx, u8 ke
 		carry /= 0x10;
 		ctr_add_counter(&aes_ctx,carry);
 	}
+
+	
 	ctr_crypt_counter(&aes_ctx, buffer, buffer, size);
 	return;
 }

@@ -39,9 +39,11 @@ int BuildTMD(cia_settings *ciaset)
 int SetupTMDBuffer(buffer_struct *tmd)
 {
 	// Predict TMD Size
-	tmd->buffer = malloc(tmd->size); // tmd->size is already set before
-	if(!tmd->buffer) { fprintf(stderr,"[ERROR] MEM ERROR\n"); return MEM_ERROR; }
-	memset(tmd->buffer,0,tmd->size);
+	tmd->buffer = calloc(1,tmd->size); // tmd->size is already set before
+	if(!tmd->buffer) { 
+		fprintf(stderr,"[ERROR] Not enough memory\n"); 
+		return MEM_ERROR; 
+	}
 	return 0;
 }
 
@@ -53,8 +55,6 @@ int SetupTMDHeader(tmd_hdr *hdr, tmd_content_info_record *info_record, cia_setti
 	hdr->formatVersion = ciaset->tmd.formatVersion;
 	hdr->caCrlVersion = ciaset->cert.caCrlVersion;
 	hdr->signerCrlVersion = ciaset->cert.signerCrlVersion;
-	//u8 dummy[8] = {0x00,0x04,0x00,0x00,0x00,0x00,0x01,0x00};
-	//memcpy(hdr->TitleID,dummy,8);
 	memcpy(hdr->titleID,ciaset->common.titleId,8);
 	memcpy(hdr->titleType,ciaset->tmd.titleType,4);
 	memcpy(hdr->savedataSize,ciaset->tmd.savedataSize,4);

@@ -323,6 +323,7 @@ void GET_CardInfo(ctr_yaml_context *ctx, rsf_settings *rsf)
 		else if(cmpYamlValue("CardDevice",ctx)) SetSimpleYAMLValue(&rsf->CardInfo.CardDevice,"CardDevice",ctx,0);
 		else if(cmpYamlValue("MediaType",ctx)) SetSimpleYAMLValue(&rsf->CardInfo.MediaType,"MediaType",ctx,0);
 		else if(cmpYamlValue("BackupWriteWaitTime",ctx)) SetSimpleYAMLValue(&rsf->CardInfo.BackupWriteWaitTime,"BackupWriteWaitTime",ctx,0);
+		else if(cmpYamlValue("SaveCrypto",ctx)) SetSimpleYAMLValue(&rsf->CardInfo.SaveCrypto,"SaveCrypto",ctx,0);
 
 		else{
 			fprintf(stderr,"[-] Unrecognised key '%s'\n",GetYamlString(ctx));

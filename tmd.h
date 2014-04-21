@@ -63,3 +63,6 @@ typedef struct
 // Prototypes
 u32 PredictTMDSize(u16 ContentCount);
 int BuildTMD(cia_settings *ciaset);
+
+// Read TMD
+tmd_hdr *GetTmdHdr(u8 *tmd);

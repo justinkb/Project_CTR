@@ -6,8 +6,11 @@
 int main(int argc, char *argv[])
 {
 	// Setting up user settings
-	user_settings *usrset = malloc(sizeof(user_settings));
-	if(usrset == NULL) {fprintf(stderr,"[!] MEM ERROR\n"); return -1;}	
+	user_settings *usrset = calloc(1,sizeof(user_settings));
+	if(usrset == NULL) {
+		fprintf(stderr,"[!] Not enough memory\n"); 
+		return -1;
+	}	
 	init_UserSettings(usrset);
 	
 	int result;
@@ -32,7 +35,10 @@ int main(int argc, char *argv[])
 	if(!usrset->ncch.buildNcch0){ // Import Content
 		if(usrset->common.workingFileType == infile_ncch){
 			FILE *ncch0 = fopen(usrset->common.contentPath[0],"rb");
-			if(!ncch0) {fprintf(stderr,"[MAKEROM ERROR] Failed to open Content 0: %s\n",usrset->common.contentPath[0]); goto finish;}
+			if(!ncch0) {
+				fprintf(stderr,"[MAKEROM ERROR] Failed to open Content 0: %s\n",usrset->common.contentPath[0]); 
+				goto finish;
+			}
 			fclose(ncch0);
 			usrset->common.workingFile.size = GetFileSize_u64(usrset->common.contentPath[0]);
 			usrset->common.workingFile.buffer = malloc(usrset->common.workingFile.size);
@@ -72,7 +78,10 @@ int main(int argc, char *argv[])
 	printf("[DEBUG] Building CCI\n");
 #endif
 		result = build_CCI(usrset);
-		if(result < 0) { fprintf(stderr,"[RESULT] Failed to build CCI\n"); goto finish; }
+		if(result < 0) { 
+			fprintf(stderr,"[RESULT] Failed to build CCI\n");
+			goto finish; 
+		}
 	}
 	// Make CIA
 	else if(usrset->common.outFormat == CIA){
@@ -80,7 +89,10 @@ int main(int argc, char *argv[])
 	printf("[DEBUG] Building CIA\n");
 #endif
 		result = build_CIA(usrset);
-		if(result < 0) { fprintf(stderr,"[RESULT] Failed to build CIA\n"); goto finish; }
+		if(result < 0) { 
+			fprintf(stderr,"[RESULT] Failed to build CIA\n"); 
+			goto finish; 
+		}
 	}
 	// No Container Raw CXI/CFA
 	else if(usrset->common.outFormat == CXI || usrset->common.outFormat == CFA){

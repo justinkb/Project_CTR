@@ -207,6 +207,7 @@ typedef struct
 		char *CardDevice;
 		char *MediaType;
 		char *BackupWriteWaitTime;
+		char *SaveCrypto;
 	} CardInfo;
 	
 	struct{
@@ -269,7 +270,9 @@ typedef struct
 	
 	struct{ 
 		bool useSDKStockData;  // incase we want to use the SDK stock data, for whatever reason.
-		bool use6xSavedataCrypto; // 6.X Gamecard Save Crypto, because spec support.
+		bool dontModifyNcchTitleID;
+		bool closeAlignWritableRegion;
+		char *cverCiaPath;
 	} cci; // CCI Settings
 	
 	struct{

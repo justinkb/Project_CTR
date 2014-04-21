@@ -80,28 +80,28 @@ typedef struct
 
 typedef struct
 {
-	u8 writable_address[4];
-	u8 card_info_bitmask[4];
+	u8 writableAddress[4];
+	u8 cardInfoBitmask[4];
 	// Notes
-	u8 reserved_0[0xf8];
-	u8 media_size_used[8];
-	u8 reserved_1[0x18];
-	u8 cver_title_id[8];
-	u8 cver_title_titleVersion[2];
-	u8 reserved_2[0xcd6];
+	u8 reserved0[0xf8];
+	u8 mediaSizeUsed[8];
+	u8 reserved1[0x18];
+	u8 cverTitleId[8];
+	u8 cverTitleVersion[2];
+	u8 reserved2[0xcd6];
 	//
-	u8 ncch_0_title_id[8];
-	u8 reserved_3[8];
-	u8 initial_data[0x30];
-	u8 reserved_4[0xc0];
-	u8 ncch_0_header[0x100];
+	u8 ncch0TitleId[8];
+	u8 reserved3[8];
+	u8 initialData[0x30];
+	u8 reserved4[0xc0];
+	u8 ncch0Hdr[0x100];
 } cardinfo_hdr;
 
 typedef struct
 {
-	u8 CardDeviceReserved1[0x200];
-	u8 TitleKey[0x10];
-	u8 CardDeviceReserved2[0xf0];
+	u8 cardDeviceReserved1[0x200];
+	u8 titleKey[0x10];
+	u8 cardDeviceReserved2[0xf0];
 } devcardinfo_hdr;
 
 typedef struct
@@ -122,6 +122,10 @@ typedef struct
 	u64 savedataSize;
 	u64 writableAddress;
 	u32 cardInfoBitmask;
+
+	// cver details
+	u8 cverTitleId[8];
+	u8 cverTitleVersion[2];
 	
 	u8 initialData[0x30];
 	ncch_hdr *ncchHdr;
