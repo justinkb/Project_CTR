@@ -9,8 +9,8 @@ typedef enum
 
 typedef enum
 {
-	Compress = 1,
-	RetailSDAppFlag = 2,
+	infoflag_COMPRESS_EXEFS_0 = 1,
+	infoflag_SD_APPLICATION = 2,
 } system_info_flags;
 
 typedef enum
@@ -50,7 +50,7 @@ typedef enum
 
 typedef enum
 {
-	fsaccess_CATEGORY_SYSTEM_APPLICATION = (1 << 0), // 0x00000001
+	fsaccess_CATEGORY_SYSTEM_APPLICATION = (1 << 0), // 0x00000001 used by all sys apps?
 	fsaccess_CATEGORY_HARDWARE_CHECK = (1 << 1), // 0x00000002
 	fsaccess_CATEGORY_FILE_SYSTEM_TOOL = (1 << 2), // 0x00000004
 	fsaccess_DEBUG = (1 << 3), // 0x00000008
@@ -63,14 +63,14 @@ typedef enum
 	fsaccess_CTR_NAND_RW = (1 << 10), // 0x00000400
 	fsaccess_CTR_NAND_RO_WRITE = (1 << 11), // 0x00000800
 	fsaccess_CATEGORY_SYSTEM_SETTINGS = (1 << 12), // 0x00001000
-	fsaccess_CARD_BOARD = (1 << 13), // 0x00002000
+	fsaccess_CARD_BOARD = (1 << 13), // 0x00002000 probably used by sys transfer
 	fsaccess_EXPORT_IMPORT_IVS = (1 << 14), // 0x00004000
 	fsaccess_DIRECT_SDMC_WRITE = (1 << 15), // 0x00008000
-	fsaccess_SWITCH_CLEANUP = (1 << 16), // 0x00010000
-	fsaccess_SAVE_DATA_MOVE = (1 << 17), // 0x00020000
-	fsaccess_SHOP = (1 << 18), // 0x00040000
-	fsaccess_SHELL = (1 << 19), // 0x00080000
-	fsaccess_CATEGORY_HOME_MENU = (1 << 20), // 0x00100000
+	fsaccess_SWITCH_CLEANUP = (1 << 16), // 0x00010000 reference to Sys Transfer?
+	fsaccess_SAVE_DATA_MOVE = (1 << 17), // 0x00020000 used by save transfer tool
+	fsaccess_SHOP = (1 << 18), // 0x00040000 probably used by eshop
+	fsaccess_SHELL = (1 << 19), // 0x00080000 reference to "Nintendo [User Interface] Shell" (NS)?
+	fsaccess_CATEGORY_HOME_MENU = (1 << 20), // 0x00100000 used by homemenu
 } file_system_access;
 
 typedef enum
@@ -226,8 +226,7 @@ int GetDependencyList_frm_exhdr(u8 *Dest,extended_hdr *hdr);
 void GetCoreVersion_frm_exhdr(u8 *Dest, extended_hdr *hdr);
 
 /* ExHeader Settings Read from Yaml */
-int GetSaveDataSize_rsf(u64 *SaveDataSize, user_settings *usrset);
-int GetSaveDataSizeFromString(u64 *out, char *string);
+int GetSaveDataSizeFromString(u64 *out, char *string, char *moduleName);
 int GetRemasterVersion_rsf(u16 *RemasterVersion, user_settings *usrset);
 
 void ErrorParamNotFound(char *string);

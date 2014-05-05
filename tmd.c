@@ -17,7 +17,7 @@ u32 PredictTMDSize(u16 ContentCount)
 int BuildTMD(cia_settings *ciaset)
 {
 	int result = 0;
-	ciaset->ciaSections.tmd.size = PredictTMDSize(ciaset->content.contentCount);
+	ciaset->ciaSections.tmd.size = PredictTMDSize(ciaset->content.count);
 	result = SetupTMDBuffer(&ciaset->ciaSections.tmd);
 	if(result) return result;
 
@@ -29,7 +29,7 @@ int BuildTMD(cia_settings *ciaset)
 
 
 	SetupTMDContentRecord(content_record,ciaset);
-	SetupTMDInfoRecord(info_record,content_record,ciaset->content.contentCount);
+	SetupTMDInfoRecord(info_record,content_record,ciaset->content.count);
 	result = SetupTMDHeader(hdr,info_record,ciaset);
 	if(result) return result;
 	result = SignTMDHeader(hdr,sig,ciaset->keys);
@@ -38,10 +38,9 @@ int BuildTMD(cia_settings *ciaset)
 
 int SetupTMDBuffer(buffer_struct *tmd)
 {
-	// Predict TMD Size
-	tmd->buffer = calloc(1,tmd->size); // tmd->size is already set before
+	tmd->buffer = calloc(1,tmd->size); 
 	if(!tmd->buffer) { 
-		fprintf(stderr,"[ERROR] Not enough memory\n"); 
+		fprintf(stderr,"[TMD ERROR] Not enough memory\n"); 
 		return MEM_ERROR; 
 	}
 	return 0;
@@ -61,7 +60,7 @@ int SetupTMDHeader(tmd_hdr *hdr, tmd_content_info_record *info_record, cia_setti
 	memcpy(hdr->privSavedataSize,ciaset->tmd.privSavedataSize,4);
 	hdr->twlFlag = ciaset->tmd.twlFlag;
 	u16_to_u8(hdr->titleVersion,ciaset->tmd.version,BE);
-	u16_to_u8(hdr->contentCount,ciaset->content.contentCount,BE);
+	u16_to_u8(hdr->contentCount,ciaset->content.count,BE);
 	ctr_sha(info_record,sizeof(tmd_content_info_record)*64,hdr->infoRecordHash,CTR_SHA_256);
 	return 0;
 }
@@ -84,13 +83,13 @@ int SetupTMDInfoRecord(tmd_content_info_record *info_record, u8 *content_record,
 
 int SetupTMDContentRecord(u8 *content_record, cia_settings *ciaset)
 {
-	for(int i = 0; i < ciaset->content.contentCount; i++){
+	for(int i = 0; i < ciaset->content.count; i++){
 		tmd_content_chunk *ptr = (tmd_content_chunk*)(content_record+sizeof(tmd_content_chunk)*i);
-		u32_to_u8(ptr->contentID,ciaset->content.contentId[i],BE);
-		u16_to_u8(ptr->contentIndex,ciaset->content.contentIndex[i],BE);
-		u16_to_u8(ptr->contentFlags,ciaset->content.contentFlags[i],BE);
-		u64_to_u8(ptr->contentSize,ciaset->content.contentSize[i],BE);
-		memcpy(ptr->contentHash,ciaset->content.contentHash[i],0x20);
+		u32_to_u8(ptr->contentID,ciaset->content.id[i],BE);
+		u16_to_u8(ptr->contentIndex,ciaset->content.index[i],BE);
+		u16_to_u8(ptr->contentFlags,ciaset->content.flags[i],BE);
+		u64_to_u8(ptr->contentSize,ciaset->content.size[i],BE);
+		memcpy(ptr->contentHash,ciaset->content.hash[i],0x20);
 	}
 	return 0;
 }

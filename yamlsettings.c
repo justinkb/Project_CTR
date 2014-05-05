@@ -20,7 +20,7 @@ void EvaluateRSF(rsf_settings *rsf, ctr_yaml_context *ctx)
 	else if(cmpYamlValue("CommonHeaderKey",ctx)) {FinishEvent(ctx); GET_CommonHeaderKey(ctx,rsf); goto GET_NextGroup;}
 
 	// If not recognised escape:
-	fprintf(stderr,"[-] Unrecognised Key: '%s'\n",GetYamlString(ctx)); 
+	fprintf(stderr,"[RSF ERROR] Unrecognised Key: '%s'\n",GetYamlString(ctx)); 
 	FinishEvent(ctx); 
 	ctx->error = YAML_BAD_GROUP_HEADER; 
 	return;
@@ -53,6 +53,7 @@ void GET_Option(ctr_yaml_context *ctx, rsf_settings *rsf)
 		if(ctx->error || ctx->done) return;
 		// Handle childs
 		if(cmpYamlValue("AllowUnalignedSection",ctx)) rsf->Option.AllowUnalignedSection = SetBoolYAMLValue("AllowUnalignedSection",ctx);
+		if(cmpYamlValue("MediaFootPadding",ctx)) rsf->Option.MediaFootPadding = SetBoolYAMLValue("MediaFootPadding",ctx);
 		//else if(cmpYamlValue("NoPadding",ctx)) rsf->Option.NoPadding = SetBoolYAMLValue("NoPadding",ctx);
 		else if(cmpYamlValue("EnableCrypt",ctx)) rsf->Option.EnableCrypt = SetBoolYAMLValue("EnableCrypt",ctx);
 		else if(cmpYamlValue("EnableCompress",ctx)) rsf->Option.EnableCompress = SetBoolYAMLValue("EnableCompress",ctx);
@@ -61,7 +62,7 @@ void GET_Option(ctr_yaml_context *ctx, rsf_settings *rsf)
 		else if(cmpYamlValue("PageSize",ctx)) SetSimpleYAMLValue(&rsf->Option.PageSize,"PageSize",ctx,0);
 		//else if(cmpYamlValue("AppendSystemCall",ctx)) rsf->Option.AppendSystemCallNum = SetYAMLSequence(&rsf->Option.AppendSystemCall,"AppendSystemCall",ctx);
 		else{
-			fprintf(stderr,"[-] Unrecognised key '%s'\n",GetYamlString(ctx));
+			fprintf(stderr,"[RSF ERROR] Unrecognised key '%s'\n",GetYamlString(ctx));
 			ctx->error = YAML_UNKNOWN_KEY;
 			FinishEvent(ctx);
 			return;
@@ -101,7 +102,10 @@ void GET_AccessControlInfo(ctr_yaml_context *ctx, rsf_settings *rsf)
 		else if(cmpYamlValue("IdealProcessor",ctx)) SetSimpleYAMLValue(&rsf->AccessControlInfo.IdealProcessor,"IdealProcessor",ctx,0); 
 		else if(cmpYamlValue("Priority",ctx)) SetSimpleYAMLValue(&rsf->AccessControlInfo.Priority,"Priority",ctx,0); 
 		else if(cmpYamlValue("MemoryType",ctx)) SetSimpleYAMLValue(&rsf->AccessControlInfo.MemoryType,"MemoryType",ctx,0); 
-		else if(cmpYamlValue("SystemMode",ctx)) SetSimpleYAMLValue(&rsf->AccessControlInfo.SystemMode,"SystemMode",ctx,0); 
+		else if(cmpYamlValue("SystemMode",ctx)){
+			SetSimpleYAMLValue(&rsf->AccessControlInfo.SystemMode,"SystemMode",ctx,0); 
+			printf("SystemMode ptr: 0x%x\n",rsf->AccessControlInfo.SystemMode);
+		}
 		else if(cmpYamlValue("CoreVersion",ctx)) SetSimpleYAMLValue(&rsf->AccessControlInfo.CoreVersion,"CoreVersion",ctx,0); 
 		else if(cmpYamlValue("HandleTableSize",ctx)) SetSimpleYAMLValue(&rsf->AccessControlInfo.HandleTableSize,"HandleTableSize",ctx,0); 
 		else if(cmpYamlValue("SystemSaveDataId1",ctx)) SetSimpleYAMLValue(&rsf->AccessControlInfo.SystemSaveDataId1,"SystemSaveDataId1",ctx,0); 
@@ -118,6 +122,8 @@ void GET_AccessControlInfo(ctr_yaml_context *ctx, rsf_settings *rsf)
 		else if(cmpYamlValue("ReleaseKernelMinor",ctx)) SetSimpleYAMLValue(&rsf->AccessControlInfo.ReleaseKernelMinor,"ReleaseKernelMinor",ctx,0); 
 		else if(cmpYamlValue("MaxCpu",ctx)) SetSimpleYAMLValue(&rsf->AccessControlInfo.MaxCpu,"MaxCpu",ctx,0); 
 
+
+
 		
 		else if(cmpYamlValue("MemoryMapping",ctx)) rsf->AccessControlInfo.MemoryMappingNum = SetYAMLSequence(&rsf->AccessControlInfo.MemoryMapping,"MemoryMapping",ctx);
 		else if(cmpYamlValue("IORegisterMapping",ctx)) rsf->AccessControlInfo.IORegisterMappingNum = SetYAMLSequence(&rsf->AccessControlInfo.IORegisterMapping,"IORegisterMapping",ctx);
@@ -130,7 +136,7 @@ void GET_AccessControlInfo(ctr_yaml_context *ctx, rsf_settings *rsf)
 		else if(cmpYamlValue("AccessibleSaveDataIds",ctx)) rsf->AccessControlInfo.AccessibleSaveDataIdsNum = SetYAMLSequence(&rsf->AccessControlInfo.AccessibleSaveDataIds,"AccessibleSaveDataIds",ctx);
 
 		else{
-			fprintf(stderr,"[-] Unrecognised key '%s'\n",GetYamlString(ctx));
+			fprintf(stderr,"[RSF ERROR] Unrecognised key '%s'\n",GetYamlString(ctx));
 			ctx->error = YAML_UNKNOWN_KEY;
 			FinishEvent(ctx);
 			return;
@@ -157,9 +163,10 @@ void GET_SystemControlInfo(ctr_yaml_context *ctx, rsf_settings *rsf)
 		else if(cmpYamlValue("StackSize",ctx)) SetSimpleYAMLValue(&rsf->SystemControlInfo.StackSize,"StackSize",ctx,0);
 		else if(cmpYamlValue("RemasterVersion",ctx)) SetSimpleYAMLValue(&rsf->SystemControlInfo.RemasterVersion,"RemasterVersion",ctx,0);
 		else if(cmpYamlValue("JumpId",ctx)) SetSimpleYAMLValue(&rsf->SystemControlInfo.JumpId,"JumpId",ctx,0);
+		else if(cmpYamlValue("SaveDataSize",ctx)) SetSimpleYAMLValue(&rsf->SystemControlInfo.SaveDataSize,"SaveDataSize",ctx,0);
 		else if(cmpYamlValue("Dependency",ctx)) rsf->SystemControlInfo.DependencyNum = SetYAMLSequenceFromMapping(&rsf->SystemControlInfo.Dependency,"Dependency",ctx,false);
 		else{
-			fprintf(stderr,"[-] Unrecognised key '%s'\n",GetYamlString(ctx));
+			fprintf(stderr,"[RSF ERROR] Unrecognised key '%s'\n",GetYamlString(ctx));
 			ctx->error = YAML_UNKNOWN_KEY;
 			FinishEvent(ctx);
 			return;
@@ -181,17 +188,15 @@ void GET_BasicInfo(ctr_yaml_context *ctx, rsf_settings *rsf)
 	while(ctx->Level == InitLevel){
 		if(ctx->error || ctx->done) return;
 		// Handle childs
-		if(cmpYamlValue("MediaFootPadding",ctx)) rsf->BasicInfo.MediaFootPadding = SetBoolYAMLValue("MediaFootPadding",ctx);
-		else if(cmpYamlValue("Title",ctx)) SetSimpleYAMLValue(&rsf->BasicInfo.Title,"Title",ctx,0);
+		if(cmpYamlValue("Title",ctx)) SetSimpleYAMLValue(&rsf->BasicInfo.Title,"Title",ctx,0);
 		else if(cmpYamlValue("CompanyCode",ctx)) SetSimpleYAMLValue(&rsf->BasicInfo.CompanyCode,"CompanyCode",ctx,0);
 		else if(cmpYamlValue("ProductCode",ctx)) SetSimpleYAMLValue(&rsf->BasicInfo.ProductCode,"ProductCode",ctx,0);
-		else if(cmpYamlValue("MediaSize",ctx)) SetSimpleYAMLValue(&rsf->BasicInfo.MediaSize,"MediaSize",ctx,0);
 		else if(cmpYamlValue("ContentType",ctx)) SetSimpleYAMLValue(&rsf->BasicInfo.ContentType,"ContentType",ctx,0);
 		else if(cmpYamlValue("Logo",ctx)) SetSimpleYAMLValue(&rsf->BasicInfo.Logo,"Logo",ctx,0);
 		//else if(cmpYamlValue("BackupMemoryType",ctx)) SetSimpleYAMLValue(&rsf->BasicInfo.BackupMemoryType,"BackupMemoryType",ctx,0);
 		//else if(cmpYamlValue("InitialCode",ctx)) SetSimpleYAMLValue(&rsf->BasicInfo.InitialCode,"InitialCode",ctx,0);
 		else{
-			fprintf(stderr,"[-] Unrecognised key '%s'\n",GetYamlString(ctx));
+			fprintf(stderr,"[RSF ERROR] Unrecognised key '%s'\n",GetYamlString(ctx));
 			ctx->error = YAML_UNKNOWN_KEY;
 			FinishEvent(ctx);
 			return;
@@ -216,7 +221,6 @@ void GET_Rom(ctr_yaml_context *ctx, rsf_settings *rsf)
 		
 		if(cmpYamlValue("HostRoot",ctx)) SetSimpleYAMLValue(&rsf->Rom.HostRoot,"HostRoot",ctx,0);
 		//else if(cmpYamlValue("Padding",ctx)) SetSimpleYAMLValue(&rsf->Rom.Padding,"Padding",ctx,0);
-		else if(cmpYamlValue("SaveDataSize",ctx)) SetSimpleYAMLValue(&rsf->Rom.SaveDataSize,"SaveDataSize",ctx,0);
 		
 		else if(cmpYamlValue("DefaultReject",ctx)) rsf->Rom.DefaultRejectNum = SetYAMLSequence(&rsf->Rom.DefaultReject,"DefaultReject",ctx);
 		else if(cmpYamlValue("Reject",ctx)) rsf->Rom.RejectNum = SetYAMLSequence(&rsf->Rom.Reject,"Reject",ctx);
@@ -224,7 +228,7 @@ void GET_Rom(ctr_yaml_context *ctx, rsf_settings *rsf)
 		else if(cmpYamlValue("File",ctx)) rsf->Rom.FileNum = SetYAMLSequence(&rsf->Rom.File,"File",ctx);
 		
 		else{
-			fprintf(stderr,"[-] Unrecognised key '%s'\n",GetYamlString(ctx));
+			fprintf(stderr,"[RSF ERROR] Unrecognised key '%s'\n",GetYamlString(ctx));
 			ctx->error = YAML_UNKNOWN_KEY;
 			FinishEvent(ctx);
 			return;
@@ -252,7 +256,7 @@ void GET_ExeFs(ctr_yaml_context *ctx, rsf_settings *rsf)
 		else if(cmpYamlValue("ReadWrite",ctx)) rsf->ExeFs.ReadWriteNum = SetYAMLSequence(&rsf->ExeFs.ReadWrite,"ReadWrite",ctx);
 		
 		else{
-			fprintf(stderr,"[-] Unrecognised key '%s'\n",GetYamlString(ctx));
+			fprintf(stderr,"[RSF ERROR] Unrecognised key '%s'\n",GetYamlString(ctx));
 			ctx->error = YAML_UNKNOWN_KEY;
 			FinishEvent(ctx);
 			return;
@@ -294,7 +298,7 @@ void GET_TitleInfo(ctr_yaml_context *ctx, rsf_settings *rsf)
 		else if(cmpYamlValue("CategoryFlags",ctx)) rsf->TitleInfo.CategoryFlagsNum = SetYAMLSequence(&rsf->TitleInfo.CategoryFlags,"CategoryFlags",ctx);
 		
 		else{
-			fprintf(stderr,"[-] Unrecognised key '%s'\n",GetYamlString(ctx));
+			fprintf(stderr,"[RSF ERROR] Unrecognised key '%s'\n",GetYamlString(ctx));
 			ctx->error = YAML_UNKNOWN_KEY;
 			FinishEvent(ctx);
 			return;
@@ -322,11 +326,12 @@ void GET_CardInfo(ctr_yaml_context *ctx, rsf_settings *rsf)
 		else if(cmpYamlValue("CryptoType",ctx)) SetSimpleYAMLValue(&rsf->CardInfo.CryptoType,"CryptoType",ctx,0);
 		else if(cmpYamlValue("CardDevice",ctx)) SetSimpleYAMLValue(&rsf->CardInfo.CardDevice,"CardDevice",ctx,0);
 		else if(cmpYamlValue("MediaType",ctx)) SetSimpleYAMLValue(&rsf->CardInfo.MediaType,"MediaType",ctx,0);
+		else if(cmpYamlValue("MediaSize",ctx)) SetSimpleYAMLValue(&rsf->CardInfo.MediaSize,"MediaSize",ctx,0);
 		else if(cmpYamlValue("BackupWriteWaitTime",ctx)) SetSimpleYAMLValue(&rsf->CardInfo.BackupWriteWaitTime,"BackupWriteWaitTime",ctx,0);
 		else if(cmpYamlValue("SaveCrypto",ctx)) SetSimpleYAMLValue(&rsf->CardInfo.SaveCrypto,"SaveCrypto",ctx,0);
 
 		else{
-			fprintf(stderr,"[-] Unrecognised key '%s'\n",GetYamlString(ctx));
+			fprintf(stderr,"[RSF ERROR] Unrecognised key '%s'\n",GetYamlString(ctx));
 			ctx->error = YAML_UNKNOWN_KEY;
 			FinishEvent(ctx);
 			return;
@@ -362,7 +367,7 @@ void GET_CommonHeaderKey(ctr_yaml_context *ctx, rsf_settings *rsf)
 		else if(cmpYamlValue("Descriptor",ctx)) SetSimpleYAMLValue(&rsf->CommonHeaderKey.AccCtlDescBin,"Descriptor",ctx,0);
 
 		else{
-			fprintf(stderr,"[-] Unrecognised key '%s'\n",GetYamlString(ctx));
+			fprintf(stderr,"[RSF ERROR] Unrecognised key '%s'\n",GetYamlString(ctx));
 			ctx->error = YAML_UNKNOWN_KEY;
 			FinishEvent(ctx);
 			return;

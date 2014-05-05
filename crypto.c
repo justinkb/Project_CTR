@@ -1,7 +1,6 @@
 #include "lib.h"
 #include "crypto.h"
 
-// API for polarssl adapted/copied from CTRTOOL by neimod
 void ctr_sha(void *data, u64 size, u8 *hash, int mode)
 {
 	switch(mode){
@@ -12,39 +11,19 @@ void ctr_sha(void *data, u64 size, u8 *hash, int mode)
 
 u8* AesKeyScrambler(u8 *Key, u8 *KeyX, u8 *KeyY)
 {
-	u32 *KeyX_u32 = (u32*) KeyX;
-	u32 *KeyY_u32 = (u32*) KeyY;
-	u32 *Key_u32 = (u32*) Key;
-		
-	for(int i = 0,j; i < 4; i++)
-	{
-		switch(i)
-		{
-			///* Type 1
-			case 0 : j = 2; break;
-			case 1 : j = 3; break;
-			case 2 : j = 0; break;
-			case 3 : j = 1; break;
-			//*/
-			/* Type 2
-			case 0 : j = 3; break;
-			case 1 : j = 2; break;
-			case 2 : j = 1; break;
-			case 3 : j = 0; break;
-			//*/
-			/* Type 3
-			case 0 : j = 1; break;
-			case 1 : j = 0; break;
-			case 2 : j = 3; break;
-			case 3 : j = 2; break;
-			//*/
-		}
-		
-		Key_u32[j] = KeyX_u32[i] ^ KeyY_u32[i];
-	}
-	
-	// Done Stuff
-	return (u8*)Key_u32;
+	// Process KeyX/KeyY to get raw normal key
+	for(int i = 0; i < 16; i++)
+		Key[i] = KeyX[i] ^ ((KeyY[i] >> 2) | ((KeyY[i < 15 ? i+1 : 0] & 3) << 6));
+
+#ifndef PUBLIC_BUILD
+	const u8 SCRAMBLE_SECRET[16] = {0x51, 0xD7, 0x5D, 0xBE, 0xFD, 0x07, 0x57, 0x6A, 0x1C, 0xFC, 0x2A, 0xF0, 0x94, 0x4B, 0xD5, 0x6C};
+
+	// Apply Secret to get final normal key
+	for(int i = 0; i < 16; i++)
+		Key[i] = Key[i] ^ SCRAMBLE_SECRET[i];
+#endif
+
+	return Key;
 }
 
 void ctr_add_counter(ctr_aes_context* ctx, u32 carry)

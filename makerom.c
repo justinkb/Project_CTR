@@ -12,6 +12,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}	
 	init_UserSettings(usrset);
+	initRand();
 	
 	int result;
 	
@@ -34,29 +35,38 @@ int main(int argc, char *argv[])
 	// Setup Content 0
 	if(!usrset->ncch.buildNcch0){ // Import Content
 		if(usrset->common.workingFileType == infile_ncch){
-			FILE *ncch0 = fopen(usrset->common.contentPath[0],"rb");
-			if(!ncch0) {
+			if(!AssertFile(usrset->common.contentPath[0])){
 				fprintf(stderr,"[MAKEROM ERROR] Failed to open Content 0: %s\n",usrset->common.contentPath[0]); 
 				goto finish;
 			}
-			fclose(ncch0);
-			usrset->common.workingFile.size = GetFileSize_u64(usrset->common.contentPath[0]);
-			usrset->common.workingFile.buffer = malloc(usrset->common.workingFile.size);
-			ncch0 = fopen(usrset->common.contentPath[0],"rb");
+			u64 fileSize = GetFileSize_u64(usrset->common.contentPath[0]);
+			u64 calcSize = 0;
+
+			FILE *ncch0 = fopen(usrset->common.contentPath[0],"rb");
+			
+			ncch_hdr hdr;
+			GetNCCH_CommonHDR(&hdr,ncch0,NULL);
+			calcSize = GetNCCH_MediaSize(&hdr) * GetNCCH_MediaUnitSize(&hdr);
+			if(calcSize != fileSize){
+				fprintf(stderr,"[MAKEROM ERROR] Content 0 is corrupt\n"); 
+				fclose(ncch0);
+				goto finish;
+			}
+
+			usrset->common.workingFile.size = fileSize;
+			usrset->common.workingFile.buffer = malloc(fileSize);
 			ReadFile_64(usrset->common.workingFile.buffer, usrset->common.workingFile.size,0,ncch0);
 			fclose(ncch0);
 		}
 		else if(usrset->common.workingFileType == infile_srl || usrset->common.workingFileType == infile_ncsd){
-			FILE *fp = fopen(usrset->common.workingFilePath,"rb");
-			if(!fp) {
+			if(!AssertFile(usrset->common.workingFilePath)) {
 				fprintf(stderr,"[MAKEROM ERROR] Failed to open %s: %s\n",usrset->common.workingFileType == infile_srl? "SRL":"CCI",usrset->common.workingFilePath); 
 				goto finish;
 			}
-			fclose(fp);
 			u64 size = GetFileSize_u64(usrset->common.workingFilePath);
 			usrset->common.workingFile.size = align(size,0x10);
 			usrset->common.workingFile.buffer = malloc(usrset->common.workingFile.size);
-			fp = fopen(usrset->common.workingFilePath,"rb");
+			FILE *fp = fopen(usrset->common.workingFilePath,"rb");
 			ReadFile_64(usrset->common.workingFile.buffer,size,0,fp);
 			fclose(fp);
 		}
@@ -101,7 +111,7 @@ int main(int argc, char *argv[])
 #endif
 		FILE *ncch_out = fopen(usrset->common.outFileName,"wb");
 		if(!ncch_out) {
-			fprintf(stderr,"[ERROR] Failed to create '%s'\n",usrset->common.outFileName); 
+			fprintf(stderr,"[MAKEROM ERROR] Failed to create '%s'\n",usrset->common.outFileName); 
 			fprintf(stderr,"[RESULT] Failed to build '%s'\n",usrset->common.outFormat == CXI? "CXI" : "CFA"); 
 			result = FAILED_TO_CREATE_OUTFILE; 
 			goto finish;

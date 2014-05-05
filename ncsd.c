@@ -8,8 +8,8 @@
 // Private Prototypes
 
 /* RSA Crypto */
-int SignCCI(u8 *Signature, u8 *NCSD_HDR);
-int CheckCCISignature(u8 *Signature, u8 *NCSD_HDR);
+int SignCCI(u8 *Signature, u8 *NCSD_HDR, keys_struct *keys);
+int CheckCCISignature(u8 *Signature, u8 *NCSD_HDR, keys_struct *keys);
 
 /* cci_settings tools */
 void init_CCISettings(cci_settings *set);
@@ -17,16 +17,18 @@ int get_CCISettings(cci_settings *cciset, user_settings *usrset);
 void free_CCISettings(cci_settings *set);
 
 /* CCI Data Gen/Write */
-int BuildNCSDHeader(cci_settings *cciset, user_settings *usrset);
+int BuildCCIHeader(cci_settings *cciset, user_settings *usrset);
 int BuildCardInfoHeader(cci_settings *cciset, user_settings *usrset);
-int WriteCCI_HDR_ToFile(cci_settings *cciset);
-int WriteCCI_Content_ToFile(cci_settings *cciset,user_settings *usrset);
-int WriteCCI_DummyBytes(cci_settings *cciset);
+int WriteHeaderToFile(cci_settings *cciset);
+int WriteContentToFile(cci_settings *cciset,user_settings *usrset);
+int WriteDummyBytes(cci_settings *cciset);
 
 /* Get Data from Content Files */
 int CheckContent0(cci_settings *cciset, user_settings *usrset);
 int GetDataFromContent0(cci_settings *cciset, user_settings *usrset);
 int GetContentFP(cci_settings *cciset, user_settings *usrset);
+int ImportNcchPartitions(cci_settings *cciset);
+int ImportCverDetails(cci_settings *cciset, user_settings *usrset);
 
 /* Get Data from YAML Settings */
 int GetNCSDFlags(cci_settings *cciset, rsf_settings *yaml);
@@ -38,6 +40,7 @@ int GetCardInfoBitmask(cci_settings *cciset, user_settings *usrset);
 int CheckMediaSize(cci_settings *cciset);
 
 static InternalCCI_Context ctx;
+const int NCCH0_OFFSET = 0x4000;
 
 // Code
 int build_CCI(user_settings *usrset)
@@ -56,6 +59,10 @@ int build_CCI(user_settings *usrset)
 	result = get_CCISettings(cciset,usrset);
 	if(result) goto finish;
 
+	// Import Content
+	result = ImportNcchPartitions(cciset);
+	if(result) goto finish;
+
 	// Create Output File
 	cciset->out = fopen(usrset->common.outFileName,"wb");
 	if(!cciset->out){
@@ -65,20 +72,19 @@ int build_CCI(user_settings *usrset)
 	}
 
 	// Generate NCSD Header and Additional Header
-	result = BuildNCSDHeader(cciset,usrset);
-	if(result) 
-		goto finish;
+	result = BuildCCIHeader(cciset,usrset);
+	if(result) goto finish;
 	BuildCardInfoHeader(cciset,usrset);
 	
 	// Write to File
-	WriteCCI_HDR_ToFile(cciset);
-	result = WriteCCI_Content_ToFile(cciset,usrset);
+	WriteHeaderToFile(cciset);
+	result = WriteContentToFile(cciset,usrset);
 	if(result) 
 		goto finish;
 	
 	// Fill out file if necessary 
-	if(cciset->fillOutCci) 
-		WriteCCI_DummyBytes(cciset);
+	if(cciset->option.fillOutCci) 
+		WriteDummyBytes(cciset);
 	
 	// Close output file
 finish:
@@ -88,14 +94,14 @@ finish:
 }
 
 
-int SignCCI(u8 *Signature, u8 *NCSD_HDR)
+int SignCCI(u8 *Signature, u8 *NCSD_HDR, keys_struct *keys)
 {
-	return ctr_sig(NCSD_HDR,sizeof(cci_hdr),Signature,ctx.keys->rsa.cciCfaPub,ctx.keys->rsa.cciCfaPvt,RSA_2048_SHA256,CTR_RSA_SIGN);
+	return ctr_sig(NCSD_HDR,sizeof(cci_hdr),Signature,keys->rsa.cciCfaPub,keys->rsa.cciCfaPvt,RSA_2048_SHA256,CTR_RSA_SIGN);
 }
 
-int CheckCCISignature(u8 *Signature, u8 *NCSD_HDR)
+int CheckCCISignature(u8 *Signature, u8 *NCSD_HDR, keys_struct *keys)
 {
-	return ctr_sig(NCSD_HDR,sizeof(cci_hdr),Signature,ctx.keys->rsa.cciCfaPub,NULL,RSA_2048_SHA256,CTR_RSA_VERIFY);
+	return ctr_sig(NCSD_HDR,sizeof(cci_hdr),Signature,keys->rsa.cciCfaPub,NULL,RSA_2048_SHA256,CTR_RSA_VERIFY);
 }
 
 void init_CCISettings(cci_settings *set)
@@ -106,7 +112,7 @@ void init_CCISettings(cci_settings *set)
 
 int get_CCISettings(cci_settings *cciset, user_settings *usrset)
 {
-	ctx.keys = &usrset->common.keys;
+	cciset->keys = &usrset->common.keys;
 	int result = 0;
 
 	/* Importing Data from Content */
@@ -118,7 +124,6 @@ int get_CCISettings(cci_settings *cciset, user_settings *usrset)
 
 	result = GetContentFP(cciset,usrset);
 	if(result) return result;
-
 	
 
 	/* Getting Data from YAML */
@@ -147,27 +152,33 @@ int get_CCISettings(cci_settings *cciset, user_settings *usrset)
 
 void free_CCISettings(cci_settings *set)
 {
-	if(set->content){
+	if(set->content.filePtrs){
 		for(int i = 1; i < 8; i++) {
-			if(set->content[i]) fclose(set->content[i]);
+			if(set->content.filePtrs[i]) fclose(set->content.filePtrs[i]);
 		}
-		free(set->content);
+		free(set->content.filePtrs);
 	}
 	free(set);
 }
 
-int BuildNCSDHeader(cci_settings *cciset, user_settings *usrset)
+int BuildCCIHeader(cci_settings *cciset, user_settings *usrset)
 {
 	memcpy((u8*)ctx.cciHdr.magic,"NCSD",4);
-	u32_to_u8((u8*)ctx.cciHdr.mediaSize,(cciset->mediaSize/cciset->mediaUnit),LE); 
-	memcpy((u8*)ctx.cciHdr.titleId,cciset->mediaId,8);
+	u32_to_u8((u8*)ctx.cciHdr.mediaSize,(cciset->header.mediaSize/cciset->option.mediaUnit),LE); 
+	memcpy((u8*)ctx.cciHdr.titleId,cciset->header.mediaId,8);
+	memcpy((u8*)ctx.cciHdr.flags,cciset->header.flags,8);
+
+	// Content
 	for(int i = 0; i < 8; i++){
-		u32_to_u8((u8*)ctx.cciHdr.offset_sizeTable[i].offset,(cciset->contentOffset[i]/cciset->mediaUnit),LE);
-		u32_to_u8((u8*)ctx.cciHdr.offset_sizeTable[i].size,(cciset->contentSize[i]/cciset->mediaUnit),LE);
-		memcpy((u8*)ctx.cciHdr.partitionIdTable[i],cciset->contentTitleId[i],8);
+		u32_to_u8((u8*)ctx.cciHdr.offset_sizeTable[i].offset,(cciset->content.offset[i]/cciset->option.mediaUnit),LE);
+		u32_to_u8((u8*)ctx.cciHdr.offset_sizeTable[i].size,(cciset->content.size[i]/cciset->option.mediaUnit),LE);
+		memcpy((u8*)ctx.cciHdr.contentIdTable[i],cciset->content.titleId[i],8);
+		ctx.cciHdr.contentFsType[i] = cciset->content.fsType[i];
+		ctx.cciHdr.contentCryptoType[i] = cciset->content.cryptoType[i];
 	}
-	memcpy((u8*)ctx.cciHdr.partitionFlags,cciset->flags,8);
-	if(SignCCI(ctx.signature,(u8*)&ctx.cciHdr) != Good){
+	
+	// Signature
+	if(SignCCI(ctx.signature,(u8*)&ctx.cciHdr,cciset->keys) != Good){
 		fprintf(stderr,"[CCI ERROR] Failed to sign CCI\n");
 		return CCI_SIG_FAIL;
 	}
@@ -176,27 +187,49 @@ int BuildNCSDHeader(cci_settings *cciset, user_settings *usrset)
 
 int BuildCardInfoHeader(cci_settings *cciset, user_settings *usrset)
 {
-	u32_to_u8((u8*)ctx.cardinfo.writableAddress,(cciset->writableAddress/cciset->mediaUnit),LE); 
-	u32_to_u8((u8*)ctx.cardinfo.cardInfoBitmask,cciset->cardInfoBitmask,BE);
-	u32_to_u8((u8*)ctx.cardinfo.mediaSizeUsed,cciset->cciTotalSize,LE);
-	memcpy(ctx.cardinfo.cverTitleId,cciset->cverTitleId,8);
-	memcpy(ctx.cardinfo.cverTitleVersion,cciset->cverTitleVersion,2);
-	memcpy((u8*)ctx.cardinfo.ncch0TitleId,cciset->contentTitleId[0],8);
-	memcpy((u8*)ctx.cardinfo.initialData,cciset->initialData,0x30);
-	memcpy((u8*)ctx.cardinfo.ncch0Hdr,cciset->ncchHdr,0x100);
-	memcpy((u8*)ctx.devcardinfo.titleKey,cciset->titleKey,0x10);
+	u32_to_u8((u8*)ctx.cardinfo.writableAddress,(cciset->cardinfo.writableAddress/cciset->option.mediaUnit),LE); 
+	u32_to_u8((u8*)ctx.cardinfo.cardInfoBitmask,cciset->cardinfo.cardInfoBitmask,BE);
+	u32_to_u8((u8*)ctx.cardinfo.mediaSizeUsed,cciset->cardinfo.cciTotalSize,LE);
+	memcpy(ctx.cardinfo.cverTitleId,cciset->cardinfo.cverTitleId,8);
+	memcpy(ctx.cardinfo.cverTitleVersion,cciset->cardinfo.cverTitleVersion,2);
+	memcpy((u8*)ctx.cardinfo.ncch0TitleId,cciset->content.titleId[0],8);
+	memcpy((u8*)ctx.cardinfo.initialData,cciset->cardinfo.initialData,0x30);
+	memcpy((u8*)ctx.cardinfo.ncch0Hdr,&cciset->cardinfo.ncchHdr,0x100);
+	memcpy((u8*)ctx.devcardinfo.titleKey,cciset->cardinfo.titleKey,0x10);
 
 	return 0;
 }
 
-int WriteCCI_HDR_ToFile(cci_settings *cciset)
+int ImportNcchPartitions(cci_settings *cciset)
+{
+	cciset->content.data->buffer = realloc(cciset->content.data->buffer,cciset->content.data->size);
+	if(!cciset->content.data->buffer){
+		fprintf(stderr,"[CCI ERROR] Not enough memory\n");
+		return MEM_ERROR;
+	}
+
+	ncch_hdr *ncch0hdr = (ncch_hdr*)(cciset->content.data->buffer+0x100);
+	for(int i = 1; i < CCI_MAX_CONTENT; i++){
+		if(!cciset->content.size[i])
+			continue;
+
+		u8 *ncchpos = (u8*)(cciset->content.data->buffer+cciset->content.offset[i]-cciset->content.offset[0]);
+
+		ReadFile_64(ncchpos, cciset->content.fileSize[i], 0, cciset->content.filePtrs[i]);
+		if(ModifyNcchIds(ncchpos, cciset->content.titleId[i], ncch0hdr->programId, cciset->keys) != 0)
+			return -1;
+	}
+	return 0;
+}
+
+int WriteHeaderToFile(cci_settings *cciset)
 {
 	WriteBuffer(ctx.signature,0x100,0,cciset->out);
 	WriteBuffer((u8*)&ctx.cciHdr,sizeof(cci_hdr),0x100,cciset->out);
 	WriteBuffer((u8*)&ctx.cardinfo,sizeof(cardinfo_hdr),0x200,cciset->out);
-	if(memcmp(ctx.devcardinfo.titleKey,ctx.keys->aes.normalKey,16) == 0){
+	if(!cciset->option.useDevCardInfo){
 		// Creating Buffer of Dummy Bytes
-		u64 len = cciset->contentOffset[0] - 0x1200;
+		u64 len = NCCH0_OFFSET - 0x1200;
 		u8 *dummy_bytes = malloc(len);
 		memset(dummy_bytes,0xff,len);
 		WriteBuffer(dummy_bytes,len,0x1200,cciset->out);
@@ -206,93 +239,85 @@ int WriteCCI_HDR_ToFile(cci_settings *cciset)
 	return 0;
 }
 
-int WriteCCI_Content_ToFile(cci_settings *cciset,user_settings *usrset)
+int WriteContentToFile(cci_settings *cciset,user_settings *usrset)
 {
 	// Write Content 0
-	WriteBuffer(cciset->ncch0,cciset->contentSize[0],cciset->contentOffset[0],cciset->out);
-	free(usrset->common.workingFile.buffer);
-	usrset->common.workingFile.buffer = NULL;
-	usrset->common.workingFile.size = 0;
-	
-	// Add additional contents, recreating them with their new TitleID
-	for(int i = 1; i < 8; i++){
-		if(cciset->content[i]){
-			u8 *ncch = RetargetNCCH(cciset->content[i],cciset->contentSize[i],cciset->contentTitleId[i],cciset->mediaId,ctx.keys);
-			if(!ncch){
-				fprintf(stderr,"[CCI ERROR] Could not import content %d to CCI\n",i);
-				return FAILED_TO_IMPORT_FILE;
-			}
-			WriteBuffer(ncch,cciset->contentSize[i],cciset->contentOffset[i],cciset->out);
-			free(ncch);
-		}
-	}
+	WriteBuffer(cciset->content.data->buffer,cciset->content.data->size,NCCH0_OFFSET,cciset->out);
+	free(cciset->content.data->buffer);
+	cciset->content.data->buffer = NULL;
+	cciset->content.data->size = 0;
 	return 0;
 }
 
-int WriteCCI_DummyBytes(cci_settings *cciset)
+int WriteDummyBytes(cci_settings *cciset)
 {
 	// Seeking end of CCI Data
-	fseek_64(cciset->out,cciset->cciTotalSize);
+	fseek_64(cciset->out,cciset->cardinfo.cciTotalSize);
 
 	// Determining Size of Dummy Bytes
-	u64 len = cciset->mediaSize - cciset->cciTotalSize;
+	u64 len = cciset->header.mediaSize - cciset->cardinfo.cciTotalSize;
 	
 	// Creating Buffer of Dummy Bytes
-	u8 *dummy_bytes = malloc(cciset->mediaUnit);
-	memset(dummy_bytes,0xff,cciset->mediaUnit);
+	u8 *dummy_bytes = malloc(cciset->option.mediaUnit);
+	memset(dummy_bytes,0xff,cciset->option.mediaUnit);
 	
 	// Writing Dummy Bytes to file
-	for(u64 i = 0; i < len; i += cciset->mediaUnit)
-		fwrite(dummy_bytes,cciset->mediaUnit,1,cciset->out);
+	for(u64 i = 0; i < len; i += cciset->option.mediaUnit)
+		fwrite(dummy_bytes,cciset->option.mediaUnit,1,cciset->out);
 	
 	return 0;
 }
 
 int GetContentFP(cci_settings *cciset, user_settings *usrset)
 {
-	cciset->content = malloc(sizeof(FILE*)*8);
-	if(!cciset->content){
+	cciset->content.filePtrs = calloc(8,sizeof(FILE*));
+	if(!cciset->content.filePtrs){
 		fprintf(stderr,"[CCI ERROR] Not enough memory\n");
 		return MEM_ERROR;
 	}
-	memset(cciset->content,0,sizeof(FILE*)*8);
 	
 	for(int i = 1; i < 8; i++){
 		if(usrset->common.contentPath[i]){
-			cciset->content[i] = fopen(usrset->common.contentPath[i],"rb");
-			if(!cciset->content[i]){ // Checking if file could be opened
+			if(!AssertFile(usrset->common.contentPath[i])){ // Checking if file could be opened
 				fprintf(stderr,"[CCI ERROR] Failed to open '%s'\n",usrset->common.contentPath[i]);
 				return FAILED_TO_OPEN_FILE;
 			}
-			if(!IsNCCH(cciset->content[i],NULL)){ // Checking if NCCH
+
+			cciset->content.fileSize[i] = GetFileSize_u64(usrset->common.contentPath[i]);
+			cciset->content.filePtrs[i] = fopen(usrset->common.contentPath[i],"rb");
+			/*
+			if(!cciset->content.filePtrs[i]){ // Checking if file could be opened
+				fprintf(stderr,"[CCI ERROR] Failed to open '%s'\n",usrset->common.contentPath[i]);
+				return FAILED_TO_OPEN_FILE;
+			}
+			*/
+			if(!IsNCCH(cciset->content.filePtrs[i],NULL)){ // Checking if NCCH
 				fprintf(stderr,"[CCI ERROR] Content '%s' is invalid\n",usrset->common.contentPath[i]);
-				return NCSD_INVALID_NCCH0;
+				return NCSD_INVALID_NCCH;
 			}
 			
 			// Getting NCCH Header
 			ncch_hdr *hdr = malloc(sizeof(ncch_hdr));
-			GetNCCH_CommonHDR(hdr,cciset->content[i],NULL);
-			
-			if(GetNCCH_MediaUnitSize(hdr) != cciset->mediaUnit){ // Checking if Media Unit Size matches CCI
-				fprintf(stderr,"[CCI ERROR] Content '%s' is invalid\n",usrset->common.contentPath[i]);
-				return NCSD_INVALID_NCCH0;
-			}
+			GetNCCH_CommonHDR(hdr,cciset->content.filePtrs[i],NULL);
 			
 			if(usrset->cci.dontModifyNcchTitleID)
-				memcpy(&cciset->contentTitleId[i],hdr->titleId,8);
+				memcpy(&cciset->content.titleId[i], hdr->titleId, 8);
 			else{
-				memcpy(&cciset->contentTitleId[i],cciset->mediaId,8); // Set TitleID
-			
-				// Modify TitleID Accordingly
-				u16 tmp = u8_to_u16(&hdr->titleId[6],LE);
-				tmp |= (i+4);
-				u16_to_u8(&cciset->contentTitleId[i][6],tmp,LE);
+				memcpy(&cciset->content.titleId[i], cciset->header.mediaId, 8); // Set TitleID			
+				u16_to_u8(&cciset->content.titleId[i][6], (i+4), LE);
 			}
 
-			cciset->contentSize[i] =  GetNCCH_MediaSize(hdr)*cciset->mediaUnit;
-			cciset->contentOffset[i] = cciset->cciTotalSize;
+			u64 contentSize = (u64)GetNCCH_MediaSize(hdr)* (u64)GetNCCH_MediaUnitSize(hdr);
+			if(contentSize != cciset->content.fileSize[i]){
+				fprintf(stderr,"[CCI ERROR] Content '%s' is corrupt\n",usrset->common.contentPath[i]);
+				return NCSD_INVALID_NCCH;
+			}
+
+			cciset->content.size[i] =  align(contentSize,cciset->option.mediaUnit);
+			cciset->content.offset[i] = cciset->cardinfo.cciTotalSize;
 			
-			cciset->cciTotalSize += cciset->contentSize[i];
+			cciset->content.data->size += cciset->content.size[i];
+			cciset->cardinfo.cciTotalSize += cciset->content.size[i];
 			
 			free(hdr);
 		}
@@ -302,81 +327,97 @@ int GetContentFP(cci_settings *cciset, user_settings *usrset)
 
 int CheckContent0(cci_settings *cciset, user_settings *usrset)
 {
-	if(!usrset->common.workingFile.buffer) 
+	if(!usrset->common.workingFile.buffer || !usrset->common.workingFile.size) 
 		return NCSD_NO_NCCH0;
-	cciset->ncch0 = usrset->common.workingFile.buffer;
-	cciset->ncch0_FileLen = usrset->common.workingFile.size;
+	cciset->content.data = &usrset->common.workingFile;
 	
-	if(!IsNCCH(NULL,cciset->ncch0)) 
+	if(!IsNCCH(NULL,cciset->content.data->buffer)) 
 		return NCSD_INVALID_NCCH0;
 	
 	return 0;
 }
 
 int GetDataFromContent0(cci_settings *cciset, user_settings *usrset)
-{
-	cciset->cciTotalSize = 0x4000;
-	
+{	
+	cciset->cardinfo.cciTotalSize = NCCH0_OFFSET; 
 	ncch_hdr *hdr;
 	
-	hdr = GetNCCH_CommonHDR(NULL,NULL,cciset->ncch0);
+	hdr = GetNCCH_CommonHDR(NULL,NULL,cciset->content.data->buffer);
 	
-	cciset->ncchHdr = hdr;
+	memcpy(&cciset->cardinfo.ncchHdr,hdr,sizeof(ncch_hdr));
 	
 	u16 ncch_format_ver = u8_to_u16(hdr->formatVersion,LE);
-	if(ncch_format_ver != 0 && ncch_format_ver != 2){
-		fprintf(stderr,"[CCI ERROR] NCCH type %d Not Supported\n",ncch_format_ver);
+	if(ncch_format_ver > 2){
+		fprintf(stderr,"[CCI ERROR] NCCH type %d not supported\n",ncch_format_ver);
 		return FAILED_TO_IMPORT_FILE;
 	}
 
 	//memdump(stdout,"ncch0 head: ",(cciset->ncch0+0x100),0x100);
 	//memdump(stdout,"ncch0 head: ",(u8*)(hdr),0x100);
 	
-	memcpy(cciset->mediaId,hdr->titleId,8);
-	memcpy(&cciset->contentTitleId[0],hdr->titleId,8);
+	memcpy(cciset->header.mediaId,hdr->titleId,8);
+	memcpy(&cciset->content.titleId[0],hdr->titleId,8);
+#ifndef PUBLIC_BUILD
 	if(usrset->cci.useSDKStockData){
-		memcpy(cciset->initialData,stock_initial_data,0x30);
-		memcpy(cciset->titleKey,stock_title_key,0x10);
+		memcpy(cciset->cardinfo.initialData,stock_initial_data,0x30);
+		memcpy(cciset->cardinfo.titleKey,stock_title_key,0x10);
+		cciset->option.useDevCardInfo = true;
 	}
 	else{
-		u8 Hash[0x40];
-		ctr_sha(cciset->ncch0,0x80,Hash,CTR_SHA_256);
-		ctr_sha((cciset->ncch0+0x80),0x80,(Hash+0x20),CTR_SHA_256);
-		memcpy(cciset->initialData,Hash,0x2C);
-		//memcpy(cciset->titleKey,(Hash+0x30),0x10); // Might Remove
+		for(int i = 0; i < 0x2c/sizeof(u32); i++)
+		{
+			u32 val = u32GetRand();
+			memcpy((cciset->cardinfo.initialData+i*sizeof(u32)),&val,4);
+		}
+		/*
+		for(int i = 0; i < 2; i++)
+		{
+			u64 val = u64GetRand();
+			memcpy((cciset->cardinfo.titleKey+i*8),&val,8);
+		}
+		cciset->option.useDevCardInfo = true;
+		*/
 	}
+#else
+	for(int i = 0; i < 0x2c/sizeof(u32); i++)
+	{
+		u32 val = u32GetRand();
+		memcpy((cciset->cardinfo.initialData+i*sizeof(u32)),&val,4);
+	}
+#endif
 	
-	cciset->flags[MediaUnitSize] = hdr->flags[ContentUnitSize];
-	cciset->mediaUnit = GetNCCH_MediaUnitSize(hdr);
+	cciset->header.flags[MediaUnitSize] = hdr->flags[ContentUnitSize];
+	cciset->option.mediaUnit = GetNCCH_MediaUnitSize(hdr);
 	
-	cciset->contentSize[0] = (u64)(GetNCCH_MediaSize(hdr) * cciset->mediaUnit);
-	cciset->contentOffset[0] = cciset->cciTotalSize;
+	cciset->content.size[0] = (u64)(GetNCCH_MediaSize(hdr) * cciset->option.mediaUnit);
+	cciset->content.offset[0] = cciset->cardinfo.cciTotalSize;
 	
-	cciset->cciTotalSize += cciset->contentSize[0];
+	cciset->content.data->size = cciset->content.size[0];
+	cciset->cardinfo.cciTotalSize += cciset->content.size[0];
 	return 0;
 }
 
 int GetMediaSize(cci_settings *cciset, user_settings *usrset)
 {
-	char *MediaSizeStr = usrset->common.rsfSet.BasicInfo.MediaSize;
-	if(!MediaSizeStr) cciset->mediaSize = (u64)GB*2;
+	char *mediaSizeStr = usrset->common.rsfSet.CardInfo.MediaSize;
+	if(!mediaSizeStr) cciset->header.mediaSize = (u64)GB*2;
 	else{
-		if(strcasecmp(MediaSizeStr,"128MB") == 0) cciset->mediaSize = (u64)MB*128;
-		else if(strcasecmp(MediaSizeStr,"256MB") == 0) cciset->mediaSize = (u64)MB*256;
-		else if(strcasecmp(MediaSizeStr,"512MB") == 0) cciset->mediaSize = (u64)MB*512;
-		else if(strcasecmp(MediaSizeStr,"1GB") == 0) cciset->mediaSize = (u64)GB*1;
-		else if(strcasecmp(MediaSizeStr,"2GB") == 0) cciset->mediaSize = (u64)GB*2;
-		else if(strcasecmp(MediaSizeStr,"4GB") == 0) cciset->mediaSize = (u64)GB*4;
-		else if(strcasecmp(MediaSizeStr,"8GB") == 0) cciset->mediaSize = (u64)GB*8;
-		else if(strcasecmp(MediaSizeStr,"16GB") == 0) cciset->mediaSize = (u64)GB*16;
-		else if(strcasecmp(MediaSizeStr,"32GB") == 0) cciset->mediaSize = (u64)GB*32;
+		if(strcasecmp(mediaSizeStr,"128MB") == 0) cciset->header.mediaSize = (u64)MB*128;
+		else if(strcasecmp(mediaSizeStr,"256MB") == 0) cciset->header.mediaSize = (u64)MB*256;
+		else if(strcasecmp(mediaSizeStr,"512MB") == 0) cciset->header.mediaSize = (u64)MB*512;
+		else if(strcasecmp(mediaSizeStr,"1GB") == 0) cciset->header.mediaSize = (u64)GB*1;
+		else if(strcasecmp(mediaSizeStr,"2GB") == 0) cciset->header.mediaSize = (u64)GB*2;
+		else if(strcasecmp(mediaSizeStr,"4GB") == 0) cciset->header.mediaSize = (u64)GB*4;
+		else if(strcasecmp(mediaSizeStr,"8GB") == 0) cciset->header.mediaSize = (u64)GB*8;
+		else if(strcasecmp(mediaSizeStr,"16GB") == 0) cciset->header.mediaSize = (u64)GB*16;
+		else if(strcasecmp(mediaSizeStr,"32GB") == 0) cciset->header.mediaSize = (u64)GB*32;
 		else {
-			fprintf(stderr,"[CCI ERROR] Invalid MediaSize: %s\n",MediaSizeStr);
+			fprintf(stderr,"[CCI ERROR] Invalid MediaSize: %s\n",mediaSizeStr);
 			return INVALID_YAML_OPT;
 		}
 	}
 	
-	if(usrset->common.rsfSet.BasicInfo.MediaFootPadding != -1) cciset->fillOutCci = usrset->common.rsfSet.BasicInfo.MediaFootPadding;
+	cciset->option.fillOutCci = usrset->common.rsfSet.Option.MediaFootPadding;
 	
 	return 0;
 }
@@ -411,21 +452,21 @@ u64 GetUnusedSize(u64 MediaSize, u8 CardType)
 int GetNCSDFlags(cci_settings *cciset, rsf_settings *yaml)
 {
 	/* BackupWriteWaitTime */
-	cciset->flags[FW6x_BackupWriteWaitTime] = 0;
+	cciset->header.flags[FW6x_BackupWriteWaitTime] = 0;
 	if(yaml->CardInfo.BackupWriteWaitTime){
 		u32 WaitTime = strtoul(yaml->CardInfo.BackupWriteWaitTime,NULL,0);
 		if(WaitTime > 255){
 			fprintf(stderr,"[CCI ERROR] Invalid Card BackupWriteWaitTime (%d) : must 0-255\n",WaitTime);
 			return EXHDR_BAD_YAML_OPT;
 		}
-		cciset->flags[FW6x_BackupWriteWaitTime] = (u8)WaitTime;
+		cciset->header.flags[FW6x_BackupWriteWaitTime] = (u8)WaitTime;
 	}
 
 	/* MediaType */
-	if(!yaml->CardInfo.MediaType) cciset->flags[MediaTypeIndex] = CARD1;
+	if(!yaml->CardInfo.MediaType) cciset->header.flags[MediaTypeIndex] = CARD1;
 	else{
-		if(strcasecmp(yaml->CardInfo.MediaType,"Card1") == 0) cciset->flags[MediaTypeIndex] = CARD1;
-		else if(strcasecmp(yaml->CardInfo.MediaType,"Card2") == 0) cciset->flags[MediaTypeIndex] = CARD2;
+		if(strcasecmp(yaml->CardInfo.MediaType,"Card1") == 0) cciset->header.flags[MediaTypeIndex] = CARD1;
+		else if(strcasecmp(yaml->CardInfo.MediaType,"Card2") == 0) cciset->header.flags[MediaTypeIndex] = CARD2;
 		else {
 			fprintf(stderr,"[CCI ERROR] Invalid MediaType: %s\n",yaml->CardInfo.MediaType);
 			return INVALID_YAML_OPT;
@@ -433,7 +474,7 @@ int GetNCSDFlags(cci_settings *cciset, rsf_settings *yaml)
 	}
 
 	/* Platform */
-	cciset->flags[MediaPlatformIndex] = CTR;
+	cciset->header.flags[MediaPlatformIndex] = CTR;
 
 	u8 saveCrypto;
 
@@ -451,23 +492,23 @@ int GetNCSDFlags(cci_settings *cciset, rsf_settings *yaml)
 	
 
 	/* FW6x SaveCrypto */
-	cciset->flags[FW6x_SaveCryptoFlag] = saveCrypto == 6;
+	cciset->header.flags[FW6x_SaveCryptoFlag] = saveCrypto == 6;
 
 	/* CardDevice */
 	if(saveCrypto > 1){
 		u8 flag = CardDeviceFlag;
 		if(saveCrypto == 2) flag = OldCardDeviceFlag;
-		if(!yaml->CardInfo.CardDevice) cciset->flags[flag] = CARD_DEVICE_NONE;
+		if(!yaml->CardInfo.CardDevice) cciset->header.flags[flag] = CARD_DEVICE_NONE;
 		else{
 			if(strcmp(yaml->CardInfo.CardDevice,"NorFlash") == 0) {
-				cciset->flags[flag] = CARD_DEVICE_NOR_FLASH;
-				if(cciset->flags[MediaTypeIndex] == CARD2){
+				cciset->header.flags[flag] = CARD_DEVICE_NOR_FLASH;
+				if(cciset->header.flags[MediaTypeIndex] == CARD2){
 					fprintf(stderr,"[CCI WARNING] 'CardDevice: NorFlash' is invalid on Card2\n");
-					cciset->flags[flag] = CARD_DEVICE_NONE;
+					cciset->header.flags[flag] = CARD_DEVICE_NONE;
 				}
 			}
-			else if(strcmp(yaml->CardInfo.CardDevice,"None") == 0) cciset->flags[flag] = CARD_DEVICE_NONE;
-			else if(strcmp(yaml->CardInfo.CardDevice,"BT") == 0) cciset->flags[flag] = CARD_DEVICE_BT;
+			else if(strcmp(yaml->CardInfo.CardDevice,"None") == 0) cciset->header.flags[flag] = CARD_DEVICE_NONE;
+			else if(strcmp(yaml->CardInfo.CardDevice,"BT") == 0) cciset->header.flags[flag] = CARD_DEVICE_BT;
 			else {
 				fprintf(stderr,"[CCI ERROR] Invalid CardDevice: %s\n",yaml->CardInfo.CardDevice);
 				return INVALID_YAML_OPT;
@@ -479,37 +520,37 @@ int GetNCSDFlags(cci_settings *cciset, rsf_settings *yaml)
 
 int GetWriteableAddress(cci_settings *cciset, user_settings *usrset)
 {
-	int result = GetSaveDataSize_rsf(&cciset->savedataSize,usrset);
+	int result = GetSaveDataSizeFromString(&cciset->option.savedataSize,usrset->common.rsfSet.SystemControlInfo.SaveDataSize,"NCSD");
 	if(result) return result;
 
 	char *WriteableAddressStr = usrset->common.rsfSet.CardInfo.WritableAddress;;
 	
-	cciset->writableAddress = -1;
-	if(cciset->flags[MediaTypeIndex] != CARD2) return 0; // Can only be set for Card2 Media
+	cciset->cardinfo.writableAddress = -1;
+	if(cciset->header.flags[MediaTypeIndex] != CARD2) return 0; // Can only be set for Card2 Media
 	
 	if(WriteableAddressStr){
 		if(strncmp(WriteableAddressStr,"0x",2) != 0){
 			fprintf(stderr,"[CCI ERROR] WritableAddress requires a Hexadecimal value\n");
 			return INVALID_YAML_OPT;
 		}	
-		cciset->writableAddress = strtoul((WriteableAddressStr+2),NULL,16);
+		cciset->cardinfo.writableAddress = strtoull((WriteableAddressStr+2),NULL,16);
 	}
-	if(cciset->writableAddress == -1){ // If not set manually or is max size
-		if ((cciset->mediaSize / 2) < cciset->savedataSize){ // If SaveData size is greater than half the MediaSize
-			u64 SavedataSize = cciset->savedataSize / KB;
+	if(cciset->cardinfo.writableAddress == -1){ // If not set manually or is max size
+		if ((cciset->header.mediaSize / 2) < cciset->option.savedataSize){ // If SaveData size is greater than half the MediaSize
+			u64 SavedataSize = cciset->option.savedataSize / KB;
 			fprintf(stderr,"[CCI ERROR] Too large SavedataSize %llK\n",SavedataSize);
 			return SAVE_DATA_TOO_LARGE;
 		}
-		if (cciset->savedataSize > (u64)(2047*MB)){ // Limit set by Nintendo
-			u64 SavedataSize = cciset->savedataSize / KB;
+		if (cciset->option.savedataSize > (u64)(2047*MB)){ // Limit set by Nintendo
+			u64 SavedataSize = cciset->option.savedataSize / KB;
 			fprintf(stderr,"[CCI ERROR] Too large SavedataSize %llK\n",SavedataSize);
 			return SAVE_DATA_TOO_LARGE;
 		}
 		if(usrset->cci.closeAlignWritableRegion)
-			cciset->writableAddress = align(cciset->cciTotalSize, cciset->mediaUnit);
+			cciset->cardinfo.writableAddress = align(cciset->cardinfo.cciTotalSize, cciset->option.mediaUnit);
 		else{
-			u64 UnusedSize = GetUnusedSize(cciset->mediaSize,cciset->flags[MediaTypeIndex]); // Need to look into this
-			cciset->writableAddress = cciset->mediaSize - UnusedSize - cciset->savedataSize;
+			u64 UnusedSize = GetUnusedSize(cciset->header.mediaSize,cciset->header.flags[MediaTypeIndex]); // Need to look into this
+			cciset->cardinfo.writableAddress = cciset->header.mediaSize - UnusedSize - cciset->option.savedataSize;
 		}
 	}
 	return 0;
@@ -518,10 +559,10 @@ int GetWriteableAddress(cci_settings *cciset, user_settings *usrset)
 int GetCardInfoBitmask(cci_settings *cciset, user_settings *usrset)
 {
 	char *str = usrset->common.rsfSet.CardInfo.CardType;
-	if(!str) cciset->cardInfoBitmask |= 0;
+	if(!str) cciset->cardinfo.cardInfoBitmask |= 0;
 	else{
-		if(strcasecmp(str,"s1") == 0) cciset->cardInfoBitmask |= 0;
-		else if(strcasecmp(str,"s2") == 0) cciset->cardInfoBitmask |= 0x20;
+		if(strcasecmp(str,"s1") == 0) cciset->cardinfo.cardInfoBitmask |= 0;
+		else if(strcasecmp(str,"s2") == 0) cciset->cardinfo.cardInfoBitmask |= 0x20;
 		else {
 			fprintf(stderr,"[CCI ERROR] Invalid CardType: %s\n",str);
 			return INVALID_YAML_OPT;
@@ -529,7 +570,7 @@ int GetCardInfoBitmask(cci_settings *cciset, user_settings *usrset)
 	}
 	
 	str = usrset->common.rsfSet.CardInfo.CryptoType;
-	if(!str) cciset->cardInfoBitmask |= (3*0x40);
+	if(!str) cciset->cardinfo.cardInfoBitmask |= 0;//(3*0x40);
 	else{
 		int Value = strtol(str,NULL,10);
 		if(Value < 0 || Value > 3) {
@@ -539,7 +580,7 @@ int GetCardInfoBitmask(cci_settings *cciset, user_settings *usrset)
 		if(Value != 3){
 			fprintf(stderr,"[CCI WARNING] Card crypto type = '%d'\n",Value);
 		}
-		cciset->cardInfoBitmask |= (Value*0x40);
+		cciset->cardinfo.cardInfoBitmask |= (Value*0x40);
 	}
 	
 	return 0;
@@ -548,12 +589,19 @@ int GetCardInfoBitmask(cci_settings *cciset, user_settings *usrset)
 int ImportCverDetails(cci_settings *cciset, user_settings *usrset)
 {
 	if(!usrset->cci.cverCiaPath){
-		memset(cciset->cverTitleId,0,8);
-		memset(cciset->cverTitleVersion,0,2);
+		memset(cciset->cardinfo.cverTitleId,0,8);
+		memset(cciset->cardinfo.cverTitleVersion,0,2);
 		return 0;
 	}
-	if(!DoesFileExist(usrset->cci.cverCiaPath)){
-		fprintf(stderr,"[NCSD ERROR] Failed to open \"%s\"\n",usrset->cci.cverCiaPath);
+	if(!cciset->content.size[7]){
+		fprintf(stderr,"[CCI WARNING] Update Partition (content 7) is not specified, cver details will not be set\n");
+		memset(cciset->cardinfo.cverTitleId,0,8);
+		memset(cciset->cardinfo.cverTitleVersion,0,2);
+		return 0;
+	}
+	
+	if(!AssertFile(usrset->cci.cverCiaPath)){
+		fprintf(stderr,"[CCI ERROR] Failed to open \"%s\"\n",usrset->cci.cverCiaPath);
 		return FAILED_TO_IMPORT_FILE;
 	}
 	FILE *cia = fopen(usrset->cci.cverCiaPath,"rb");
@@ -565,12 +613,15 @@ int ImportCverDetails(cci_settings *cciset, user_settings *usrset)
 	u8 *tmd = calloc(1,tmdSize);
 	ReadFile_64(tmd,tmdSize,tmdOffset,cia);
 	tmd_hdr *tmdHdr = GetTmdHdr(tmd);
-	memdump(stdout,"tmd: ",(u8*)tmdHdr,sizeof(tmd_hdr));
+	//memdump(stdout,"tmd: ",(u8*)tmdHdr,sizeof(tmd_hdr));
 
 
-	endian_memcpy(cciset->cverTitleId,tmdHdr->titleID,8,LE);
-	endian_memcpy(cciset->cverTitleVersion,tmdHdr->titleVersion,2,LE);
+	endian_memcpy(cciset->cardinfo.cverTitleId,tmdHdr->titleID,8,LE);
+	endian_memcpy(cciset->cardinfo.cverTitleVersion,tmdHdr->titleVersion,2,LE);
 
+	if(!usrset->cci.dontModifyNcchTitleID)
+		endian_memcpy(&cciset->content.titleId[7][6],tmdHdr->titleVersion,2,LE);
+	
 	fclose(cia);
 	free(ciaHdr);
 	free(tmd);
@@ -580,9 +631,9 @@ int ImportCverDetails(cci_settings *cciset, user_settings *usrset)
 
 int CheckMediaSize(cci_settings *cciset)
 {
-	if(cciset->cciTotalSize > cciset->mediaSize){
+	if(cciset->cardinfo.cciTotalSize > cciset->header.mediaSize){
 		char *MediaSizeStr = NULL;
-		switch(cciset->mediaSize){
+		switch(cciset->header.mediaSize){
 			case (u64)128*MB: MediaSizeStr = " '128MB'"; break;
 			case (u64)256*MB: MediaSizeStr = " '256MB'"; break;
 			case (u64)512*MB: MediaSizeStr = " '512MB'"; break;
@@ -605,8 +656,9 @@ bool IsCci(u8 *ncsd)
 	cci_hdr *hdr = (cci_hdr*)(ncsd+0x100);
 	if(!hdr) return false;
 	if(memcmp(hdr->magic,"NCSD",4)!=0) return false;
-	if(hdr->partitionFlags[MediaPlatformIndex] != CTR) return false;
-	if(hdr->partitionFlags[MediaTypeIndex] != CARD1 && hdr->partitionFlags[MediaTypeIndex] != CARD2) return false;
+	if(hdr->flags[MediaPlatformIndex] != CTR) return false;
+	if(hdr->flags[MediaTypeIndex] != CARD1 && hdr->flags[MediaTypeIndex] != CARD2) return false;
+
 	return true;
 }
 
@@ -619,7 +671,7 @@ u8* GetPartition(u8 *ncsd, u8 index)
 u64 GetPartitionOffset(u8 *ncsd, u8 index)
 {
 	cci_hdr *hdr = (cci_hdr*)(ncsd+0x100);
-	u32 media_size = 0x200*pow(2,hdr->partitionFlags[MediaUnitSize]);
+	u32 media_size = 0x200*pow(2,hdr->flags[MediaUnitSize]);
 	u32 offset = u8_to_u64(hdr->offset_sizeTable[index].offset,LE);
 	return offset*media_size;
 }
@@ -627,7 +679,7 @@ u64 GetPartitionOffset(u8 *ncsd, u8 index)
 u64 GetPartitionSize(u8 *ncsd, u8 index)
 {
 	cci_hdr *hdr = (cci_hdr*)(ncsd+0x100);
-	u32 media_size = 0x200*pow(2,hdr->partitionFlags[MediaUnitSize]);
+	u32 media_size = 0x200*pow(2,hdr->flags[MediaUnitSize]);
 	u32 size = u8_to_u64(hdr->offset_sizeTable[index].size,LE);
 	return size*media_size;
 }

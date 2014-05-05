@@ -113,7 +113,7 @@ int get_ExHeaderSettingsFromNcchset(exheader_settings *exhdrset, ncch_settings *
 	/* Transfer settings */
 	exhdrset->keys = ncchset->keys;
 	exhdrset->rsf = ncchset->rsfSet;
-	exhdrset->useAccessDescPreset = ncchset->keys->accessDescSign.presetType != not_preset;
+	exhdrset->useAccessDescPreset = ncchset->keys->accessDescSign.presetType != desc_preset_NONE;
 
 	/* Creating Output Buffer */
 	ncchset->sections.exhdr.size = 0x800;
@@ -158,9 +158,9 @@ int get_ExHeaderSettingsFromNcchset(exheader_settings *exhdrset, ncch_settings *
 
 	/* Set Simple Flags */
 	if(ncchset->options.CompressCode)
-		exhdrset->exHdr->codeSetInfo.flag |= Compress;
+		exhdrset->exHdr->codeSetInfo.flag |= infoflag_COMPRESS_EXEFS_0;
 	if(ncchset->options.UseOnSD)
-		exhdrset->exHdr->codeSetInfo.flag |= RetailSDAppFlag;
+		exhdrset->exHdr->codeSetInfo.flag |= infoflag_SD_APPLICATION;
 	if(!ncchset->options.UseRomFS) // Move this later
 		exhdrset->exHdr->arm11SystemLocalCapabilities.storageInfo.otherAttributes |= attribute_NOT_USE_ROMFS;
 
@@ -187,10 +187,9 @@ int get_ExHeaderSettingsFromYaml(exheader_settings *exhdrset)
 	if(!exhdrset->useAccessDescPreset){
 		result = get_ExHeaderARM11KernelInfo(&exhdrset->exHdr->arm11KernelCapabilities, exhdrset->rsf);
 		if(result) goto finish;
-
-		result = get_ExHeaderARM9AccessControlInfo(&exhdrset->exHdr->arm9AccessControlInfo, exhdrset->rsf);
-		if(result) goto finish;
 	}
+	result = get_ExHeaderARM9AccessControlInfo(&exhdrset->exHdr->arm9AccessControlInfo, exhdrset->rsf);
+		if(result) goto finish;
 
 finish:
 	return result;
@@ -247,9 +246,9 @@ int get_ExHeaderDependencyList(u8 *DependencyList, rsf_settings *rsf)
 int get_ExHeaderSystemInfo(exhdr_SystemInfo *SystemInfo, rsf_settings *rsf)
 {
 	/* SaveDataSize */
-	if(rsf->Rom.SaveDataSize){
+	if(rsf->SystemControlInfo.SaveDataSize){
 		u64 SaveDataSize = 0;
-		int ret = GetSaveDataSizeFromString(&SaveDataSize,rsf->Rom.SaveDataSize);
+		int ret = GetSaveDataSizeFromString(&SaveDataSize,rsf->SystemControlInfo.SaveDataSize,"EXHEADER");
 		if(ret) return ret;
 		u64_to_u8(SystemInfo->savedataSize,SaveDataSize,LE);
 	}
@@ -1142,8 +1141,9 @@ int get_ExHeaderARM9AccessControlInfo(exhdr_ARM9AccessControlInfo *arm9, rsf_set
 		arm9->descriptors[15] = strtol(rsf->AccessControlInfo.DescVersion,NULL,0);
 	}
 	else{
-		ErrorParamNotFound("AccessControlInfo/DescVersion");
-		return EXHDR_BAD_YAML_OPT;
+		//ErrorParamNotFound("AccessControlInfo/DescVersion");
+		//return EXHDR_BAD_YAML_OPT;
+		arm9->descriptors[15] = 2; // Makerom generates a desc version 2 anyway, so if not specified, it will be set to 2
 	}
 
 	return 0;
@@ -1212,10 +1212,16 @@ int GetDependencyList_frm_exhdr(u8 *Dest, extended_hdr *hdr)
 	return 0;
 }
 
-/* ExHeader Settings Read from Yaml */
-int GetSaveDataSizeFromString(u64 *out, char *string)
+/* ExHeader Settings Read from RSF */
+int GetSaveDataSizeFromString(u64 *out, char *string, char *moduleName)
 {
+	if(!string){
+		*out = 0;
+		return 0;
+	}
+
 	u64 SaveDataSize = strtoull(string,NULL,10);
+
 	if(strstr(string,"K")){
 		char *str = strstr(string,"K");
 		if(strcmp(str,"K") == 0 || strcmp(str,"KB") == 0 ){
@@ -1235,11 +1241,17 @@ int GetSaveDataSizeFromString(u64 *out, char *string)
 		}
 	}
 	else{
-		fprintf(stderr,"[ERROR] Invalid save data size format.\n");
+		if(moduleName)
+			fprintf(stderr,"[%s ERROR] Invalid save data size format.\n",moduleName);
+		else
+			fprintf(stderr,"[ERROR] Invalid save data size format.\n");
 		return EXHDR_BAD_YAML_OPT;
 	}
 	if((SaveDataSize & 65536) != 0){
-		fprintf(stderr,"[ERROR] Save data size must be aligned to 64K.\n");
+		if(moduleName)
+			fprintf(stderr,"[%s ERROR] Save data size must be aligned to 64K.\n",moduleName);
+		else
+			fprintf(stderr,"[ERROR] Save data size must be aligned to 64K.\n");
 		return EXHDR_BAD_YAML_OPT;
 	}
 	*out = SaveDataSize;
@@ -1249,22 +1261,22 @@ int GetSaveDataSizeFromString(u64 *out, char *string)
 int GetSaveDataSize_rsf(u64 *SaveDataSize, user_settings *usrset)
 {	
 
-	if(usrset->common.rsfSet.Rom.SaveDataSize){
-		*SaveDataSize = strtoull(usrset->common.rsfSet.Rom.SaveDataSize,NULL,10);
-		if(strstr(usrset->common.rsfSet.Rom.SaveDataSize,"K")){
-			char *str = strstr(usrset->common.rsfSet.Rom.SaveDataSize,"K");
+	if(usrset->common.rsfSet.SystemControlInfo.SaveDataSize){
+		*SaveDataSize = strtoull(usrset->common.rsfSet.SystemControlInfo.SaveDataSize,NULL,10);
+		if(strstr(usrset->common.rsfSet.SystemControlInfo.SaveDataSize,"K")){
+			char *str = strstr(usrset->common.rsfSet.SystemControlInfo.SaveDataSize,"K");
 			if(strcmp(str,"K") == 0 || strcmp(str,"KB") == 0 ){
 				*SaveDataSize = *SaveDataSize*KB;
 			}
 		}
-		else if(strstr(usrset->common.rsfSet.Rom.SaveDataSize,"M")){
-			char *str = strstr(usrset->common.rsfSet.Rom.SaveDataSize,"M");
+		else if(strstr(usrset->common.rsfSet.SystemControlInfo.SaveDataSize,"M")){
+			char *str = strstr(usrset->common.rsfSet.SystemControlInfo.SaveDataSize,"M");
 			if(strcmp(str,"M") == 0 || strcmp(str,"MB") == 0 ){
 				*SaveDataSize = *SaveDataSize*MB;
 			}
 		}
-		else if(strstr(usrset->common.rsfSet.Rom.SaveDataSize,"G")){
-			char *str = strstr(usrset->common.rsfSet.Rom.SaveDataSize,"G");
+		else if(strstr(usrset->common.rsfSet.SystemControlInfo.SaveDataSize,"G")){
+			char *str = strstr(usrset->common.rsfSet.SystemControlInfo.SaveDataSize,"G");
 			if(strcmp(str,"G") == 0 || strcmp(str,"GB") == 0 ){
 				*SaveDataSize = *SaveDataSize*GB;
 			}

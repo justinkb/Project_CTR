@@ -9,6 +9,15 @@ typedef enum
 // IVFC Structs
 typedef struct
 {
+	u64 size;
+	u64 offset;
+	u64 logicalOffset;
+	u8 *pos;
+	u8 reserved[8];
+} ivfc_level;
+
+typedef struct
+{
 	u8 logicalOffset[8];
 	u8 hashDataSize[8];
 	u8 blockSize[4];
@@ -20,14 +29,11 @@ typedef struct
 	u8 magic[4];
 	u8 id[4];
 	u8 masterHashSize[4];
-	ivfc_levelheader level1;
-	ivfc_levelheader level2;
-	ivfc_levelheader level3;
-	u8 reserved[4];
+	ivfc_levelheader level[3];
 	u8 optionalSize[4];
+	u8 reserved[4];
 } ivfc_hdr;
 
-// ROMFS FS Structs
 typedef struct
 {
 	u8 offset[4];
@@ -37,9 +43,9 @@ typedef struct
 typedef struct
 {
 	u8 headersize[4];
-	romfs_sectionheader section[4];
+	romfs_sectionheader section[4]; // 8*4 = 0x20
 	u8 dataoffset[4];
-} romfs_infoheader;
+} romfs_infoheader; //sizeof(romfs_infoheader) = 0x28
 
 
 typedef struct
@@ -64,16 +70,58 @@ typedef struct
 	//u8 name[ROMFS_MAXNAMESIZE];
 } romfs_fileentry; //sizeof(romfs_fileentry)  = 0x20
 
-
 typedef struct
 {
 	u8 *output;
 	u64 romfsSize;
+	u64 romfsHeaderSize;
 
+	/* For Importing ROMFS Binaries */
+	bool ImportRomfsBinary;
+	FILE *romfsBinary;
+	
+	/* For Creating ROMFS Binaries */
+	ivfc_hdr *ivfcHdr;
+	romfs_infoheader *romfsHdr;
+	
+	fs_dir *fs;
+	
+	u32 *dirUTable;
+	u32 m_dirUTableEntry;
+	u32 u_dirUTableEntry;
+	
+	u8 *dirTable;
+	u32 dirNum;
+	u32 m_dirTableLen;
+	u32 u_dirTableLen;
+	
+	u32 *fileUTable;
+	u32 m_fileUTableEntry;
+	u32 u_fileUTableEntry;
+	
+	u8 *fileTable;
+	u32 fileNum;
+	u32 m_fileTableLen;
+	u32 u_fileTableLen;
+	
+	u8 *data;
+	u64 m_dataLen;
+	u64 u_dataLen;
+	
+	// Levels
+	ivfc_level level[4];
+} romfs_buildctx;
+
+/*
+typedef struct
+{
+	u8 *output;
+	u64 romfsSize;
+	u64 romfsHeaderSize;
 
 	bool ImportRomfsBinary;
 	FILE *romfsBinary;
 } romfs_buildctx;
-
+*/
 int SetupRomFs(ncch_settings *ncchset, romfs_buildctx *ctx);
 int BuildRomFs(romfs_buildctx *ctx);

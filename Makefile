@@ -15,13 +15,13 @@ YAML_OBJS = libyaml/api.o libyaml/dumper.o libyaml/emitter.o libyaml/loader.o li
 # Compiler Settings
 LIBS = -static-libgcc -static-libstdc++
 CXXFLAGS = -I.
-CFLAGS = --std=c99 -Wall -I. -DMAKEROM_VER_MAJOR=$(VER_MAJOR) -DMAKEROM_VER_MINOR=$(VER_MINOR) $(MAKEROM_BUILD_FLAGS) -m64
+CFLAGS = --std=c99 -Wall -I. -DMAKEROM_VER_MAJOR=$(VER_MAJOR) -DMAKEROM_VER_MINOR=$(VER_MINOR) $(MAKEROM_BUILD_FLAGS)
 CC = gcc
  
 # MAKEROM Build Settings
 MAKEROM_BUILD_FLAGS = #-DDEBUG #-DPUBLIC_BUILD 
 VER_MAJOR = 0
-VER_MINOR = 7
+VER_MINOR = 8
 OUTPUT = makerom
 
 main: build
@@ -29,7 +29,7 @@ main: build
 rebuild: clean build
 
 build: $(OBJS) $(POLAR_OBJS) $(YAML_OBJS)
-	g++ -o $(OUTPUT) $(LIBS) $(OBJS) $(POLAR_OBJS) $(YAML_OBJS) -m64
+	g++ -o $(OUTPUT) $(LIBS) $(OBJS) $(POLAR_OBJS) $(YAML_OBJS)
 
 clean:
 	rm -rf $(OUTPUT) $(OBJS) $(POLAR_OBJS) $(YAML_OBJS) *.cci *.cia *.cxi *.cfa

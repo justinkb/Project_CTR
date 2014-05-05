@@ -1,4 +1,5 @@
 #include "lib.h"
+#include "dir.h"
 #include "ncch.h"
 #include "romfs.h"
 #include "romfs_binary.h"
@@ -16,15 +17,12 @@ int SetupRomFs(ncch_settings *ncchset, romfs_buildctx *ctx)
 	if(!ncchset->options.UseRomFS)
 		return 0;
 
-	int result = 0;
-
 	if(ncchset->componentFilePtrs.romfs)// The user has specified a pre-built RomFs Binary
-		result = PrepareImportRomFsBinaryFromFile(ncchset,ctx);
+		return PrepareImportRomFsBinaryFromFile(ncchset,ctx);
 	
 	else // Otherwise build ROMFS
-		result = PrepareBuildRomFsBinary(ncchset,ctx);
+		return PrepareBuildRomFsBinary(ncchset,ctx);
 
-	return result;
 }
 
 int BuildRomFs(romfs_buildctx *ctx)
@@ -49,4 +47,9 @@ void FreeRomFsCtx(romfs_buildctx *ctx)
 {
 	if(ctx->romfsBinary)
 		fclose(ctx->romfsBinary);
+	if(ctx->fs){
+		fs_FreeFiles(ctx->fs);
+		fs_FreeDir(ctx->fs);	
+		free(ctx->fs);
+	}
 }

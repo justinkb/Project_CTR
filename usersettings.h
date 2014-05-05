@@ -52,7 +52,9 @@ typedef struct
 {	
 	struct{
 		// Booleans
-		bool NoPadding; // DELETE
+		// Booleans
+		bool MediaFootPadding;
+		//bool NoPadding; // DELETE
 		bool AllowUnalignedSection;
 		bool EnableCrypt;
 		bool EnableCompress;
@@ -63,8 +65,8 @@ typedef struct
 		char *PageSize;
 		
 		// String Collections
-		u32 AppendSystemCallNum; // DELETE
-		char **AppendSystemCall; // DELETE
+		//u32 AppendSystemCallNum; // DELETE
+		//char **AppendSystemCall; // DELETE
 	} Option;
 	
 	struct{
@@ -83,7 +85,7 @@ typedef struct
 		bool SpecialMemoryArrange;
 		
 		// Strings
-		char *ProgramId; // DELETE
+		//char *ProgramId; // DELETE
 		char *IdealProcessor;
 		char *Priority;
 		char *MemoryType;
@@ -99,7 +101,7 @@ typedef struct
 		char *AffinityMask;
 		// Strings From DESC
 		char *DescVersion;
-		char *CryptoKey; // DELETE
+		//char *CryptoKey; // DELETE
 		char *ResourceLimitCategory;
 		char *ReleaseKernelMajor;
 		char *ReleaseKernelMinor;
@@ -131,6 +133,7 @@ typedef struct
 		char *AppType;
 		char *StackSize;
 		char *RemasterVersion;
+		char *SaveDataSize;
 		char *JumpId;
 		
 		// String Collections
@@ -139,25 +142,20 @@ typedef struct
 	} SystemControlInfo;
 	
 	struct{
-		// Booleans
-		bool MediaFootPadding;
-		
 		// Strings
 		char *Title;
 		char *CompanyCode;
 		char *ProductCode;
-		char *MediaSize;
 		char *ContentType;
 		char *Logo;
-		char *BackupMemoryType;// Delete
-		char *InitialCode;// Delete
+		//char *BackupMemoryType;// Delete
+		//char *InitialCode;// Delete
 	} BasicInfo;
 	
 	struct{
 		// Strings
 		char *HostRoot;
-		char *Padding; // DELETE
-		char *SaveDataSize;
+		//char *Padding; // DELETE
 		
 		// String Collections
 		u32 DefaultRejectNum;
@@ -184,13 +182,13 @@ typedef struct
 	
 	struct{
 		// Strings
-		char *Platform; // DELETE
+		//char *Platform; // DELETE
 		char *Category;
 		char *UniqueId;
 		char *Version;
 		char *ContentsIndex;
 		char *Variation;
-		char *Use; // DELETE
+		//char *Use; // DELETE
 		char *ChildIndex;
 		char *DemoIndex;
 		char *TargetCategory;
@@ -206,6 +204,7 @@ typedef struct
 		char *CryptoType;
 		char *CardDevice;
 		char *MediaType;
+		char *MediaSize;
 		char *BackupWriteWaitTime;
 		char *SaveCrypto;
 	} CardInfo;

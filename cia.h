@@ -87,19 +87,20 @@ typedef struct
 
 		bool keyNotFound;
 
-		FILE **contentFilePtrs;
+		FILE **filePtrs;
+		u64 fileSize[CIA_MAX_CONTENT];
 
 		/* Misc Records */
-		u16 contentCount;
-		u64 contentOffset[CIA_MAX_CONTENT];
-		u64 totalContentSize;
+		u16 count;
+		u64 offset[CIA_MAX_CONTENT];
+		u64 totalSize;
 
 		/* Content Chunk Records */
-		u64 contentSize[CIA_MAX_CONTENT];
-		u16 contentIndex[CIA_MAX_CONTENT];
-		u16 contentFlags[CIA_MAX_CONTENT];
-		u32 contentId[CIA_MAX_CONTENT];
-		u8 contentHash[CIA_MAX_CONTENT][0x20];		
+		u64 size[CIA_MAX_CONTENT];
+		u16 index[CIA_MAX_CONTENT];
+		u16 flags[CIA_MAX_CONTENT];
+		u32 id[CIA_MAX_CONTENT];
+		u8 hash[CIA_MAX_CONTENT][0x20];		
 	} content;
 
 	struct{

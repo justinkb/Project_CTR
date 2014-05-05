@@ -53,6 +53,7 @@ typedef enum
 
 typedef enum
 {
+	UnFixedCryptoKey = 0x0,
 	FixedCryptoKey = 0x1,
 	NoMountRomFs = 0x2,
 	NoCrypto = 0x4,

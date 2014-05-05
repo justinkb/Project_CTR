@@ -26,8 +26,15 @@ int str_u32_to_u16(u16 **dst, u32 *dst_len, u32 *src, u32 src_len);
 int str_utf8_to_u16(u16 **dst, u32 *dst_len, u8 *src, u32 src_len);
 #endif
 
+// Pseudo-Random Number Generator
+void initRand(void);
+u8 u8GetRand(void);
+u16 u16GetRand(void);
+u32 u32GetRand(void);
+u64 u64GetRand(void);
+
 //Char IO
-bool DoesFileExist(char *filename);
+bool AssertFile(char *filename);
 u64 GetFileSize_u64(char *filename);
 int makedir(const char* dir);
 char *getcwdir(char *buffer,int maxlen);

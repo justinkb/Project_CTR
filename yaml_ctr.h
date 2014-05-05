@@ -24,6 +24,8 @@ typedef struct
 	yaml_event_type_t prev_event;
 	u32 Level;
 	
+	// Processed String
+	char *string;
 } ctr_yaml_context;
 
 // Public Prototypes
@@ -55,4 +57,4 @@ void SetSimpleYAMLValue(char **dest, char *key, ctr_yaml_context *ctx, u32 size_
 bool SetBoolYAMLValue(char *key, ctr_yaml_context *ctx);
 u32 SetYAMLSequence(char ***dest, char *key, ctr_yaml_context *ctx);
 u32 SetYAMLSequenceFromMapping(char ***dest, char *key, ctr_yaml_context *ctx, bool StoreKey);
-void SkipYAMLGroup(ctr_yaml_context *ctx);
+//void SkipYAMLGroup(ctr_yaml_context *ctx);

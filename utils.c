@@ -175,8 +175,34 @@ int str_utf8_to_u16(u16 **dst, u32 *dst_len, u8 *src, u32 src_len)
 }
 #endif
 
+// Pseudo-Random Number Generator
+void initRand(void)
+{
+	srand(time(0));
+}
+
+u8 u8GetRand(void)
+{
+	return rand() % 0xff;
+}
+
+u16 u16GetRand(void)
+{
+	return rand() % 0xffff;
+}
+
+u32 u32GetRand(void)
+{
+	return  (u32)u16GetRand() | (u32)u16GetRand() << 16;
+}
+
+u64 u64GetRand(void)
+{	
+	return (u64)u32GetRand() | (u64)u32GetRand() << 32;
+}
+
 //Char IO
-bool DoesFileExist(char *filename)
+bool AssertFile(char *filename)
 {
 	if(filename == NULL)
 		return false;

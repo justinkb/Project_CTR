@@ -87,15 +87,21 @@ u8 *GetCertName(u8 *cert)
 
 int GenCertChildIssuer(u8 *dest, u8 *cert)
 {
-	u8 *Issuer = GetCertIssuer(cert);
-	u8 *Name = GetCertName(cert);
+	u8 *issuer = GetCertIssuer(cert);
+	u8 *name = GetCertName(cert);
 
-	u32 out_size = strlen((char*)Issuer) + strlen((char*)Name) + 1;
+	/*
+	u32 out_size = strlen((char*)issuer) + strlen((char*)name) + 1;
 	if(out_size > 0x40) return MEM_ERROR;
+	*/
 
-	memcpy(dest,Issuer,strlen((char*)Issuer));
-	dest[strlen((char*)Issuer)] = '-';
-	memcpy((dest+strlen((char*)Issuer)+1),Name,strlen((char*)Name));
+	snprintf((char*)dest,0x40,"%s-%s",issuer,name);
+
+	/*
+	strcat((char*)dest,(char*)issuer);
+	strcat((char*)dest,"-");
+	strcat((char*)dest,(char*)name);
+	*/
 	return 0;
 }
 

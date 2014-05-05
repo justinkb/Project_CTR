@@ -1,4 +1,5 @@
 #include "lib.h"
+#include "dir.h"
 #include "ncch.h"
 #include "exheader.h"
 #include "elf.h"
@@ -397,7 +398,7 @@ int SetupNcch(ncch_settings *ncchset, romfs_buildctx *romfs)
 		plnRgnSize = 0;
 
 	if(ncchset->sections.exeFs.size){
-		exefsHashSize = ncchset->options.mediaSize;
+		exefsHashSize = align(sizeof(exefs_hdr),ncchset->options.mediaSize);
 		exefsSize = align(ncchset->sections.exeFs.size,ncchset->options.mediaSize);
 		exefsOffset = align(ncchSize,ncchset->options.mediaSize);
 		ncchSize = exefsOffset + exefsSize;
@@ -406,9 +407,9 @@ int SetupNcch(ncch_settings *ncchset, romfs_buildctx *romfs)
 		exefsSize = 0;
 
 	if(romfs->romfsSize){
-		romfsHashSize = ncchset->options.mediaSize;
+		romfsHashSize = align(romfs->romfsHeaderSize,ncchset->options.mediaSize);
 		romfsSize = align(romfs->romfsSize,ncchset->options.mediaSize);
-		//romfsOffset = align(ncchSize,0x200); // Old makerom method, SDK 3.x and prior
+		//romfsOffset = align(ncchSize,0x200); // Old makerom method, SDK 2.x and prior
 		romfsOffset = align(ncchSize,0x1000);
 		ncchSize = romfsOffset + romfsSize;
 	}
@@ -580,8 +581,10 @@ int SetCommonHeaderBasicData(ncch_settings *ncchset, ncch_hdr *hdr)
 	/* NCCH Magic */
 	memcpy(hdr->magic,"NCCH",4);
 
-	/* NCCH Format titleVersion */
-	u16_to_u8(hdr->formatVersion,0x2,LE);
+	/* NCCH Format Version */
+	if(!ncchset->options.IsCfa)
+		u16_to_u8(hdr->formatVersion,0x2,LE);
+
 	
 	/* Setting ProgramId/TitleId */
 	u64 ProgramId = 0;
@@ -614,12 +617,20 @@ int SetCommonHeaderBasicData(ncch_settings *ncchset, ncch_hdr *hdr)
 	if(!ncchset->options.Encrypt)
 		hdr->flags[OtherFlag] = (NoCrypto|FixedCryptoKey);
 	else if(ncchset->keys->aes.ncchKeyX0){
-		hdr->flags[OtherFlag] = 0;
+		hdr->flags[OtherFlag] = UnFixedCryptoKey;
 		if(ncchset->keys->aes.ncchKeyX1)
 			hdr->flags[SecureCrypto2] = 1;
 	}
-	else 
+	else{
 		hdr->flags[OtherFlag] = FixedCryptoKey;	
+		u8 *key = GetNCCHKey(GetNCCHKeyType(hdr),ncchset->keys);
+		if(!key){ // for detecting absense of fixed aes keys
+			hdr->flags[OtherFlag] = (NoCrypto|FixedCryptoKey);
+			fprintf(stderr,"[NCCH WARNING] NCCH AES Key could not be loaded, NCCH will not be encrypted\n");
+		}
+	}
+
+	
 
 	/* Set ContentUnitSize */
 	hdr->flags[ContentUnitSize] = 0; // 0x200
@@ -969,11 +980,11 @@ bool IsCfa(ncch_hdr* hdr)
 
 u32 GetNCCH_MediaUnitSize(ncch_hdr* hdr)
 {
-	u16 titleVersion = u8_to_u16(hdr->formatVersion,LE);
+	u16 formatVersion = u8_to_u16(hdr->formatVersion,LE);
 	u32 ret = 0;
-	if (titleVersion == 1)
+	if (formatVersion == 1)
 		ret = 1;
-	else if (titleVersion == 2 || titleVersion == 0)
+	else if (formatVersion == 2 || formatVersion == 0)
 		ret = 1 << (hdr->flags[ContentUnitSize] + 9);
 	return ret;
 	//return 0x200*pow(2,hdr->flags[ContentUnitSize]);
@@ -1006,7 +1017,8 @@ u8* GetNCCHKey(ncch_key_type keytype, keys_struct *keys)
 {
 	switch(keytype){
 		case NoKey: return NULL;
-		case KeyIsNormalFixed: return keys->aes.normalKey;
+		case KeyIsNormalFixed:
+			return keys->aes.normalKey;
 		case KeyIsSystemFixed:
 			return keys->aes.systemFixedKey;
 		case KeyIsUnFixed:

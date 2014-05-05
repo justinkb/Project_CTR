@@ -1,4 +1,10 @@
 #pragma once
+
+typedef enum
+{
+	KEYSET_ERROR = -10,
+} keyset_errors;
+
 typedef enum
 {
 	RSA_1024_KEY_SIZE = 0x80,
@@ -9,7 +15,7 @@ typedef enum
 typedef enum
 {
 	pki_TEST,
-	pki_BETA,
+	pki_BETA, // Not used, but is here for completeness
 	pki_DEVELOPMENT,
 	pki_PRODUCTION,
 	pki_CUSTOM,
@@ -17,20 +23,20 @@ typedef enum
 
 typedef enum
 {
-	not_preset,
-	app,
-	ec_app,
-	dlp,
-	demo,
+	desc_preset_NONE,
+	desc_preset_APP,
+	desc_preset_EC_APP,
+	desc_preset_DLP,
+	desc_preset_DEMO,
+	desc_preset_FIRM,
 } fixed_accessdesc_type;
 
 // Structs
 
 typedef struct
 {
-	char *keydir;
 	pki_keyset keyset;
-
+	bool keysetLoaded;
 	bool dumpkeys;
 
 	struct
@@ -92,6 +98,8 @@ void FreeKeys(keys_struct *keys);
 
 int SetCommonKey(keys_struct *keys, u8 *commonKey, u8 Index);
 int SetCurrentCommonKey(keys_struct *keys, u8 Index);
+int SetNormalKey(keys_struct *keys, u8 *systemFixedKey);
 int SetSystemFixedKey(keys_struct *keys, u8 *systemFixedKey);
+
 
 int SetNcchUnfixedKeys(keys_struct *keys, u8 *ncchSig);

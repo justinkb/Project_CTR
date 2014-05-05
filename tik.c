@@ -47,6 +47,10 @@ int SetupTicketHeader(tik_hdr *hdr, cia_settings *ciaset)
 	hdr->signerCrlVersion = ciaset->cert.signerCrlVersion;
 	if(ciaset->content.encryptCia)
 		CryptTitleKey(hdr->encryptedTitleKey, ciaset->common.titleKey,ciaset->common.titleId,ciaset->keys,ENC);
+	else{
+		u64_to_u8(hdr->encryptedTitleKey,u64GetRand(),BE);
+		u64_to_u8((hdr->encryptedTitleKey+8),u64GetRand(),BE);
+	}
 	memcpy(hdr->ticketId,ciaset->tik.ticketId,8);
 	memcpy(hdr->deviceId,ciaset->tik.deviceId,8);
 	memcpy(hdr->titleId,ciaset->common.titleId,8);

@@ -4,7 +4,9 @@
 // Private Prototypes
 void InitYamlContext(ctr_yaml_context *ctx);
 int ParseSpecFile(rsf_settings *set, char *path, dname_struct *dname);
+void ProcessYamlString(ctr_yaml_context *ctx);
 void CheckEvent(ctr_yaml_context *ctx);
+
 
 void BadYamlFormatting(void);
 
@@ -16,7 +18,7 @@ int GetYamlSettings(user_settings *set)
 	if(set->common.rsfPath) {
 		FILE *rsf = fopen(set->common.rsfPath,"rb");
 		if(!rsf) {
-			fprintf(stderr,"[YAML ERROR] Failed to open %s\n",set->common.rsfPath);
+			fprintf(stderr,"[RSF ERROR] Failed to open %s\n",set->common.rsfPath);
 			return FAILED_TO_OPEN_FILE;
 		}
 		fclose(rsf);
@@ -86,7 +88,7 @@ int ParseSpecFile(rsf_settings *set, char *path, dname_struct *dname)
 
 	/* On error. */
 	error:
-	fprintf(stderr,"[-] Error Proccessing RSF file\n");
+	fprintf(stderr,"[RSF ERROR] Error Proccessing RSF file\n");
 	
 	/* Destroy the Parser object. */
 	yaml_parser_delete(&ctx->parser);
@@ -99,28 +101,141 @@ void InitYamlContext(ctr_yaml_context *ctx)
 	memset(ctx,0,sizeof(ctr_yaml_context));
 }
 
-char *GetYamlString(ctr_yaml_context *ctx)
+void ProcessYamlString(ctr_yaml_context *ctx)
 {
-	//return (char*)ctx->event.data.scalar.value;
-	
-	if(!ctx->event.data.scalar.value)
-		return NULL;
-
-	// Intercept values set from -DNAME=VALUE
-	char *start = strstr((char*)ctx->event.data.scalar.value,"$(");
-	char *end = strstr((char*)ctx->event.data.scalar.value,")");
-	if(!start || !end)
-		return (char*)ctx->event.data.scalar.value;
-
-	char *name = (start + 2);
-	u32 name_len = (end - 1 - name);
-
-	for(u32 i = 0; i < ctx->dname->u_items; i++){
-		if(strncmp(ctx->dname->items[i].name,name,name_len) == 0)
-			return ctx->dname->items[i].value;
+	if(ctx->string)
+	{
+		free(ctx->string);
+		ctx->string = NULL;
 	}
 
-	return "";
+	if(!ctx->event.data.scalar.value)
+		return;
+	
+	char *rawStr = (char*)ctx->event.data.scalar.value;
+	int rawStrLen = strlen(rawStr);
+	int procStrLen = 0;
+
+	char *subStart = NULL;
+	char *subEnd = NULL;
+	char *pos = rawStr;
+	char *end = (rawStr+rawStrLen);
+	while(pos < end)
+	{
+		// Find substution syntax in string
+		subStart = strstr(pos,"$(");
+		if(!subStart)
+		{
+			procStrLen += (end - pos);
+			break;
+		}
+
+		// Check For errors
+		if((end - subStart) <= 3) // Valid use of substitution syntax is not possible
+		{
+			ctx->error = true;
+			return;
+		}
+
+		subEnd = strstr((subStart+2),")"); 
+
+		if(!subEnd) // no closing bracket
+		{
+			ctx->error = true;
+			return;
+		}
+
+		// Add length of string not accounted for
+		procStrLen += (int)(subStart - pos);
+
+		// Get Length Of substitution key
+		char *subName = (subStart+2);
+		int subNameLen = (int)((subEnd - subStart) - 2);
+
+		// Add length of substitutiion value
+		for(u32 i = 0; i < ctx->dname->u_items; i++){
+			char *testSubName = ctx->dname->items[i].name;
+			int testSubNameLen = strlen(testSubName);
+			char *testSubValue = ctx->dname->items[i].value;
+			int testSubValueLen = strlen(testSubValue);
+
+			if(testSubNameLen != subNameLen)
+				continue;
+			if(strncmp(testSubName,subName,subNameLen) != 0)
+				continue;
+
+			procStrLen += testSubValueLen;
+			break;
+		}
+
+		// Increment pos
+		pos = (subEnd + 1);
+	}
+	
+	// Allocate memory for processed string
+	ctx->string = calloc(procStrLen+1,sizeof(char));
+	char *procStr = ctx->string;
+
+	pos = rawStr;
+	end = (rawStr+rawStrLen);
+	while(pos < end)
+	{
+		// Find substution syntax in string
+		subStart = strstr(pos,"$(");
+		if(!subStart)
+		{
+			strncat(procStr,pos,(end - pos));
+			break;
+		}
+
+		// Check For errors
+		if((end - subStart) <= 3) // Valid use of substitution syntax is not possible
+		{
+			ctx->error = true;
+			return;
+		}
+
+		subEnd = strstr((subStart+2),")"); 
+
+		if(!subEnd) // no closing bracket
+		{
+			ctx->error = true;
+			return;
+		}
+
+		// Add length of string not accounted for
+		strncat(procStr,pos,(subStart - pos));
+
+		// Get Length Of substitution key
+		char *subName = (subStart+2);
+		int subNameLen = (int)((subEnd - subStart) - 2);
+
+		// Add length of substitutiion value
+		for(u32 i = 0; i < ctx->dname->u_items; i++){
+			char *testSubName = ctx->dname->items[i].name;
+			int testSubNameLen = strlen(testSubName);
+			char *testSubValue = ctx->dname->items[i].value;
+			int testSubValueLen = strlen(testSubValue);
+
+			if(testSubNameLen != subNameLen)
+				continue;
+			if(strncmp(testSubName,subName,subNameLen) != 0)
+				continue;
+
+			strncat(procStr,testSubValue,testSubValueLen);
+			break;
+		}
+
+		// Increment pos
+		pos = (subEnd + 1);
+	}
+
+	return;
+}
+
+char *GetYamlString(ctr_yaml_context *ctx)
+{
+	return ctx->string;
 }
 
 
@@ -141,6 +256,9 @@ void GetEvent(ctr_yaml_context *ctx)
 void CheckEvent(ctr_yaml_context *ctx)
 {
 	switch(ctx->event.type){
+		case YAML_SCALAR_EVENT:
+			ProcessYamlString(ctx);
+			break;
 		case YAML_SEQUENCE_START_EVENT: 
 			ctx->IsSequence = true;
 			ctx->IsKey = true;
@@ -175,10 +293,16 @@ void FinishEvent(ctr_yaml_context *ctx)
 {
 	if(ctx->event.type == YAML_SCALAR_EVENT) {
 		if(!ctx->IsSequence){
-			if(!ctx->IsKey)ctx->IsKey = true;
-			else ctx->IsKey = false;
+			ctx->IsKey = !ctx->IsKey;
+			//if(!ctx->IsKey)ctx->IsKey = true;
+			//else ctx->IsKey = false;
+		}
+		if(ctx->string){
+			free(ctx->string);
+			ctx->string = NULL;
 		}
 	}
+
 	ctx->prev_event = ctx->event.type;
 	yaml_event_delete(&ctx->event);
 }
@@ -253,7 +377,7 @@ bool casecmpYamlValue(char *string,ctr_yaml_context *ctx)
 void SetSimpleYAMLValue(char **dest, char *key, ctr_yaml_context *ctx, u32 size_limit)
 {
 	if(*dest){
-		fprintf(stderr,"[-] Item '%s' is already set\n",key);
+		fprintf(stderr,"[RSF ERROR] Item '%s' is already set\n",key);
 		ctx->error = YAML_MEM_ERROR;
 		return;
 	}
@@ -261,7 +385,7 @@ void SetSimpleYAMLValue(char **dest, char *key, ctr_yaml_context *ctx, u32 size_
 	GetEvent(ctx);
 	if(ctx->error || ctx->done) return;
 	if(!EventIsScalar(ctx)){
-		fprintf(stderr,"[-] '%s' requires a value\n",key);
+		fprintf(stderr,"[RSF ERROR] '%s' requires a value\n",key);
 		ctx->error = YAML_BAD_FORMATTING;
 		return;
 	}
@@ -291,12 +415,12 @@ bool SetBoolYAMLValue(char *key, ctr_yaml_context *ctx)
 	GetEvent(ctx);
 	if(ctx->error || ctx->done) return false;
 	if(!EventIsScalar(ctx)){
-		fprintf(stderr,"[-] '%s' requires a value\n",key);
+		fprintf(stderr,"[RSF ERROR] '%s' requires a value\n",key);
 		ctx->error = YAML_BAD_FORMATTING;
 		return false;
 	}
 	if(!GetYamlStringSize(ctx)){
-		fprintf(stderr,"[-] '%s' requires a value\n",key);
+		fprintf(stderr,"[RSF ERROR] '%s' requires a value\n",key);
 		ctx->error = YAML_BAD_FORMATTING;
 		return false;
 	}
@@ -304,7 +428,7 @@ bool SetBoolYAMLValue(char *key, ctr_yaml_context *ctx)
 	if(casecmpYamlValue("true",ctx)) return true;
 	if(casecmpYamlValue("false",ctx)) return false;
 	
-	fprintf(stderr,"[-] Invalid '%s'\n",key);
+	fprintf(stderr,"[RSF ERROR] Invalid '%s'\n",key);
 	ctx->error = YAML_BAD_FORMATTING;
 	return false;
 	
@@ -313,7 +437,7 @@ bool SetBoolYAMLValue(char *key, ctr_yaml_context *ctx)
 u32 SetYAMLSequence(char ***dest, char *key, ctr_yaml_context *ctx)
 {
 	if(*dest){
-		fprintf(stderr,"[-] %s already set\n",key);
+		fprintf(stderr,"[RSF ERROR] %s already set\n",key);
 		ctx->error = YAML_MEM_ERROR;
 		return 0;
 	}
@@ -332,7 +456,7 @@ u32 SetYAMLSequence(char ***dest, char *key, ctr_yaml_context *ctx)
 	GetEvent(ctx);
 	if(ctx->error || ctx->done) return 0;
 	if(!EventIsScalar(ctx)){
-		fprintf(stderr,"[-] '%s' requires a value\n",key);
+		fprintf(stderr,"[RSF ERROR] '%s' requires a value\n",key);
 		ctx->error = YAML_BAD_FORMATTING;
 		return 0;
 	}
@@ -376,7 +500,7 @@ u32 SetYAMLSequence(char ***dest, char *key, ctr_yaml_context *ctx)
 u32 SetYAMLSequenceFromMapping(char ***dest, char *key, ctr_yaml_context *ctx, bool StoreKey)
 {
 	if(*dest){
-		fprintf(stderr,"[-] %s already set\n",key);
+		fprintf(stderr,"[RSF ERROR] %s already set\n",key);
 		ctx->error = YAML_MEM_ERROR;
 		return 0;
 	}
@@ -395,7 +519,7 @@ u32 SetYAMLSequenceFromMapping(char ***dest, char *key, ctr_yaml_context *ctx, b
 	GetEvent(ctx);
 	if(ctx->error || ctx->done) return 0;
 	if(!EventIsScalar(ctx)){
-		fprintf(stderr,"[-] '%s' requires a value\n",key);
+		fprintf(stderr,"[RSF ERROR] '%s' requires a value\n",key);
 		ctx->error = YAML_BAD_FORMATTING;
 		return 0;
 	}
@@ -431,7 +555,8 @@ u32 SetYAMLSequenceFromMapping(char ***dest, char *key, ctr_yaml_context *ctx, b
 	return ActualCount++; // return number of strings
 }
 
-void SkipYAMLGroup(ctr_yaml_context *ctx) // Why Nintendo? Why is this necessary? Why can't you just create valid .desc files?
+/*
+void SkipYAMLGroup(ctr_yaml_context *ctx)
 {
 	FinishEvent(ctx);
 	GetEvent(ctx);
@@ -441,7 +566,7 @@ void SkipYAMLGroup(ctr_yaml_context *ctx) // Why Nintendo? Why is this necessary
 	
 	if(ctx->error || ctx->done) return;
 	if(!EventIsScalar(ctx)){
-		fprintf(stderr,"[-] 'Format error\n");
+		fprintf(stderr,"[RSF ERROR] Format error\n");
 		ctx->error = YAML_BAD_FORMATTING;
 		return;
 	}
@@ -454,3 +579,4 @@ void SkipYAMLGroup(ctr_yaml_context *ctx) // Why Nintendo? Why is this necessary
 	}
 	FinishEvent(ctx);
 }
+*/

@@ -5,8 +5,9 @@ typedef enum
 {
 	NCSD_NO_NCCH0 = -1,
 	NCSD_INVALID_NCCH0 = -2,
-	INVALID_YAML_OPT = -3,
-	CCI_SIG_FAIL = -4,
+	NCSD_INVALID_NCCH = -3,
+	INVALID_YAML_OPT = -4,
+	CCI_SIG_FAIL = -5,
 	
 } ncsd_errors;
 
@@ -69,12 +70,12 @@ typedef struct
 	u8 magic[4];
 	u8 mediaSize[4];
 	u8 titleId[8];
-	u8 partitionsFsType[8];
-	u8 partitionsCryptoType[8];
+	u8 contentFsType[8];
+	u8 contentCryptoType[8];
 	partition_offsetsize offset_sizeTable[8];
 	u8 padding0[0x28];
-	u8 partitionFlags[8];
-	u8 partitionIdTable[8][8];
+	u8 flags[8];
+	u8 contentIdTable[8][8];
 	u8 padding1[0x30];
 } cci_hdr;
 
@@ -82,18 +83,20 @@ typedef struct
 {
 	u8 writableAddress[4];
 	u8 cardInfoBitmask[4];
-	// Notes
+	// Notes: reserved[0xDF8];
 	u8 reserved0[0xf8];
 	u8 mediaSizeUsed[8];
-	u8 reserved1[0x18];
+	u8 reserved1[0x8];
+	u8 unknown[0x4];
+	u8 reserved2[0xc];
 	u8 cverTitleId[8];
 	u8 cverTitleVersion[2];
-	u8 reserved2[0xcd6];
+	u8 reserved3[0xcd6];
 	//
 	u8 ncch0TitleId[8];
-	u8 reserved3[8];
+	u8 reserved4[8];
 	u8 initialData[0x30];
-	u8 reserved4[0xc0];
+	u8 reserved5[0xc0];
 	u8 ncch0Hdr[0x100];
 } cardinfo_hdr;
 
@@ -110,41 +113,61 @@ typedef struct
 	cci_hdr cciHdr;
 	cardinfo_hdr cardinfo;
 	devcardinfo_hdr devcardinfo;
-	u8 *ncchImportBuffer;
-	keys_struct *keys;
 } InternalCCI_Context;
 
 typedef struct
 {
-	u64 mediaSize;
-	u8 mediaId[8];
-	u8 flags[8];
-	u64 savedataSize;
-	u64 writableAddress;
-	u32 cardInfoBitmask;
-
-	// cver details
-	u8 cverTitleId[8];
-	u8 cverTitleVersion[2];
-	
-	u8 initialData[0x30];
-	ncch_hdr *ncchHdr;
-	u8 titleKey[0x10];
-	
-	u8 *ncch0;
-	u64 ncch0_FileLen;
-	FILE **content;
-	u64 contentSize[CCI_MAX_CONTENT];
-	u64 contentOffset[CCI_MAX_CONTENT];
-	u8 contentTitleId[CCI_MAX_CONTENT][8];
-	u64 cciTotalSize;
-	
-	bool fillOutCci;
-	u32 mediaUnit;
-	
 	FILE *out;
+	keys_struct *keys;
+
+	struct{
+		bool fillOutCci;
+		bool useDevCardInfo;
+		u32 mediaUnit;
+
+		u64 savedataSize;
+	} option;
+
+	struct{
+		/* Data */
+		buffer_struct *data;
+
+		/* Misc Records */
+		FILE **filePtrs;
+		u64 fileSize[CCI_MAX_CONTENT];
+		u16 count;
+
+		/* Details for NCSD header */
+		u8 fsType[CCI_MAX_CONTENT];
+		u8 cryptoType[CCI_MAX_CONTENT];
+		u64 offset[CCI_MAX_CONTENT];
+		u64 size[CCI_MAX_CONTENT];
+		u8 titleId[CCI_MAX_CONTENT][8];
+	} content;
+
+	struct{
+		u64 mediaSize;
+		u8 mediaId[8];
+		u8 flags[8];
+	} header;
+	
+	struct{
+		u64 writableAddress;
+		u32 cardInfoBitmask;
+
+		u64 cciTotalSize;
+
+		// cver details
+		u8 cverTitleId[8];
+		u8 cverTitleVersion[2];
+
+		u8 initialData[0x30];
+		ncch_hdr ncchHdr;
+		u8 titleKey[0x10];
+	} cardinfo;
 } cci_settings;
 
+#ifndef PUBLIC_BUILD
 static const u8 stock_initial_data[0x30] = 
 {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -163,6 +186,7 @@ static const u8 stock_title_key[0x10] =
 	0x87, 0x46, 0x1E, 0xDD, 0xCB, 0xB8, 
 	0x97, 0x11, 0x92, 0xBA
 };
+#endif
 
 // Public Prototypes
 // Build Functions
