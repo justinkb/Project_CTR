@@ -1,4 +1,4 @@
-#include "libyaml/yaml_private.h"
+#include "yaml_private.h"
 
 /*
  * Get the library titleVersion.

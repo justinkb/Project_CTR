@@ -475,7 +475,7 @@
  *      BLOCK-END
  */
 
-#include "libyaml/yaml_private.h"
+#include "yaml_private.h"
 
 /*
  * Ensure that the buffer contains the required number of characters.
