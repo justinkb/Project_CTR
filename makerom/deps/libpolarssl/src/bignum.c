@@ -30,12 +30,12 @@
  *  http://math.libtomcrypt.com/files/tommath.pdf
  */
 
-#include "polarssl/config.h"
+#include <polarssl/config.h>
 
 #if defined(POLARSSL_BIGNUM_C)
 
-#include "polarssl/bignum.h"
-#include "polarssl/bn_mul.h"
+#include <polarssl/bignum.h>
+#include <polarssl/bn_mul.h>
 
 #include <stdlib.h>
 

@@ -23,11 +23,11 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "polarssl/config.h"
+#include <polarssl/config.h>
 
 #if defined(POLARSSL_BASE64_C)
 
-#include "polarssl/base64.h"
+#include <polarssl/base64.h>
 
 #ifdef _MSC_VER
 #include <basetsd.h>

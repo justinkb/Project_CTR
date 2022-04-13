@@ -27,7 +27,7 @@
 #ifndef POLARSSL_SHA1_H
 #define POLARSSL_SHA1_H
 
-#include "polarssl/config.h"
+#include <polarssl/config.h>
 
 #include <string.h>
 
@@ -94,7 +94,7 @@ void sha1_process( sha1_context *ctx, const unsigned char data[64] );
 #endif
 
 #else  /* POLARSSL_SHA1_ALT */
-#include "polarssl/sha1_alt.h"
+#include <polarssl/sha1_alt.h>
 #endif /* POLARSSL_SHA1_ALT */
 
 #ifdef __cplusplus

@@ -27,7 +27,7 @@
 #ifndef POLARSSL_AES_H
 #define POLARSSL_AES_H
 
-#include "polarssl/config.h"
+#include <polarssl/config.h>
 
 #include <string.h>
 
@@ -181,7 +181,7 @@ int aes_crypt_ctr( aes_context *ctx,
 #endif
 
 #else  /* POLARSSL_AES_ALT */
-#include "polarssl/aes_alt.h"
+#include <polarssl/aes_alt.h>
 #endif /* POLARSSL_AES_ALT */
 
 #ifdef __cplusplus

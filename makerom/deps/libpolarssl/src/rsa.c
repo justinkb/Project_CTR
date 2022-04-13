@@ -29,14 +29,14 @@
  *  http://www.cacr.math.uwaterloo.ca/hac/about/chap8.pdf
  */
 
-#include "polarssl/config.h"
+#include <polarssl/config.h>
 
 #if defined(POLARSSL_RSA_C)
 
-#include "polarssl/rsa.h"
+#include <polarssl/rsa.h>
 
 #if defined(POLARSSL_PKCS1_V21)
-#include "polarssl/md.h"
+#include <polarssl/md.h>
 #endif
 
 #include <stdlib.h>
@@ -1283,7 +1283,7 @@ void rsa_free( rsa_context *ctx )
 
 #if defined(POLARSSL_SELF_TEST)
 
-#include "polarssl/sha1.h"
+#include <polarssl/sha1.h>
 
 /*
  * Example RSA-1024 keypair, for test purposes
