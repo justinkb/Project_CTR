@@ -30,7 +30,7 @@ jobs:
             os: macos-latest
             arch: arm64
             makeArgs: -j$(sysctl -n hw.activecpu)
-           - dist: win_x86_64
+          - dist: win_x86_64
             os: windows-latest
             arch: x86_64
             makeArgs: -j $env:NUMBER_OF_PROCESSORS
