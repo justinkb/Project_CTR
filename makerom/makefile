@@ -1,6 +1,6 @@
 # C++/C Recursive Project Makefile 
 # (c) Jack
-# Version 6 (20211110)
+# Version 7 (20220413)
 
 # Project Name
 PROJECT_NAME = makerom
@@ -58,6 +58,8 @@ ifeq ($(PROJECT_PLATFORM),)
 		UNAME = $(shell uname -s)
 		ifeq ($(UNAME), Darwin)
 			export PROJECT_PLATFORM = MACOS
+		else ifneq (, $(findstring CYGWIN_NT, $(UNAME)))
+			export PROJECT_PLATFORM = CYGWIN_NT
 		else
 			export PROJECT_PLATFORM = GNU
 		endif
@@ -87,6 +89,15 @@ ifeq ($(PROJECT_PLATFORM), WIN32)
 	INC +=
 	LIB += -static
 	ARFLAGS = cr -o
+else ifeq ($(PROJECT_PLATFORM), CYGWIN_NT)
+	# CygWin Flags/Libs
+	#CC = 
+	#CXX =
+	WARNFLAGS = -Wall -Wno-unused-value -Wno-unused-but-set-variable
+	ARCHFLAGS =
+	INC +=
+	LIB += -liconv
+	ARFLAGS = cr -o
 else ifeq ($(PROJECT_PLATFORM), GNU)
 	# GNU/Linux Flags/Libs
 	#CC = 
@@ -94,7 +105,7 @@ else ifeq ($(PROJECT_PLATFORM), GNU)
 	WARNFLAGS = -Wall -Wno-unused-value -Wno-unused-but-set-variable
 	ARCHFLAGS =
 	INC +=
-	LIB += -liconv
+	LIB +=
 	ARFLAGS = cr -o
 else ifeq ($(PROJECT_PLATFORM), MACOS)
 	# MacOS Flags/Libs
@@ -117,7 +128,6 @@ TESTSRC_OBJ = $(foreach dir,$(PROJECT_TESTSRC_SUBDIRS),$(subst .cpp,.o,$(wildcar
 
 # all is the default, user should specify what the default should do
 #	- 'static_lib' for building static library
-#	- 'shared_lib' for building shared library
 #	- 'program' for building the program
 #	- 'test_program' for building the test program
 # These can typically be used together however *_lib and program should not be used together
@@ -157,10 +167,6 @@ clean_object_files:
 static_lib: $(SRC_OBJ) create_binary_dir
 	@echo LINK $(PROJECT_BIN_PATH)/$(PROJECT_NAME).a
 	@ar $(ARFLAGS) "$(PROJECT_BIN_PATH)/$(PROJECT_NAME).a" $(SRC_OBJ)
-
-shared_lib: $(SRC_OBJ) create_binary_dir
-	@echo LINK $(PROJECT_BIN_PATH)/$(PROJECT_SO_FILENAME)
-	@gcc -shared -Wl,-soname,$(PROJECT_SONAME) -o "$(PROJECT_BIN_PATH)/$(PROJECT_SO_FILENAME)" $(SRC_OBJ)
 
 # Build Program
 program: $(SRC_OBJ) create_binary_dir
