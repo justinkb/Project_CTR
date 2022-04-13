@@ -74,6 +74,8 @@ ifeq ($(PROJECT_PLATFORM_ARCH),)
 		export PROJECT_PLATFORM_ARCH = $(shell uname -m)
 	else ifeq ($(PROJECT_PLATFORM), MACOS)
 		export PROJECT_PLATFORM_ARCH = $(shell uname -m)
+	else ifeq ($(PROJECT_PLATFORM), CYGWIN_NT)
+		export PROJECT_PLATFORM_ARCH = $(shell uname -m)
 	else
 		export PROJECT_PLATFORM_ARCH = x86_64
 	endif
@@ -88,15 +90,6 @@ ifeq ($(PROJECT_PLATFORM), WIN32)
 	ARCHFLAGS =
 	INC +=
 	LIB += -static
-	ARFLAGS = cr -o
-else ifeq ($(PROJECT_PLATFORM), CYGWIN_NT)
-	# CygWin Flags/Libs
-	#CC = 
-	#CXX =
-	WARNFLAGS = -Wall -Wno-unused-value -Wno-unused-but-set-variable
-	ARCHFLAGS =
-	INC +=
-	LIB += -liconv
 	ARFLAGS = cr -o
 else ifeq ($(PROJECT_PLATFORM), GNU)
 	# GNU/Linux Flags/Libs
@@ -116,6 +109,15 @@ else ifeq ($(PROJECT_PLATFORM), MACOS)
 	INC +=
 	LIB += -liconv
 	ARFLAGS = rc	
+else ifeq ($(PROJECT_PLATFORM), CYGWIN_NT)
+	# CygWin Flags/Libs
+	#CC = 
+	#CXX =
+	WARNFLAGS = -Wall -Wno-unused-value -Wno-unused-but-set-variable
+	ARCHFLAGS =
+	INC +=
+	LIB += -liconv
+	ARFLAGS = cr -o
 endif
 
 # Compiler Flags
