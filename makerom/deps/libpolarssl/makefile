@@ -1,10 +1,9 @@
 # C++/C Recursive Project Makefile 
 # (c) Jack
-# Version 6 (20211110)
+# Version 7 (20220413)
 
 # Project Name
 PROJECT_NAME = libpolarssl
-
 # Project Relative Paths
 PROJECT_PATH = $(CURDIR)
 PROJECT_SRC_PATH = src
@@ -22,13 +21,6 @@ ifeq ($(ROOT_PROJECT_NAME),)
 	export ROOT_PROJECT_PATH = $(PROJECT_PATH)
 	export ROOT_PROJECT_DEPENDENCY_PATH = $(ROOT_PROJECT_PATH)/deps
 endif
-
-# Shared Library Definitions
-PROJECT_SO_VER_MAJOR = 0
-PROJECT_SO_VER_MINOR = 1
-PROJECT_SO_VER_PATCH = 0
-PROJECT_SONAME = $(PROJECT_NAME).so.$(PROJECT_SO_VER_MAJOR)
-PROJECT_SO_FILENAME = $(PROJECT_SONAME).$(PROJECT_SO_VER_MINOR).$(PROJECT_SO_VER_PATCH)
 
 # Project Dependencies
 PROJECT_DEPEND = 
@@ -58,6 +50,8 @@ ifeq ($(PROJECT_PLATFORM),)
 		UNAME = $(shell uname -s)
 		ifeq ($(UNAME), Darwin)
 			export PROJECT_PLATFORM = MACOS
+		else ifneq (, $(findstring CYGWIN_NT, $(UNAME)))
+			export PROJECT_PLATFORM = CYGWIN_NT
 		else
 			export PROJECT_PLATFORM = GNU
 		endif
@@ -71,6 +65,8 @@ ifeq ($(PROJECT_PLATFORM_ARCH),)
 	else ifeq ($(PROJECT_PLATFORM), GNU)
 		export PROJECT_PLATFORM_ARCH = $(shell uname -m)
 	else ifeq ($(PROJECT_PLATFORM), MACOS)
+		export PROJECT_PLATFORM_ARCH = $(shell uname -m)
+	else ifeq ($(PROJECT_PLATFORM), CYGWIN_NT)
 		export PROJECT_PLATFORM_ARCH = $(shell uname -m)
 	else
 		export PROJECT_PLATFORM_ARCH = x86_64
@@ -105,6 +101,15 @@ else ifeq ($(PROJECT_PLATFORM), MACOS)
 	INC +=
 	LIB +=
 	ARFLAGS = rc	
+else ifeq ($(PROJECT_PLATFORM), CYGWIN_NT)
+	# CygWin Flags/Libs
+	#CC = 
+	#CXX =
+	WARNFLAGS = -Wall -Wno-unused-value -Wno-unused-but-set-variable
+	ARCHFLAGS =
+	INC +=
+	LIB +=
+	ARFLAGS = cr -o
 endif
 
 # Compiler Flags
@@ -116,11 +121,10 @@ SRC_OBJ = $(foreach dir,$(PROJECT_SRC_SUBDIRS),$(subst .cpp,.o,$(wildcard $(dir)
 TESTSRC_OBJ = $(foreach dir,$(PROJECT_TESTSRC_SUBDIRS),$(subst .cpp,.o,$(wildcard $(dir)/*.cpp))) $(foreach dir,$(PROJECT_TESTSRC_SUBDIRS),$(subst .cc,.o,$(wildcard $(dir)/*.cc))) $(foreach dir,$(PROJECT_TESTSRC_SUBDIRS),$(subst .c,.o,$(wildcard $(dir)/*.c)))
 
 # all is the default, user should specify what the default should do
-#	- 'static_lib' for building static library
-#	- 'shared_lib' for building shared library
-#	- 'program' for building the program
+#	- 'static_lib' for building source as a static library
+#	- 'program' for building source as executable program
 #	- 'test_program' for building the test program
-# These can typically be used together however *_lib and program should not be used together
+# test_program can be used with program or static_lib, but program and static_lib cannot be used together
 all: static_lib
 	
 clean: clean_object_files remove_binary_dir
@@ -157,10 +161,6 @@ clean_object_files:
 static_lib: $(SRC_OBJ) create_binary_dir
 	@echo LINK $(PROJECT_BIN_PATH)/$(PROJECT_NAME).a
 	@ar $(ARFLAGS) "$(PROJECT_BIN_PATH)/$(PROJECT_NAME).a" $(SRC_OBJ)
-
-shared_lib: $(SRC_OBJ) create_binary_dir
-	@echo LINK $(PROJECT_BIN_PATH)/$(PROJECT_SO_FILENAME)
-	@gcc -shared -Wl,-soname,$(PROJECT_SONAME) -o "$(PROJECT_BIN_PATH)/$(PROJECT_SO_FILENAME)" $(SRC_OBJ)
 
 # Build Program
 program: $(SRC_OBJ) create_binary_dir

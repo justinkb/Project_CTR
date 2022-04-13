@@ -23,13 +23,6 @@ ifeq ($(ROOT_PROJECT_NAME),)
 	export ROOT_PROJECT_DEPENDENCY_PATH = $(ROOT_PROJECT_PATH)/deps
 endif
 
-# Shared Library Definitions
-PROJECT_SO_VER_MAJOR = 0
-PROJECT_SO_VER_MINOR = 1
-PROJECT_SO_VER_PATCH = 0
-PROJECT_SONAME = $(PROJECT_NAME).so.$(PROJECT_SO_VER_MAJOR)
-PROJECT_SO_FILENAME = $(PROJECT_SONAME).$(PROJECT_SO_VER_MINOR).$(PROJECT_SO_VER_PATCH)
-
 # Project Dependencies
 PROJECT_DEPEND = polarssl yaml
 PROJECT_DEPEND_LOCAL_DIR = libpolarssl libyaml
@@ -129,10 +122,10 @@ SRC_OBJ = $(foreach dir,$(PROJECT_SRC_SUBDIRS),$(subst .cpp,.o,$(wildcard $(dir)
 TESTSRC_OBJ = $(foreach dir,$(PROJECT_TESTSRC_SUBDIRS),$(subst .cpp,.o,$(wildcard $(dir)/*.cpp))) $(foreach dir,$(PROJECT_TESTSRC_SUBDIRS),$(subst .cc,.o,$(wildcard $(dir)/*.cc))) $(foreach dir,$(PROJECT_TESTSRC_SUBDIRS),$(subst .c,.o,$(wildcard $(dir)/*.c)))
 
 # all is the default, user should specify what the default should do
-#	- 'static_lib' for building static library
-#	- 'program' for building the program
+#	- 'static_lib' for building source as a static library
+#	- 'program' for building source as executable program
 #	- 'test_program' for building the test program
-# These can typically be used together however *_lib and program should not be used together
+# test_program can be used with program or static_lib, but program and static_lib cannot be used together
 all: program
 	
 clean: clean_object_files remove_binary_dir
