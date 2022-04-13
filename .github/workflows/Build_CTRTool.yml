@@ -20,7 +20,7 @@ jobs:
          - dist: ubuntu_x86_64
            os: ubuntu-latest
            arch: x86_64
-           makeArgs: -j$(nproc)
+           makeArgs: # -j$(nproc) # This messes with the build
          - dist: macos_x86_64
            os: macos-latest
            arch: x86_64
@@ -35,7 +35,7 @@ jobs:
           fetch-depth: 0
       - name: Compile ${{ matrix.prog }}
         working-directory: ${{ matrix.prog }}
-        run: make PROJECT_PLATFORM_ARCH=${{ matrix.arch }} deps all
+        run: make ${{ matrix.makeArgs }} PROJECT_PLATFORM_ARCH=${{ matrix.arch }} deps all
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.prog }}-${{ matrix.dist }}
