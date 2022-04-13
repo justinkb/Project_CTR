@@ -1,5 +1,5 @@
 #pragma once
-#include "desc/desc.h"
+#include "desc.h"
 
 static const CtrSdkDesc kDescPresets[] =
 {

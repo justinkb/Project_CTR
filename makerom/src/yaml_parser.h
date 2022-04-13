@@ -1,6 +1,6 @@
 #pragma once
 
-#include "libyaml/yaml.h"
+#include <libyaml/yaml.h>
 
 typedef enum
 {
