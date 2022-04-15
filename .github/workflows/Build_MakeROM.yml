@@ -21,19 +21,15 @@ jobs:
           - dist: ubuntu_x86_64
             os: ubuntu-latest
             arch: x86_64
-            makeArgs: -j$(nproc)
           - dist: macos_x86_64
             os: macos-latest
             arch: x86_64
-            makeArgs: -j$(sysctl -n hw.activecpu)
           - dist: macos_arm64
             os: macos-latest
             arch: arm64
-            makeArgs: -j$(sysctl -n hw.activecpu)
           - dist: win_x86_64
             os: windows-latest
             arch: x86_64
-            makeArgs: -j $env:NUMBER_OF_PROCESSORS
             binExt: .exe
     steps:
       - uses: actions/checkout@v2
@@ -41,7 +37,7 @@ jobs:
           fetch-depth: 0
       - name: Compile ${{ matrix.prog }}
         working-directory: ${{ matrix.prog }}
-        run: make ${{ matrix.makeArgs }} PROJECT_PLATFORM_ARCH=${{ matrix.arch }} deps all
+        run: make PROJECT_PLATFORM_ARCH=${{ matrix.arch }} deps all
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.prog }}-${{ matrix.dist }}
