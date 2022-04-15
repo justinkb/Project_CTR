@@ -1,11 +1,5 @@
 #pragma once
 
-#include <polarssl/config.h>
-#include <polarssl/aes.h>
-#include <polarssl/rsa.h>
-#include <polarssl/sha1.h>
-#include <polarssl/sha2.h>
-
 typedef enum
 {
 	RSA_4096_SHA1 = 0x00010000,

@@ -1,15 +1,15 @@
 #include "lib.h"
 #include "crypto.h"
 
+#include <polarssl/rsa.h>
+
+#include <mbedtls/aes.h>
+#include <mbedtls/rsa.h>
+#include <mbedtls/sha1.h>
+#include <mbedtls/sha256.h>
+
 const u8 RSA_PUB_EXP[0x3] = {0x01,0x00,0x01};
 const int HASH_MAX_LEN = 0x20;
-
-int ctr_rsa_rsassa_pkcs1_v15_sign( rsa_context *ctx,
-                               int mode,
-                               int hash_id,
-                               unsigned int hashlen,
-                               const unsigned char *hash,
-                               unsigned char *sig );
 
 bool VerifySha256(void *data, u64 size, u8 hash[32])
 {
@@ -21,8 +21,8 @@ bool VerifySha256(void *data, u64 size, u8 hash[32])
 void ShaCalc(void *data, u64 size, u8 *hash, int mode)
 {
 	switch(mode){
-		case(CTR_SHA_1): sha1((u8*)data, size, hash); break;
-		case(CTR_SHA_256): sha2((u8*)data, size, hash, 0); break;
+		case(CTR_SHA_1): mbedtls_sha1((u8*)data, size, hash); break;
+		case(CTR_SHA_256): mbedtls_sha256((u8*)data, size, hash, 0); break;
 	}
 }
 
@@ -34,32 +34,31 @@ void SetAesCtrOffset(u8 *ctr, u64 offset)
 void AesCtrCrypt(u8 *key, u8 *ctr, u8 *input, u8 *output, u64 length, u64 offset)
 {
 	u8 stream[16];
-	aes_context aes;
+	mbedtls_aes_context aes;
 	size_t nc_off = 0;
 	
-	clrmem(&aes,sizeof(aes_context));
-	aes_setkey_enc(&aes, key, 128);
+	mbedtls_aes_init(&aes);
+	mbedtls_aes_setkey_enc(&aes, key, 128);
 	SetAesCtrOffset(ctr,offset);
 	
-	aes_crypt_ctr(&aes, length, &nc_off, ctr, stream, input, output);
-	
+	mbedtls_aes_crypt_ctr(&aes, length, &nc_off, ctr, stream, input, output);
 	
 	return;
 }
 
 void AesCbcCrypt(u8 *key, u8 *iv, u8 *input, u8 *output, u64 length, u8 mode)
 {
-	aes_context aes;
-	clrmem(&aes,sizeof(aes_context));
+	mbedtls_aes_context aes;
+	mbedtls_aes_init(&aes);
 	
 	switch(mode){
 		case(ENC): 
-			aes_setkey_enc(&aes, key, 128);
-			aes_crypt_cbc(&aes, AES_ENCRYPT, length, iv, input, output);
+			mbedtls_aes_setkey_enc(&aes, key, 128);
+			mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, length, iv, input, output);
 			return;
 		case(DEC):
-			aes_setkey_dec(&aes, key, 128);
-			aes_crypt_cbc(&aes, AES_DECRYPT, length, iv, input, output); 
+			mbedtls_aes_setkey_dec(&aes, key, 128);
+			mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, length, iv, input, output); 
 			return;
 		default:
 			return;
