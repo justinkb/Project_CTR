@@ -3,13 +3,12 @@
 # Version 7 (20220413)
 
 # Project Name
-PROJECT_NAME = makerom
-
+PROJECT_NAME = libmbedtls
 # Project Relative Paths
 PROJECT_PATH = $(CURDIR)
 PROJECT_SRC_PATH = src
 PROJECT_SRC_SUBDIRS = $(PROJECT_SRC_PATH)
-#PROJECT_INCLUDE_PATH = include
+PROJECT_INCLUDE_PATH = include
 #PROJECT_TESTSRC_PATH = test
 #PROJECT_TESTSRC_SUBDIRS = $(PROJECT_TESTSRC_PATH)
 PROJECT_BIN_PATH = bin
@@ -24,8 +23,8 @@ ifeq ($(ROOT_PROJECT_NAME),)
 endif
 
 # Project Dependencies
-PROJECT_DEPEND = mbedtls polarssl yaml
-PROJECT_DEPEND_LOCAL_DIR = libmbedtls libpolarssl libyaml
+PROJECT_DEPEND = 
+PROJECT_DEPEND_LOCAL_DIR = 
 
 # Generate compiler flags for including project include path
 ifneq ($(PROJECT_INCLUDE_PATH),)
@@ -100,7 +99,7 @@ else ifeq ($(PROJECT_PLATFORM), MACOS)
 	WARNFLAGS = -Wall -Wno-unused-value -Wno-unused-private-field
 	ARCHFLAGS = -arch $(PROJECT_PLATFORM_ARCH)
 	INC +=
-	LIB += -liconv
+	LIB +=
 	ARFLAGS = rc	
 else ifeq ($(PROJECT_PLATFORM), CYGWIN_NT)
 	# CygWin Flags/Libs
@@ -109,7 +108,7 @@ else ifeq ($(PROJECT_PLATFORM), CYGWIN_NT)
 	WARNFLAGS = -Wall -Wno-unused-value -Wno-unused-but-set-variable
 	ARCHFLAGS =
 	INC +=
-	LIB += -liconv
+	LIB +=
 	ARFLAGS = cr -o
 endif
 
@@ -126,7 +125,7 @@ TESTSRC_OBJ = $(foreach dir,$(PROJECT_TESTSRC_SUBDIRS),$(subst .cpp,.o,$(wildcar
 #	- 'program' for building source as executable program
 #	- 'test_program' for building the test program
 # test_program can be used with program or static_lib, but program and static_lib cannot be used together
-all: program
+all: static_lib
 	
 clean: clean_object_files remove_binary_dir
 
