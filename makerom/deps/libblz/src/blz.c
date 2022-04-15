@@ -17,8 +17,10 @@
 /*----------------------------------------------------------------------------*/
 
 /*----------------------------------------------------------------------------*/
-#include "lib.h"
-#include "blz.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <blz.h>
 
 /*----------------------------------------------------------------------------*/
 #define CMD_DECODE    0x00       // decode
@@ -47,16 +49,16 @@
 #define EXIT(text)    { printf(text); exit(-1); }
 
 /*----------------------------------------------------------------------------*/
-u8 *Memory(int length, int size);
+uint8_t *Memory(int length, int size);
 
-u8 *BLZ_Code(u8 *raw_buffer, int raw_len, u32 *new_len, int best);
-void  BLZ_Invert(u8 *buffer, int length);
+uint8_t *BLZ_Code(uint8_t *raw_buffer, int raw_len, uint32_t *new_len, int best);
+void  BLZ_Invert(uint8_t *buffer, int length);
 
 /*----------------------------------------------------------------------------*/
-u8 *Memory(int length, int size) {
-  u8 *fb;
+uint8_t *Memory(int length, int size) {
+  uint8_t *fb;
 
-  fb = (u8 *) calloc(length * size, size);
+  fb = (uint8_t *) calloc(length * size, size);
   if (fb == NULL) EXIT("\nMemory error\n");
 
   return(fb);
@@ -64,15 +66,15 @@ u8 *Memory(int length, int size) {
 
 /*----------------------------------------------------------------------------*/
 void BLZ_Decode(char *filename) {
-  // u8 *pak_buffer, *raw_buffer, *pak, *raw, *pak_end, *raw_end;
-  // u32   pak_len, raw_len, len, pos, inc_len, hdr_len, enc_len, dec_len;
-  // u8  flags, mask;
+  // uint8_t *pak_buffer, *raw_buffer, *pak, *raw, *pak_end, *raw_end;
+  // uint32_t   pak_len, raw_len, len, pos, inc_len, hdr_len, enc_len, dec_len;
+  // uint8_t  flags, mask;
 
   // printf("- decoding '%s'", filename);
 
   // // pak_buffer = Load(filename, &pak_len, BLZ_MINIM, BLZ_MAXIM);
 
-  // inc_len = *(u32 *)(pak_buffer + pak_len - 4);
+  // inc_len = *(uint32_t *)(pak_buffer + pak_len - 4);
   // if (!inc_len) {
   //   enc_len = 0;
   //   dec_len = pak_len - 4;
@@ -83,14 +85,14 @@ void BLZ_Decode(char *filename) {
   //   hdr_len = pak_buffer[pak_len - 5];
   //   if ((hdr_len < 0x08) || (hdr_len > 0x0B)) EXIT("Bad header length\n");
   //   if (pak_len <= hdr_len) EXIT("Bad length\n");
-  //   enc_len = *(u32 *)(pak_buffer + pak_len - 8) & 0x00FFFFFF;
+  //   enc_len = *(uint32_t *)(pak_buffer + pak_len - 8) & 0x00FFFFFF;
   //   dec_len = pak_len - enc_len;
   //   pak_len = enc_len - hdr_len;
   //   raw_len = dec_len + enc_len + inc_len;
   //   if (raw_len > RAW_MAXIM) EXIT("Bad decoded length\n");
   // }
 
-  // raw_buffer = (u8 *) Memory(raw_len, sizeof(char));
+  // raw_buffer = (uint8_t *) Memory(raw_len, sizeof(char));
 
   // pak = pak_buffer;
   // raw = raw_buffer;
@@ -141,10 +143,10 @@ void BLZ_Decode(char *filename) {
   // printf("\n");
 }
 
-u8 *Load(char *filename, u32 *length, int min, int max) {
+uint8_t *Load(char *filename, uint32_t *length, int min, int max) {
   FILE *fp;
   int   fs;
-  u8 *fb;
+  uint8_t *fb;
 
   if ((fp = fopen(filename, "rb")) == NULL) EXIT("\nFile open error\n");
   fseek(fp, 0, SEEK_END);
@@ -161,9 +163,9 @@ u8 *Load(char *filename, u32 *length, int min, int max) {
 }
 
 /*----------------------------------------------------------------------------*/
-u8* BLZ_Encode(char *filename, u32* pak_len, int mode) {
-  u8 *raw_buffer, *pak_buffer, *new_buffer;
-  u32   raw_len, new_len;
+uint8_t* BLZ_Encode(char *filename, uint32_t* pak_len, int mode) {
+  uint8_t *raw_buffer, *pak_buffer, *new_buffer;
+  uint32_t   raw_len, new_len;
 
   raw_buffer = Load(filename, &raw_len, RAW_MINIM, RAW_MAXIM);
 
@@ -181,12 +183,12 @@ u8* BLZ_Encode(char *filename, u32* pak_len, int mode) {
 }
 
 /*----------------------------------------------------------------------------*/
-u8 *BLZ_Code(u8 *raw_buffer, int raw_len, u32 *new_len, int best) {
-  u8 *pak_buffer, *pak, *raw, *raw_end, *flg = NULL, *tmp;
-  u32   pak_len, inc_len, hdr_len, enc_len, len, pos, max;
-  u32   len_best, pos_best = 0, len_next, pos_next, len_post, pos_post;
-  u32   pak_tmp, raw_tmp;
-  u8  mask;
+uint8_t *BLZ_Code(uint8_t *raw_buffer, int raw_len, uint32_t *new_len, int best) {
+  uint8_t *pak_buffer, *pak, *raw, *raw_end, *flg = NULL, *tmp;
+  uint32_t   pak_len, inc_len, hdr_len, enc_len, len, pos, max;
+  uint32_t   len_best, pos_best = 0, len_next, pos_next, len_post, pos_post;
+  uint32_t   pak_tmp, raw_tmp;
+  uint8_t  mask;
 
 #define SEARCH(l,p) { \
   l = BLZ_THRESHOLD;                                          \
@@ -210,7 +212,7 @@ u8 *BLZ_Code(u8 *raw_buffer, int raw_len, u32 *new_len, int best) {
   raw_tmp = raw_len;
 
   pak_len = raw_len + ((raw_len + 7) / 8) + 11;
-  pak_buffer = (u8 *) Memory(pak_len, sizeof(char));
+  pak_buffer = (uint8_t *) Memory(pak_len, sizeof(char));
 
   BLZ_Invert(raw_buffer, raw_len);
 
@@ -282,9 +284,9 @@ u8 *BLZ_Code(u8 *raw_buffer, int raw_len, u32 *new_len, int best) {
 
     while ((pak - pak_buffer) & 3) *pak++ = 0;
 
-    *(u32 *)pak = 0; pak += 4;
+    *(uint32_t *)pak = 0; pak += 4;
   } else {
-    tmp = (u8 *) Memory(raw_tmp + pak_tmp + 11, sizeof(char));
+    tmp = (uint8_t *) Memory(raw_tmp + pak_tmp + 11, sizeof(char));
 
     for (len = 0; len < raw_tmp; len++)
       tmp[len] = raw_buffer[len];
@@ -308,9 +310,9 @@ u8 *BLZ_Code(u8 *raw_buffer, int raw_len, u32 *new_len, int best) {
       hdr_len++;
     }
 
-    *(u32 *)pak = enc_len + hdr_len; pak += 3;
+    *(uint32_t *)pak = enc_len + hdr_len; pak += 3;
     *pak++ = hdr_len;
-    *(u32 *)pak = inc_len - hdr_len; pak += 4;
+    *(uint32_t *)pak = inc_len - hdr_len; pak += 4;
   }
 
   *new_len = pak - pak_buffer;
@@ -319,8 +321,8 @@ u8 *BLZ_Code(u8 *raw_buffer, int raw_len, u32 *new_len, int best) {
 }
 
 /*----------------------------------------------------------------------------*/
-void BLZ_Invert(u8 *buffer, int length) {
-  u8 *bottom, ch;
+void BLZ_Invert(uint8_t *buffer, int length) {
+  uint8_t *bottom, ch;
 
   bottom = buffer + length - 1;
 

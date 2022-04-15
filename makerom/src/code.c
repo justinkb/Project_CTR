@@ -1,9 +1,10 @@
 #include "lib.h"
 #include "elf.h"
-#include "blz.h"
 #include "ncch_build.h"
 #include "exheader_read.h"
 #include "code.h"
+
+#include <blz.h>
 
 const u32 CTR_PAGE_SIZE = 0x1000;
 const u32 DEFAULT_STACK_SIZE = 0x4000; // 10KB
