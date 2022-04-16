@@ -1,6 +1,6 @@
 Project_CTR
 ===========
 
-ctrtool - a tool to read/extract Nintendo 3DS files.
+* [ctrtool](ctrtool/README.md) - a tool to read/extract Nintendo 3DS files.
 
-makerom - creates CTR cxi/cfa/cci/cia files.
+* [makerom](makerom/README.md) - creates CTR cxi/cfa/cci/cia files.
