@@ -1,15 +1,15 @@
 # C++/C Recursive Project Makefile 
 # (c) Jack
-# Version 7 (20220416)
+# Version 6 (20211110)
 
 # Project Name
-PROJECT_NAME = makerom
+PROJECT_NAME = libmbedtls
 
 # Project Relative Paths
 PROJECT_PATH = $(CURDIR)
 PROJECT_SRC_PATH = src
 PROJECT_SRC_SUBDIRS = $(PROJECT_SRC_PATH)
-#PROJECT_INCLUDE_PATH = include
+PROJECT_INCLUDE_PATH = include
 #PROJECT_TESTSRC_PATH = test
 #PROJECT_TESTSRC_SUBDIRS = $(PROJECT_TESTSRC_PATH)
 PROJECT_BIN_PATH = bin
@@ -23,9 +23,16 @@ ifeq ($(ROOT_PROJECT_NAME),)
 	export ROOT_PROJECT_DEPENDENCY_PATH = $(ROOT_PROJECT_PATH)/deps
 endif
 
+# Shared Library Definitions
+PROJECT_SO_VER_MAJOR = 0
+PROJECT_SO_VER_MINOR = 2
+PROJECT_SO_VER_PATCH = 0
+PROJECT_SONAME = $(PROJECT_NAME).so.$(PROJECT_SO_VER_MAJOR)
+PROJECT_SO_FILENAME = $(PROJECT_SONAME).$(PROJECT_SO_VER_MINOR).$(PROJECT_SO_VER_PATCH)
+
 # Project Dependencies
-PROJECT_DEPEND = mbedtls polarssl blz yaml
-PROJECT_DEPEND_LOCAL_DIR = libmbedtls libpolarssl libblz libyaml
+PROJECT_DEPEND =
+PROJECT_DEPEND_LOCAL_DIR =
 
 # Generate compiler flags for including project include path
 ifneq ($(PROJECT_INCLUDE_PATH),)
@@ -96,8 +103,8 @@ else ifeq ($(PROJECT_PLATFORM), MACOS)
 	WARNFLAGS = -Wall -Wno-unused-value -Wno-unused-private-field
 	ARCHFLAGS = -arch $(PROJECT_PLATFORM_ARCH)
 	INC +=
-	LIB += -liconv
-	ARFLAGS = rc
+	LIB +=
+	ARFLAGS = rc	
 endif
 
 # Compiler Flags
@@ -109,11 +116,12 @@ SRC_OBJ = $(foreach dir,$(PROJECT_SRC_SUBDIRS),$(subst .cpp,.o,$(wildcard $(dir)
 TESTSRC_OBJ = $(foreach dir,$(PROJECT_TESTSRC_SUBDIRS),$(subst .cpp,.o,$(wildcard $(dir)/*.cpp))) $(foreach dir,$(PROJECT_TESTSRC_SUBDIRS),$(subst .cc,.o,$(wildcard $(dir)/*.cc))) $(foreach dir,$(PROJECT_TESTSRC_SUBDIRS),$(subst .c,.o,$(wildcard $(dir)/*.c)))
 
 # all is the default, user should specify what the default should do
-#	- 'static_lib' for building source as a static library
-#	- 'program' for building source as executable program
+#	- 'static_lib' for building static library
+#	- 'shared_lib' for building shared library
+#	- 'program' for building the program
 #	- 'test_program' for building the test program
-# test_program can be used with program or static_lib, but program and static_lib cannot be used together
-all: program
+# These can typically be used together however *_lib and program should not be used together
+all: static_lib
 	
 clean: clean_object_files remove_binary_dir
 
@@ -149,6 +157,10 @@ clean_object_files:
 static_lib: $(SRC_OBJ) create_binary_dir
 	@echo LINK $(PROJECT_BIN_PATH)/$(PROJECT_NAME).a
 	@ar $(ARFLAGS) "$(PROJECT_BIN_PATH)/$(PROJECT_NAME).a" $(SRC_OBJ)
+
+shared_lib: $(SRC_OBJ) create_binary_dir
+	@echo LINK $(PROJECT_BIN_PATH)/$(PROJECT_SO_FILENAME)
+	@gcc -shared -Wl,-soname,$(PROJECT_SONAME) -o "$(PROJECT_BIN_PATH)/$(PROJECT_SO_FILENAME)" $(SRC_OBJ)
 
 # Build Program
 program: $(SRC_OBJ) create_binary_dir
