@@ -1,5 +1,5 @@
 #include "lib.h"
-#include <polarssl/base64.h>
+#include <mbedtls/base64.h>
 
 #define IO_BLOCKSIZE 5*MB
 
@@ -110,10 +110,10 @@ bool IsValidB64Char(char chr)
 	return (isalnum(chr) || chr == '+' || chr == '/' || chr == '=');
 }
 
-u32 b64_strlen(char *str)
+size_t b64_strlen(const char *str)
 {
-	u32 count = 0;
-	u32 i = 0;
+	size_t count = 0;
+	size_t i = 0;
 	while(str[i] != 0x0){
 		if(IsValidB64Char(str[i])) {
 			//printf("Is Valid: %c\n",str[i]);
@@ -125,11 +125,11 @@ u32 b64_strlen(char *str)
 	return count;
 }
 
-void b64_strcpy(char *dst, char *src)
+void b64_strcpy(char *dst, const char *src)
 {
-	u32 src_len = strlen(src);
-	u32 j = 0;
-	for(u32 i = 0; i < src_len; i++){
+	size_t src_len = strlen(src);
+	size_t j = 0;
+	for(size_t i = 0; i < src_len; i++){
 		if(IsValidB64Char(src[i])){
 			dst[j] = src[i];
 			j++;
@@ -141,15 +141,15 @@ void b64_strcpy(char *dst, char *src)
 	//memdump(stdout,"dst: ",(u8*)dst,j+1);
 }
 
-int b64_decode(u8 *dst, char *src, u32 dst_size)
+int b64_decode(u8 *dst, const char *src, size_t dst_size)
 {
 	int ret;
-	u32 size = dst_size;
+	size_t size = dst_size;
 	
-	ret = base64_decode(dst,(size_t*)&size,(const u8*)src,strlen(src));
+	ret = mbedtls_base64_decode(dst, size, &size, (const u8*)src, strlen(src));
 	
 	if(size != dst_size)
-		ret = POLARSSL_ERR_BASE64_BUFFER_TOO_SMALL;
+		ret = MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL;
 	
 	return ret;
 }

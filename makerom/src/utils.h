@@ -23,9 +23,9 @@ char* replace_filextention(const char *input, const char *extention);
 
 // Base64
 bool IsValidB64Char(char chr);
-u32 b64_strlen(char *str);
-void b64_strcpy(char *dst, char *src);
-int b64_decode(u8 *dst, char *src, u32 dst_size);
+size_t b64_strlen(const char *str);
+void b64_strcpy(char *dst, const char *src);
+int b64_decode(u8 *dst, const char *src, size_t dst_size);
 
 // Pseudo-Random Number Generator
 void initRand(void);

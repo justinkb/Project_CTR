@@ -1,15 +1,16 @@
 #include "lib.h"
 #include "crypto.h"
 
-#include <polarssl/rsa.h>
-
 #include <mbedtls/aes.h>
 #include <mbedtls/rsa.h>
+#include <mbedtls/md.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/ctr_drbg.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/sha256.h>
 
-const u8 RSA_PUB_EXP[0x3] = {0x01,0x00,0x01};
-const int HASH_MAX_LEN = 0x20;
+static const u8 RSA_PUB_EXP[0x3] = {0x01,0x00,0x01};
+static const int HASH_MAX_LEN = 0x20;
 
 bool VerifySha256(void *data, u64 size, u8 hash[32])
 {
@@ -65,13 +66,13 @@ void AesCbcCrypt(u8 *key, u8 *iv, u8 *input, u8 *output, u64 length, u8 mode)
 	}
 }
 
-bool RsaKeyInit(rsa_context* ctx, u8 *modulus, u8 *private_exp, u8 *exponent, u8 rsa_type)
+bool RsaKeyInit(mbedtls_rsa_context* ctx, const u8 *modulus, const u8 *private_exp, const u8 *public_exp, u8 rsa_type)
 {
 	// Sanity Check
 	if(!ctx)
 		return false;
 	
-	rsa_init(ctx, RSA_PKCS_V15, 0);
+	mbedtls_rsa_init( ctx, MBEDTLS_RSA_PKCS_V15, 0 );
 	
 	u16 n_size = 0;
 	u16 d_size = 0;
@@ -92,18 +93,20 @@ bool RsaKeyInit(rsa_context* ctx, u8 *modulus, u8 *private_exp, u8 *exponent, u8
 			break;
 		default: return false;
 	}
+
+	int ret = mbedtls_rsa_import_raw(ctx, \
+		                       modulus ? modulus : NULL, modulus ? n_size : 0, \
+							   NULL, 0, \
+							   NULL, 0, \
+							   private_exp ? private_exp : NULL, private_exp ? d_size : 0, \
+							   public_exp ? public_exp : NULL, public_exp ? e_size : 0);
 	
-	if (modulus && mpi_read_binary(&ctx->N, modulus, n_size))
+	if (ret != 0)
 		goto clean;
-	if (exponent && mpi_read_binary(&ctx->E, exponent, e_size))
-		goto clean;
-	if (private_exp && mpi_read_binary(&ctx->D, private_exp, d_size))
-		goto clean;
-	
 
 	return true;
 clean:
-	rsa_free(ctx);
+	mbedtls_rsa_free(ctx);
 	return false;
 }
 
@@ -135,19 +138,6 @@ u32 GetSigHashType(u32 sig_type)
 	return 0;
 }
 
-int GetRsaHashType(u32 sig_type)
-{
-	switch(sig_type){
-		case RSA_4096_SHA1:
-		case RSA_2048_SHA1:
-			return SIG_RSA_SHA1;
-		case RSA_4096_SHA256:
-		case RSA_2048_SHA256:
-			return SIG_RSA_SHA256;
-	}
-	return 0;
-}
-
 u32 GetSigHashLen(u32 sig_type)
 {
 	switch(sig_type){
@@ -163,6 +153,28 @@ u32 GetSigHashLen(u32 sig_type)
 	return 0;
 }
 
+mbedtls_md_type_t getMdWrappedHashType(u32 sig_type)
+{
+	mbedtls_md_type_t md_type = MBEDTLS_MD_NONE;
+
+	switch(sig_type){
+		case RSA_4096_SHA1:
+		case RSA_2048_SHA1:
+		case ECC_SHA1:
+			md_type = MBEDTLS_MD_SHA1;
+			break;
+		case RSA_4096_SHA256:
+		case RSA_2048_SHA256:
+		case ECC_SHA256:
+			md_type = MBEDTLS_MD_SHA256;
+			break;
+		default:
+			break;
+	}
+
+	return md_type;
+}
+
 bool CalcHashForSign(void *data, u64 len, u8 *hash, u32 sig_type)
 {
 	if(GetSigHashType(sig_type) == 0)
@@ -176,20 +188,46 @@ bool CalcHashForSign(void *data, u64 len, u8 *hash, u32 sig_type)
 int RsaSignVerify(void *data, u64 len, u8 *sign, u8 *mod, u8 *priv_exp, u32 sig_type, u8 rsa_mode)
 {
 	int rsa_result = 0;
-	rsa_context ctx;
+	mbedtls_rsa_context ctx;
 	u8 hash[HASH_MAX_LEN];
 		
-	if(!RsaKeyInit(&ctx, mod, priv_exp, (u8*)RSA_PUB_EXP, GetRsaType(sig_type)))
+	if(!RsaKeyInit(&ctx, mod, priv_exp, RSA_PUB_EXP, GetRsaType(sig_type)))
 		return -1;
 		
 	if(!CalcHashForSign(data, len, hash, sig_type))
 		return -1;		
 
 	if(rsa_mode == CTR_RSA_VERIFY)
-		rsa_result = rsa_pkcs1_verify(&ctx, RSA_PUBLIC, GetRsaHashType(sig_type), 0, hash, sign);
+	{
+		//rsa_result = rsa_pkcs1_verify(&ctx, RSA_PUBLIC, GetRsaHashType(sig_type), 0, hash, sign);
+		rsa_result = mbedtls_rsa_rsassa_pkcs1_v15_verify(&ctx, NULL, NULL, MBEDTLS_RSA_PUBLIC, getMdWrappedHashType(sig_type), GetSigHashLen(sig_type), hash, sign);
+	}
 	else // CTR_RSA_SIGN
-		rsa_result = rsa_rsassa_pkcs1_v15_sign(&ctx, RSA_PRIVATE, GetRsaHashType(sig_type), 0, hash, sign);
+	{
+		// mbedtls API requires we init their PRBG before signing, but it isn't strictly required for the specific signture type we are generating
+
+		mbedtls_entropy_context entropy;
+		mbedtls_ctr_drbg_context ctr_drbg;
+
+		mbedtls_entropy_init( &entropy );
+		mbedtls_ctr_drbg_init( &ctr_drbg );
+
+		// init PRBG 
+		const char* pers = "RsaSignVerify";
+		rsa_result = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const uint8_t*)pers, strlen(pers));
+		
+		// if initing the PRBG succeeded we can sign
+		if (rsa_result == 0)
+		{
+			//rsa_result = rsa_rsassa_pkcs1_v15_sign(&ctx, RSA_PRIVATE, GetRsaHashType(sig_type), 0, hash, sign);
+			rsa_result = mbedtls_rsa_rsassa_pkcs1_v15_sign(&ctx, mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PRIVATE, getMdWrappedHashType(sig_type), GetSigHashLen(sig_type), hash, sign);
+		} 
+
+		mbedtls_ctr_drbg_free( &ctr_drbg );
+		mbedtls_entropy_free( &entropy );
+	}
+		
 	
-	rsa_free(&ctx);
+	mbedtls_rsa_free(&ctx);
 	return rsa_result;
 }

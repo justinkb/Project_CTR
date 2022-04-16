@@ -24,8 +24,8 @@ ifeq ($(ROOT_PROJECT_NAME),)
 endif
 
 # Project Dependencies
-PROJECT_DEPEND = mbedtls polarssl blz yaml
-PROJECT_DEPEND_LOCAL_DIR = libmbedtls libpolarssl libblz libyaml
+PROJECT_DEPEND = mbedtls blz yaml
+PROJECT_DEPEND_LOCAL_DIR = libmbedtls libblz libyaml
 
 # Generate compiler flags for including project include path
 ifneq ($(PROJECT_INCLUDE_PATH),)
