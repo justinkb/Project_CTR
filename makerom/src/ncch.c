@@ -38,12 +38,20 @@ int SignCFA(ncch_hdr *hdr, keys_struct *keys)
 {
 	if (Rsa2048Key_CanSign(&keys->rsa.cciCfa) == false)
 	{
-		printf("[NCCH WARNING] Failed to sign CFA header\n");
+		printf("[NCCH WARNING] Failed to sign CFA header (key was incomplete)\n");
 		memset(GetNcchHdrSig(hdr), 0xFF, 0x100);
 		return 0;
 	}
 
-	return RsaSignVerify(GetNcchHdrData(hdr), GetNcchHdrDataLen(hdr), GetNcchHdrSig(hdr), keys->rsa.cciCfa.pub, keys->rsa.cciCfa.pvt, RSA_2048_SHA256, CTR_RSA_SIGN);
+	int rsa_ret = RsaSignVerify(GetNcchHdrData(hdr), GetNcchHdrDataLen(hdr), GetNcchHdrSig(hdr), keys->rsa.cciCfa.pub, keys->rsa.cciCfa.pvt, RSA_2048_SHA256, CTR_RSA_SIGN);
+	if (rsa_ret != 0)
+	{
+		printf("[NCCH WARNING] Failed to sign CFA header (mbedtls error = -0x%x)\n", -rsa_ret);
+		memset(GetNcchHdrSig(hdr), 0xFF, 0x100);
+		return 0;
+	}
+
+	return 0;
 }
 
 int CheckCFASignature(ncch_hdr *hdr, keys_struct *keys)
@@ -55,12 +63,18 @@ int SignCXI(ncch_hdr *hdr, keys_struct *keys)
 {
 	if (Rsa2048Key_CanSign(&keys->rsa.cxi) == false)
 	{
-		printf("[NCCH WARNING] Failed to sign CXI header\n");
+		printf("[NCCH WARNING] Failed to sign CXI header (key was incomplete)\n");
 		memset(GetNcchHdrSig(hdr), 0xFF, 0x100);
 		return 0;
 	}
 
-	return RsaSignVerify(GetNcchHdrData(hdr), GetNcchHdrDataLen(hdr), GetNcchHdrSig(hdr), keys->rsa.cxi.pub, keys->rsa.cxi.pvt, RSA_2048_SHA256, CTR_RSA_SIGN);
+	int rsa_ret = RsaSignVerify(GetNcchHdrData(hdr), GetNcchHdrDataLen(hdr), GetNcchHdrSig(hdr), keys->rsa.cxi.pub, keys->rsa.cxi.pvt, RSA_2048_SHA256, CTR_RSA_SIGN);
+	if (rsa_ret != 0)
+	{
+		printf("[NCCH WARNING] Failed to sign CXI header (mbedtls error = -0x%x)\n", -rsa_ret);
+		memset(GetNcchHdrSig(hdr), 0xFF, 0x100);
+		return 0;
+	}
 }
 
 int CheckCXISignature(ncch_hdr *hdr, u8 *pubk)

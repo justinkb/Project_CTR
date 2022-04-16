@@ -6,8 +6,8 @@
 #include "desc/presets.h"
 #include "desc/dev_sigdata.h"
 
-const int RSF_RSA_DATA_LEN = 344;
-const int RSF_DESC_DATA_LEN = 684;
+const size_t RSF_RSA_DATA_LEN = 344;
+const size_t RSF_DESC_DATA_LEN = 684;
 
 
 int accessdesc_SignWithKey(exheader_settings *exhdrset);
@@ -47,12 +47,20 @@ int accessdesc_SignWithKey(exheader_settings *exhdrset)
 	/* Sign AccessDesc */
 	if (Rsa2048Key_CanSign(&exhdrset->keys->rsa.acex) == false)
 	{
-		printf("[ACEXDESC WARNING] Failed to sign access descriptor\n");
+		printf("[ACEXDESC WARNING] Failed to sign access descriptor (key was incomplete)\n");
 		memset(exhdrset->acexDesc->signature, 0xFF, 0x100);
 		return 0;
 	}
 
-	return SignAccessDesc(exhdrset->acexDesc, exhdrset->keys);
+	int rsa_ret = SignAccessDesc(exhdrset->acexDesc, exhdrset->keys);
+	if (rsa_ret != 0)
+	{
+		printf("[ACEXDESC WARNING] Failed to sign access descriptor (mbedtls error = -0x%x)\n", -rsa_ret);
+		memset(exhdrset->acexDesc->signature, 0xFF, 0x100);
+		return 0;
+	}
+
+	return 0;
 }
 
 int accessdesc_GetSignFromRsf(exheader_settings *exhdrset)
@@ -68,7 +76,7 @@ int accessdesc_GetSignFromRsf(exheader_settings *exhdrset)
 		return COMMON_HEADER_KEY_NOT_FOUND;
 	}
 	if(b64_strlen(exhdrset->rsf->CommonHeaderKey.D) != RSF_RSA_DATA_LEN){
-		fprintf(stderr,"[ACEXDESC ERROR] \"CommonHeaderKey/D\" has invalid length (%d)\n",b64_strlen(exhdrset->rsf->CommonHeaderKey.D));
+		fprintf(stderr,"[ACEXDESC ERROR] \"CommonHeaderKey/D\" has invalid length (%d)\n", (int)b64_strlen(exhdrset->rsf->CommonHeaderKey.D));
 		return COMMON_HEADER_KEY_NOT_FOUND;
 	}
 
@@ -77,7 +85,7 @@ int accessdesc_GetSignFromRsf(exheader_settings *exhdrset)
 		return COMMON_HEADER_KEY_NOT_FOUND;
 	}
 	if(b64_strlen(exhdrset->rsf->CommonHeaderKey.Modulus) != RSF_RSA_DATA_LEN){
-		fprintf(stderr,"[ACEXDESC ERROR] \"CommonHeaderKey/Modulus\" has invalid length (%d)\n",b64_strlen(exhdrset->rsf->CommonHeaderKey.Modulus));
+		fprintf(stderr,"[ACEXDESC ERROR] \"CommonHeaderKey/Modulus\" has invalid length (%d)\n", (int)b64_strlen(exhdrset->rsf->CommonHeaderKey.Modulus));
 		return COMMON_HEADER_KEY_NOT_FOUND;
 	}
 
@@ -86,7 +94,7 @@ int accessdesc_GetSignFromRsf(exheader_settings *exhdrset)
 		return COMMON_HEADER_KEY_NOT_FOUND;
 	}
 	if(b64_strlen(exhdrset->rsf->CommonHeaderKey.AccCtlDescSign) != RSF_RSA_DATA_LEN){
-		fprintf(stderr,"[ACEXDESC ERROR] \"CommonHeaderKey/Signature\" has invalid length (%d)\n",b64_strlen(exhdrset->rsf->CommonHeaderKey.AccCtlDescSign));
+		fprintf(stderr,"[ACEXDESC ERROR] \"CommonHeaderKey/Signature\" has invalid length (%d)\n", (int)b64_strlen(exhdrset->rsf->CommonHeaderKey.AccCtlDescSign));
 		return COMMON_HEADER_KEY_NOT_FOUND;
 	}
 
@@ -95,7 +103,7 @@ int accessdesc_GetSignFromRsf(exheader_settings *exhdrset)
 		return COMMON_HEADER_KEY_NOT_FOUND;
 	}
 	if(b64_strlen(exhdrset->rsf->CommonHeaderKey.AccCtlDescBin) != RSF_DESC_DATA_LEN){
-		fprintf(stderr,"[ACEXDESC ERROR] \"CommonHeaderKey/Descriptor\" has invalid length (%d)\n",b64_strlen(exhdrset->rsf->CommonHeaderKey.AccCtlDescBin));
+		fprintf(stderr,"[ACEXDESC ERROR] \"CommonHeaderKey/Descriptor\" has invalid length (%d)\n", (int)b64_strlen(exhdrset->rsf->CommonHeaderKey.AccCtlDescBin));
 		return COMMON_HEADER_KEY_NOT_FOUND;
 	}
 

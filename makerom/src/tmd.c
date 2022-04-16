@@ -33,7 +33,7 @@ int BuildTMD(cia_settings *ciaset)
 	result = SetupTMDHeader(hdr,info_record,ciaset);
 	if(result) return result;
 	result = SignTMDHeader(hdr,sig,ciaset->keys);
-	return 0;
+	return result;
 }
 
 int SetupTMDBuffer(buffer_struct *tmd)
@@ -73,12 +73,20 @@ int SignTMDHeader(tmd_hdr *hdr, tmd_signature *sig, keys_struct *keys)
 	
 	if (Rsa2048Key_CanSign(&keys->rsa.cp) == false)
 	{
-		printf("[TMD WARNING] Failed to sign header\n");
+		printf("[TMD WARNING] Failed to sign header (key was incomplete)\n");
 		memset(sig->data, 0xFF, 0x100);
 		return 0;
 	}
 
-	return RsaSignVerify((u8*)hdr, sizeof(tmd_hdr), sig->data, keys->rsa.cp.pub, keys->rsa.cp.pvt, RSA_2048_SHA256, CTR_RSA_SIGN);
+	int rsa_ret = RsaSignVerify((u8*)hdr, sizeof(tmd_hdr), sig->data, keys->rsa.cp.pub, keys->rsa.cp.pvt, RSA_2048_SHA256, CTR_RSA_SIGN);
+	if (rsa_ret != 0)
+	{
+		printf("[TMD WARNING] Failed to sign header (mbedtls error = -0x%x)\n", -rsa_ret);
+		memset(sig->data, 0xFF, 0x100);
+		return 0;
+	}
+
+	return 0;
 }
 
 int SetupTMDInfoRecord(tmd_content_info_record *info_record, u8 *content_record, u16 ContentCount)
