@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
 		result = build_NCCH(set);
 		if(result < 0) { 
 			//fprintf(stderr,"[ERROR] %s generation failed\n",set->build_ncch_type == CXI? "CXI" : "CFA"); 
-			fprintf(stderr,"[RESULT] Failed to build outfile\n"); 
+			fprintf(stderr,"[RESULT] Failed to build NCCH (ret = %d)\n", result); 
 			goto finish; 
 		}	
 	}
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
 	if(set->common.outFormat == CCI){
 		result = build_CCI(set);
 		if(result < 0) { 
-			fprintf(stderr,"[RESULT] Failed to build CCI\n");
+			fprintf(stderr,"[RESULT] Failed to build CCI (ret = %d)\n", result); 
 			goto finish; 
 		}
 	}
@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
 	else if(set->common.outFormat == CIA){
 		result = build_CIA(set);
 		if(result < 0) { 
-			fprintf(stderr,"[RESULT] Failed to build CIA\n"); 
+			fprintf(stderr,"[RESULT] Failed to build CIA (ret = %d)\n", result); 
 			goto finish; 
 		}
 	}
