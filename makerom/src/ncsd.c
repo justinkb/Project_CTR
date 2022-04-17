@@ -586,7 +586,15 @@ int GenCciHdr(cci_settings *set)
 		return 0;
 	}
 
-	return RsaSignVerify(&hdr->magic, sizeof(cci_hdr) - RSA_2048_KEY_SIZE, hdr->signature, set->keys->rsa.cciCfa.pub, set->keys->rsa.cciCfa.pvt, RSA_2048_SHA256, CTR_RSA_SIGN);
+	int rsa_ret = RsaSignVerify(&hdr->magic, sizeof(cci_hdr) - RSA_2048_KEY_SIZE, hdr->signature, set->keys->rsa.cciCfa.pub, set->keys->rsa.cciCfa.pvt, RSA_2048_SHA256, CTR_RSA_SIGN);
+	if (rsa_ret != 0)
+	{
+		printf("[NCSD WARNING] Failed to sign header (mbedtls error = -0x%x)\n", -rsa_ret);
+		memset(hdr->signature, 0xFF, 0x100);
+		return 0;
+	}
+
+	return 0;
 }
 
 char* GetMediaSizeStr(u64 mediaSize)
