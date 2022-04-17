@@ -80,6 +80,9 @@ int LoadKeysFromResources(keys_struct *keys)
 		SetNormalKey(keys,zeros_aesKey);
 		SetSystemFixedKey(keys,zeros_aesKey);
 
+		// CCI
+		SetCciInitialDataKeyX(keys, zeros_aesKey);
+
 		/* RSA Keys */
 		// CIA
 		Rsa2048Key_Set(&keys->rsa.xs, tpki_rsa.priv_exponent, tpki_rsa.modulus);
@@ -112,6 +115,9 @@ int LoadKeysFromResources(keys_struct *keys)
 		for(int i = 0; i < 4; i++)
 			SetNcchKeyX(keys, dev_unfixed_ncch_keyX[i],i);
 		
+		// CCI
+		SetCciInitialDataKeyX(keys, dev_initial_data_keyx);
+
 		/* RSA Keys */
 		// CIA
 		Rsa2048Key_Set(&keys->rsa.xs, xs9_dpki_rsa.priv_exponent, xs9_dpki_rsa.modulus);
@@ -143,6 +149,8 @@ int LoadKeysFromResources(keys_struct *keys)
 		for(int i = 0; i < 4; i++)
 			SetNcchKeyX(keys, prod_unfixed_ncch_keyX[i],i);
 		
+		// CCI
+		SetCciInitialDataKeyX(keys, dev_initial_data_keyx);
 
 		/* RSA Keys */
 		// CIA
@@ -360,6 +368,12 @@ int SetSystemFixedKey(keys_struct *keys, const u8 *key)
 {
 	if(!keys) return -1;
 	return CopyData(&keys->aes.systemFixedKey,key,16);
+}
+
+int SetCciInitialDataKeyX(keys_struct *keys, const u8 *key)
+{
+	if(!keys) return -1;
+	return CopyData(&keys->aes.initialDataKeyX,key,16);
 }
 
 int SetCaCert(keys_struct *keys, const u8 *cert)

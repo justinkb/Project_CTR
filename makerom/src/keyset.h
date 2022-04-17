@@ -62,6 +62,9 @@ typedef struct
 		
 		u8 *ncchKey0;
 		u8 *ncchKey1;
+
+		// CCI
+		u8 *initialDataKeyX;
 	} aes;
 	
 	struct
@@ -96,6 +99,7 @@ int SetCommonKey(keys_struct *keys, const u8 *key, u8 Index);
 int SetCurrentCommonKey(keys_struct *keys, u8 Index);
 int SetNormalKey(keys_struct *keys, const u8 *key);
 int SetSystemFixedKey(keys_struct *keys, const u8 *key);
+int SetCciInitialDataKeyX(keys_struct *keys, const u8 *key);
 
 void Rsa2048Key_Alloc(rsa2048_key* key);
 void Rsa2048Key_Free(rsa2048_key* key);
