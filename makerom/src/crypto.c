@@ -4,8 +4,6 @@
 #include <mbedtls/aes.h>
 #include <mbedtls/rsa.h>
 #include <mbedtls/md.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/ctr_drbg.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/sha256.h>
 
@@ -199,32 +197,11 @@ int RsaSignVerify(void *data, u64 len, u8 *sign, u8 *mod, u8 *priv_exp, u32 sig_
 
 	if(rsa_mode == CTR_RSA_VERIFY)
 	{
-		//rsa_result = rsa_pkcs1_verify(&ctx, RSA_PUBLIC, GetRsaHashType(sig_type), 0, hash, sign);
 		rsa_result = mbedtls_rsa_rsassa_pkcs1_v15_verify(&ctx, NULL, NULL, MBEDTLS_RSA_PUBLIC, getMdWrappedHashType(sig_type), GetSigHashLen(sig_type), hash, sign);
 	}
 	else // CTR_RSA_SIGN
 	{
-		// mbedtls API requires we init their PRBG before signing, but it isn't strictly required for the specific signture type we are generating
-
-		mbedtls_entropy_context entropy;
-		mbedtls_ctr_drbg_context ctr_drbg;
-
-		mbedtls_entropy_init( &entropy );
-		mbedtls_ctr_drbg_init( &ctr_drbg );
-
-		// init PRBG 
-		const char* pers = "RsaSignVerify";
-		rsa_result = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const uint8_t*)pers, strlen(pers));
-		
-		// if initing the PRBG succeeded we can sign
-		if (rsa_result == 0)
-		{
-			//rsa_result = rsa_rsassa_pkcs1_v15_sign(&ctx, RSA_PRIVATE, GetRsaHashType(sig_type), 0, hash, sign);
-			rsa_result = mbedtls_rsa_rsassa_pkcs1_v15_sign(&ctx, mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PRIVATE, getMdWrappedHashType(sig_type), GetSigHashLen(sig_type), hash, sign);
-		} 
-
-		mbedtls_ctr_drbg_free( &ctr_drbg );
-		mbedtls_entropy_free( &entropy );
+		rsa_result = mbedtls_rsa_rsassa_pkcs1_v15_sign(&ctx, NULL, NULL, MBEDTLS_RSA_PRIVATE, getMdWrappedHashType(sig_type), GetSigHashLen(sig_type), hash, sign);
 	}
 		
 	
