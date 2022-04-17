@@ -1,4 +1,8 @@
 #include "lib.h"
+
+#include <mbedtls/ccm.h>
+#include "aes_keygen.h"
+
 #include "ncch_read.h"
 #include "ncsd_build.h"
 #include "cardinfo.h"
@@ -8,8 +12,7 @@ int SetWriteableAddress(cardinfo_hdr *hdr, cci_settings *set);
 int SetCardInfoBitmask(cardinfo_hdr *hdr, cci_settings *set);
 int SetCardInfoNotes(cardinfo_hdr *hdr, cci_settings *set);
 void SetNcchHeader(cardinfo_hdr *hdr, cci_settings *set);
-void SetCardSeedData(cardinfo_hdr *hdr, cci_settings *set);
-void SetDevCardInfo(devcardinfo_hdr *hdr, cci_settings *set);
+void SetCardSeedData(cardinfo_hdr *hdr, devcardinfo_hdr *devhdr, cci_settings *set);
 
 
 int GenCardInfoHdr(cci_settings *set)
@@ -26,30 +29,20 @@ int GenCardInfoHdr(cci_settings *set)
 	if(SetCardInfoNotes(cihdr,set))
 		return GEN_HDR_FAIL;
 	SetNcchHeader(cihdr,set);
-	SetCardSeedData(cihdr,set);
-	
-	if(dcihdr)
-		SetDevCardInfo(dcihdr,set);
+	SetCardSeedData(cihdr,dcihdr,set);
 	
 	return 0;
 }
 
 void InitCardInfoHdr(cardinfo_hdr **cihdr, devcardinfo_hdr **dcihdr, cci_settings *set)
 {
-	set->headers.cardinfohdr.size = sizeof(cardinfo_hdr);
-	if(set->options.useExternalSdkCardInfo)
-		set->headers.cardinfohdr.size += sizeof(devcardinfo_hdr);
-		
+	set->headers.cardinfohdr.size = sizeof(cardinfo_hdr) + sizeof(devcardinfo_hdr);
 	set->headers.cardinfohdr.buffer = calloc(1,set->headers.cardinfohdr.size);
 	
 	*cihdr = (cardinfo_hdr*)set->headers.cardinfohdr.buffer;
+	*dcihdr = (devcardinfo_hdr*)(set->headers.cardinfohdr.buffer+sizeof(cardinfo_hdr));
 	
-	if(set->headers.cardinfohdr.size > sizeof(cardinfo_hdr))
-		*dcihdr = (devcardinfo_hdr*)(set->headers.cardinfohdr.buffer+sizeof(cardinfo_hdr));
-	else
-		*dcihdr = NULL;
-	
-	//clrmem(set->headers.cardinfohdr.buffer, set->headers.cardinfohdr.size);
+	clrmem(set->headers.cardinfohdr.buffer, set->headers.cardinfohdr.size);
 
 	return;
 }
@@ -128,12 +121,12 @@ int SetCardInfoBitmask(cardinfo_hdr *hdr, cci_settings *set)
 
 	char *str = set->rsf->CardInfo.CardType;
 	if(!str) 
-		bitmask |= 0;
+		bitmask |= 0 << 5;
 	else{
 		if(strcasecmp(str,"s1") == 0) 
-			bitmask |= 0;
+			bitmask |= 0 << 5;
 		else if(strcasecmp(str,"s2") == 0) 
-			bitmask |= 0x20;
+			bitmask |= 1 << 5;
 		else {
 			fprintf(stderr,"[CCI ERROR] Invalid CardType: %s\n",str);
 			return INVALID_RSF_OPT;
@@ -143,7 +136,7 @@ int SetCardInfoBitmask(cardinfo_hdr *hdr, cci_settings *set)
 	str = set->rsf->CardInfo.CryptoType;
 	if(!str) {
 		if(set->options.useExternalSdkCardInfo)
-			bitmask |= (3*0x40);
+			bitmask |= (3 << 6);
 		else
 			bitmask |= 0;
 	}
@@ -153,9 +146,14 @@ int SetCardInfoBitmask(cardinfo_hdr *hdr, cci_settings *set)
 			fprintf(stderr,"[CCI ERROR] Invalid CryptoType: %s\n",str);
 			return INVALID_RSF_OPT;
 		}
-		if(val != 3)
-			fprintf(stderr,"[CCI WARNING] Card crypto type = '%d'\n",val);
-		bitmask |= val * 0x40;
+		if(val != 3 && set->keys->keyset == pki_DEVELOPMENT) {
+			fprintf(stderr,"[CCI WARNING] Card crypto type = '%d', this is not supported for development target.\n",val);
+		}
+		if(val == 3 && set->keys->keyset == pki_PRODUCTION) {
+			fprintf(stderr,"[CCI WARNING] Card crypto type = '%d', this is not supported for production target.\n",val);
+		}
+			
+		bitmask |= val << 6;
 	}
 	
 	u32_to_u8(hdr->cardInfoBitmask,bitmask,BE);
@@ -189,7 +187,7 @@ void SetNcchHeader(cardinfo_hdr *hdr, cci_settings *set)
 	return;
 }
 
-void SetCardSeedData(cardinfo_hdr *hdr, cci_settings *set)
+void SetCardSeedData(cardinfo_hdr *hdr, devcardinfo_hdr *devhdr, cci_settings *set)
 {
 	u8 *ncch;
 	ncch_hdr *ncchHdr;
@@ -197,18 +195,81 @@ void SetCardSeedData(cardinfo_hdr *hdr, cci_settings *set)
 	ncch = set->content.data + set->content.dOffset[0];
 	ncchHdr = (ncch_hdr*)ncch;
 
+	/*
 	if (set->options.useExternalSdkCardInfo) {
+		// initial data
+		clrmem(hdr->cardSeedKeyY, 0x10);
 		memcpy(hdr->cardSeedKeyY, ncchHdr->titleId, 8);
 		clrmem(hdr->encCardSeed, 0x10);
 		memcpy(hdr->cardSeedMac, stock_card_seed_mac, 0x10);
 		clrmem(hdr->cardSeedNonce, 0xC);
+		
+		// dev card info
+		memcpy(devhdr->titleKey, stock_title_key, 0x10);
+		
+		return;
 	}
-	else {
+	*/
+	
+
+	// select title_key
+	u8 title_key[0x10] = {0};
+	if (set->options.useExternalSdkCardInfo)
+	{
+		memcpy(title_key, stock_title_key, 0x10);
+	}
+	else
+	{
+		rndset(title_key, 0x10);
+	}
+
+	// generate initial data
+	{
+		// set the keyY
+		clrmem(hdr->cardSeedKeyY, 0x10);
 		memcpy(hdr->cardSeedKeyY, ncchHdr->titleId, 8);
-		rndset(hdr->encCardSeed, 0x10);
-		rndset(hdr->cardSeedMac, 0x10);
-		rndset(hdr->cardSeedNonce, 0xC);
+
+		// use crypto type to determine initial data key
+		uint32_t crypto_type = (u8_to_u32(hdr->cardInfoBitmask, BE) >> 6) & 3;
+		u8 initial_data_key[0x10] = {0};
+		if (crypto_type == 3)
+		{
+			clrmem(initial_data_key, 0x10);
+		}
+		else
+		{
+			ctr_aes_keygen(set->keys->aes.initialDataKeyX, hdr->cardSeedKeyY, initial_data_key);
+		}
+
+		// determine nonce
+		if (set->options.useExternalSdkCardInfo)
+		{
+			clrmem(hdr->cardSeedNonce, 0xC);
+		}
+		else
+		{
+			rndset(hdr->cardSeedNonce, 0xC);
+		}
+
+		// encrypt title key (& generate MAC)
+		mbedtls_ccm_context ccm_ctx;
+		mbedtls_ccm_init(&ccm_ctx);
+		mbedtls_ccm_setkey(&ccm_ctx, MBEDTLS_CIPHER_ID_AES, initial_data_key, 128);
+
+		int ccm_ret = mbedtls_ccm_encrypt_and_tag(&ccm_ctx, sizeof(title_key), hdr->cardSeedNonce, sizeof(hdr->cardSeedNonce), NULL, 0, title_key, hdr->encCardSeed, hdr->cardSeedMac, sizeof(hdr->cardSeedMac));
+		if (ccm_ret != 0)
+		{
+			printf("[CARDINFO WARNING] Failed to encrypt initial data (mbedtls error: -0x%04X)\n", -ccm_ret);
+		}
+
+		mbedtls_ccm_free(&ccm_ctx);
 	}
+
+	// generate dev card info header
+	{
+		memcpy(devhdr->titleKey, title_key, 0x10);
+	}
+	
 		
 	return;
 }
