@@ -56,7 +56,7 @@ int build_CIA(user_settings *usrset)
 	if(result) {
 		fprintf(stderr,"[CIA ERROR] Failed to initialize context.\n");
 		goto finish;
-	} 
+	}
 
 	// Create Output File
 	ciaset->out = fopen(usrset->common.outFileName,"wb");
@@ -73,35 +73,35 @@ int build_CIA(user_settings *usrset)
 	if(result) {
 		fprintf(stderr,"[CIA ERROR] Failed to build Certificate Chain\n");
 		goto finish;
-	} 
+	}
 
 	/* Ticket */
 	result = BuildTicket(ciaset);
 	if(result) {
 		fprintf(stderr,"[CIA ERROR] Failed to build Ticket\n");
 		goto finish;
-	} 
+	}
 
 	/* Title Metadata */
 	result = BuildTMD(ciaset);
 	if(result) {
 		fprintf(stderr,"[CIA ERROR] Failed to build Title Metadata\n");
 		goto finish;
-	} 
+	}
 
 	/* CIA Header */
 	result = BuildCiaHdr(ciaset);
 	if(result) {
 		fprintf(stderr,"[CIA ERROR] Failed to build CIA Header\n");
 		goto finish;
-	} 
+	}
 	
 	/* Write To File */
 	result = WriteCiaToFile(ciaset);
 	if(result) {
 		fprintf(stderr,"[CIA ERROR] Failed to write CIA to file\n");
 		goto finish;
-	} 
+	}
 
 finish:
 	if(result != FAILED_TO_CREATE_OUTFILE && ciaset->out) 
