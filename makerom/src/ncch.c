@@ -75,6 +75,8 @@ int SignCXI(ncch_hdr *hdr, keys_struct *keys)
 		memset(GetNcchHdrSig(hdr), 0xFF, 0x100);
 		return 0;
 	}
+
+	return 0;
 }
 
 int CheckCXISignature(ncch_hdr *hdr, u8 *pubk)
@@ -97,49 +99,79 @@ int build_NCCH(user_settings *usrset)
 
 	// Get Settings
 	result = GetNcchSettings(ncchset,usrset);
-	if(result) goto finish;
+	if(result) {
+		fprintf(stderr,"[NCCH ERROR] Failed to initialize context.\n");
+		goto finish;
+	}
 
 	// Import Data
 	result = ImportNonCodeExeFsSections(ncchset);
-	if(result) return result;
+	if(result) {
+		fprintf(stderr,"[NCCH ERROR] Failed to import non-code ExeFs sections\n");
+		goto finish;
+	}
 	
 	result = ImportLogo(ncchset);
-	if(result) return result;
+	if(result) {
+		fprintf(stderr,"[NCCH ERROR] Failed to import Logo\n");
+		goto finish;
+	}
 
 	if(!ncchset->options.IsCfa){ // CXI Specific Sections
 		// Build ExeFs Code Section\n");
 		result = BuildExeFsCode(ncchset);
-		if(result) goto finish;
+		if(result) {
+			fprintf(stderr,"[NCCH ERROR] Failed to build ExeFs code\n");
+			goto finish;
+		}
 	
 		// Build ExHeader\n");
 		result = BuildExHeader(ncchset);
-		if(result) goto finish;
+		if(result) {
+			fprintf(stderr,"[NCCH ERROR] Failed to build ExHeader\n");
+			goto finish;
+		}
 	}	
 
 	
 	// Build ExeFs\n");
 	result = BuildExeFs(ncchset);
-	if(result) goto finish;
+	if(result) {
+		fprintf(stderr,"[NCCH ERROR] Failed to build ExeFs\n");
+		goto finish;
+	}
 
 	
 	// Prepare for RomFs\n");
 	romfs_buildctx romfs;
 	memset(&romfs,0,sizeof(romfs_buildctx));
 	result = SetupRomFs(ncchset,&romfs);
-	if(result) goto finish;
+	if(result) {
+		fprintf(stderr,"[NCCH ERROR] Failed to setup RomFs\n");
+		goto finish;
+	}
 
 	
 	// Setup NCCH including final memory allocation\n");
 	result = SetupNcch(ncchset,&romfs);
-	if(result) goto finish;
+	if(result) {
+		fprintf(stderr,"[NCCH ERROR] Failed to setup NCCH\n");
+		goto finish;
+	}
 
 	// Build RomFs\n");
 	result = BuildRomFs(&romfs);
-	if(result) goto finish;
+	if(result) {
+		fprintf(stderr,"[NCCH ERROR] Failed to build RomFs\n");
+		goto finish;
+	}
 	
 	// Finalise NCCH (Hashes/Signatures and crypto)\n");
 	result = FinaliseNcch(ncchset);
-	if(result) goto finish;
+	if(result) {
+		fprintf(stderr,"[NCCH ERROR] Failed to finalize NCCH\n");
+		goto finish;
+	}
 
 finish:
 	if(result) 
