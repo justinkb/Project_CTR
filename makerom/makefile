@@ -85,7 +85,7 @@ else ifeq ($(PROJECT_PLATFORM), GNU)
 	# GNU/Linux Flags/Libs
 	#CC = 
 	#CXX =
-	DEFINEFLAGS = -D_BSD_SOURCE
+	DEFINEFLAGS = -D_DEFAULT_SOURCE
 	WARNFLAGS = -Wall -Wno-unused-value -Wno-unused-but-set-variable
 	ARCHFLAGS =
 	INC +=
