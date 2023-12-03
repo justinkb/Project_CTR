@@ -23,6 +23,13 @@ ifeq ($(ROOT_PROJECT_NAME),)
 	export ROOT_PROJECT_DEPENDENCY_PATH = $(ROOT_PROJECT_PATH)/deps
 endif
 
+# Shared Library Definitions
+PROJECT_SO_VER_MAJOR = 0
+PROJECT_SO_VER_MINOR = 1
+PROJECT_SO_VER_PATCH = 0
+PROJECT_SONAME = $(PROJECT_NAME).so.$(PROJECT_SO_VER_MAJOR)
+PROJECT_SO_FILENAME = $(PROJECT_SONAME).$(PROJECT_SO_VER_MINOR).$(PROJECT_SO_VER_PATCH)
+
 # Project Dependencies
 PROJECT_DEPEND = 
 PROJECT_DEPEND_LOCAL_DIR = 
@@ -152,6 +159,10 @@ clean_object_files:
 static_lib: $(SRC_OBJ) create_binary_dir
 	@echo LINK $(PROJECT_BIN_PATH)/$(PROJECT_NAME).a
 	@ar $(ARFLAGS) "$(PROJECT_BIN_PATH)/$(PROJECT_NAME).a" $(SRC_OBJ)
+
+shared_lib: $(SRC_OBJ) create_binary_dir
+	@echo LINK $(PROJECT_BIN_PATH)/$(PROJECT_SO_FILENAME)
+	@gcc -shared -Wl,-soname,$(PROJECT_SONAME) -o "$(PROJECT_BIN_PATH)/$(PROJECT_SO_FILENAME)" $(SRC_OBJ)
 
 # Build Program
 program: $(SRC_OBJ) create_binary_dir
